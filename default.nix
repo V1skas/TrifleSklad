@@ -6,6 +6,7 @@ pkgs.mkShell {
     pyenv
 
     zlib.dev
+    unzip
     libffi.dev
     readline.dev
     bzip2.dev
