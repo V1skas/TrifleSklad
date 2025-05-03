@@ -4,7 +4,7 @@ import reflex as rx
 
 from rxconfig import config
 
-from TrifleSklad import routes, state
+from TrifleSklad import routes, state, models, authorithation
 
 
 def index() -> rx.Component:
@@ -40,3 +40,4 @@ app = rx.App(
         )
 )
 app.add_page(index, route=routes.INDEX)
+app.add_page(authorithation.frontend.index, route=routes.LOGIN)
