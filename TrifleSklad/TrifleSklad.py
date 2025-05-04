@@ -4,32 +4,7 @@ import reflex as rx
 
 from rxconfig import config
 
-from TrifleSklad import routes, state, models, authorithation
-
-
-def index() -> rx.Component:
-    # Welcome Page (Index)
-    return rx.container(
-        rx.color_mode.button(position="top-right"),
-        rx.vstack(
-            rx.heading("Welcome to Reflex!", size="9"),
-            rx.text(
-                "Get started by editing ",
-                rx.code(f"{config.app_name}/{config.app_name}.py"),
-                size="5",
-            ),
-            rx.link(
-                rx.button("Check out our docs!"),
-                href="https://reflex.dev/docs/getting-started/introduction/",
-                is_external=True,
-            ),
-            spacing="5",
-            justify="center",
-            min_height="85vh",
-        ),
-        rx.logo(),
-    )
-
+from TrifleSklad import frontend, routes
 
 app = rx.App(
     theme=rx.theme(
@@ -39,5 +14,5 @@ app = rx.App(
             accent_color="blue",
         )
 )
-app.add_page(index, route=routes.INDEX)
-app.add_page(authorithation.frontend.index, route=routes.LOGIN)
+app.add_page(frontend.welcome_page, route=routes.WELCOME)
+app.add_page(frontend.auth_page, route=routes.LOGIN)
