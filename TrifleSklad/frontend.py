@@ -1,6 +1,6 @@
 import reflex as rx
 
-from TrifleSklad import authorithation, routes
+from TrifleSklad import authorithation, administration, routes
 
 def navbar_link(text: str, url: str) -> rx.Component:
     return rx.hstack(
@@ -27,12 +27,16 @@ def navbar_link(text: str, url: str) -> rx.Component:
 def navbar() -> rx.Component:
     return rx.box(
         rx.hstack(
-            rx.hstack(
-                rx.heading("Trifle", size="7", color=rx.color("accent", 3), background_color=rx.color("accent", 9), padding="0.1em", padding_left="0.3em", padding_right="0.3em"),
-                rx.heading("Склад", size="7", color=rx.color("accent", 9), background_color="transparent", padding="0.1em"),
+            rx.link(
+                rx.hstack(
+                    rx.heading("Trifle", size="7", color=rx.color("accent", 3), background_color=rx.color("accent", 9), padding="0.1em", padding_left="0.3em", padding_right="0.3em"),
+                    rx.heading("Склад", size="7", color=rx.color("accent", 9), background_color="transparent", padding="0.1em"),
 
-                align_items="center",
-                padding="1em",
+                    align_items="center",
+                    padding="1em",
+                    spacing="1",
+                ),
+                href=routes.WELCOME,
             ),
             rx.hstack(
                 navbar_link("Администрирование", routes.ADMIN),
@@ -104,3 +108,10 @@ def welcome_page() -> rx.Component:
         width="100%",
     )
 
+def administration_page() -> rx.Component:
+    return rx.vstack(
+        navbar(),
+        administration.frontend.index(),
+
+        width="100%",
+    )

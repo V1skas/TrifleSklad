@@ -16,3 +16,4 @@ app = rx.App(
 )
 app.add_page(frontend.welcome_page, route=routes.WELCOME)
 app.add_page(frontend.auth_page, route=routes.LOGIN)
+app.add_page(frontend.administration_page, route=routes.ADMIN)
