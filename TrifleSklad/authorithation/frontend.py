@@ -1,19 +1,15 @@
 import reflex as rx
 
-from TrifleSklad import routes
+from components import decor
 
+from TrifleSklad import routes
 from TrifleSklad.authorithation.backend import AuthorizationState
 
 def login_card() -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.center(
-                rx.center(
-                    rx.heading("Trifle", size="9", color=rx.color("accent", 1), background_color=rx.color("accent", 9), padding="0.1em", padding_left="0.3em", padding_right="0.3em"),
-                    rx.heading("Склад", size="9", color=rx.color("accent", 9), background_color="transparent", padding="0.1em"),
-
-                    width="100%"
-                ),
+                decor.logo(size="9", width="100%"),
                 rx.divider(),
                 rx.heading(
                     "Войдите в Ваш аккаунт",

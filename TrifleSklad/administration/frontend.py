@@ -1,6 +1,7 @@
 from turtle import width
 import reflex as rx
 
+from TrifleSklad import routes
 from TrifleSklad.administration.backend import AdministrationState
 
 def roles():
@@ -11,32 +12,53 @@ def roles():
 def users():
     return rx.text("Users")
 
+def sidebar_link(text: str, url: str):
+    return rx.link(
+        rx.button(
+            text,
+
+            radius="none",
+            variant="soft",
+            color=rx.color("accent", 11),
+
+            border_radius="0",
+
+            _hover={
+                "color": rx.color("accent", 12),
+                "transform": "translateX(5px)",
+                "transition": "all 0.1s ease-in-out",
+                "border_left": f"4px solid {rx.color('accent', 9)}",
+            },
+
+            size="3",
+
+            width="100%",
+        ),
+
+        href=url,
+    )
+
 def sidebar():
     return rx.card(
         rx.vstack(
             rx.heading("Меню", size="6", color=rx.color("accent", 3), bg=rx.color("accent", 9), height="50px", text_align="center", line_height="50px"),
-            rx.button(
-                "Роли",
-                size="3",
-                radius="none",
-                variant='soft',
-                #on_click=rx.redirect(AdministrationState.Tabs.ROLES)
+            sidebar_link("Роли", routes.ADMIN),
+            sidebar_link("Пользователи", routes.ADMIN),
+            rx.box(
+                background_color=rx.color("accent", 9),
+                height="1em",
             ),
-            rx.button(
-                "Пользователи",
-                size="3",
-                radius="none",
-                variant='soft',
-                #on_click=rx.redirect(AdministrationState.Tabs.USERS)
-            ),
+
             spacing="0",
             align_items="stretch",
             width="100%",
         ),
-
+        
         padding="0",
         margin_left="1em",
+
         size="4",
+
         width="23em",
     )
 
