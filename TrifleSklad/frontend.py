@@ -43,7 +43,7 @@ def navbar() -> rx.Component:
                 href=routes.WELCOME,
             ),
             rx.hstack(
-                navbar_link("Администрирование", routes.ADMIN),
+                navbar_link("Администрирование", routes.ADMIN_WELCOME),
                 navbar_link("Item 2", "#"),
                 navbar_link("Item 3", "#"),
 

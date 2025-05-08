@@ -1,5 +1,5 @@
 import reflex as rx
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from TrifleSklad.models import Role
 from TrifleSklad.dao import RoleDAO
@@ -12,12 +12,20 @@ class RoleState(rx.State):
 
     current_page: str = Pages.VIEW
 
-    items: Optional[List[Role]] = None
-    selected_item: Optional[Role]
+    items: List[Role] = []
+    selected_item: int = -1
 
     @rx.var
     def get_current_page(self) -> str:
         return self.current_page
+    
+    @rx.var
+    def get_current_item(self) -> Tuple[int, Role]:
+        return (self.selected_item, self.items[self.selected_item]) if self.selected_item != -1 else (-1, Role())
+    
+    @rx.var
+    def get_items(self) -> List[Tuple[int, Role]]:
+        return [(index, item) for index, item in enumerate(self.items)]
 
     @rx.var
     def has_items(self) -> bool:
@@ -28,7 +36,7 @@ class RoleState(rx.State):
     
     @rx.var
     def has_selected_item(self) -> bool:
-        if self.selected_item is not None:
+        if self.selected_item != -1:
             return True
         return False
 
@@ -37,7 +45,7 @@ class RoleState(rx.State):
         self.items = RoleDAO.get_all()
 
     @rx.event
-    def set_select_item(self, item: Optional[Role]):
+    def set_select_item(self, item: int):
         self.selected_item = item
 
     @rx.event

@@ -4,13 +4,17 @@ import reflex as rx
 from TrifleSklad import routes
 from TrifleSklad.administration.backend import AdministrationState
 
+import TrifleSklad.administration.actions as actions
+
 def roles():
     return rx.vstack(
         rx.heading("Роли", size="7"),
     )
 
 def users():
-    return rx.text("Users")
+    return rx.vstack(
+        rx.heading("Пользователи", size="7"),
+    )
 
 def sidebar_link(text: str, url: str):
     return rx.link(
@@ -42,8 +46,20 @@ def sidebar():
     return rx.card(
         rx.vstack(
             rx.heading("Меню", size="6", color=rx.color("accent", 3), bg=rx.color("accent", 9), height="50px", text_align="center", line_height="50px"),
-            sidebar_link("Роли", routes.ADMIN),
-            sidebar_link("Пользователи", routes.ADMIN),
+            sidebar_link("Роли", routes.ADMIN_ROLES),
+            sidebar_link("Пользователи", routes.ADMIN_USERS),
+            rx.dialog.root(
+                rx.dialog.trigger(
+                    sidebar_link("Действия", "#"),
+                ),
+                rx.dialog.content(
+                    actions.frontend.index(height="50em"),
+
+                    padding="0",
+                ),
+
+                on_open_change=actions.backend.ActionsState.load_items,
+            ),
             rx.box(
                 background_color=rx.color("accent", 9),
                 height="1em",
@@ -58,7 +74,7 @@ def sidebar():
         margin_left="1em",
 
         size="4",
-
+        
         width="23em",
     )
 
@@ -74,8 +90,13 @@ def workspace():
 
             value=AdministrationState.Tabs.USERS,
         ),
+        rx.tabs.content(
+            rx.text("Welcome"),
 
-        value=AdministrationState.Tabs.ROLES,
+            value=AdministrationState.Tabs.WELCOME,
+        ),
+
+        value=AdministrationState.current_tab,
         width="100%",
         height="100%",
     )
@@ -86,5 +107,5 @@ def index():
         workspace(),
 
         width="100%",
-        height="100%",
+        height="100%"
     )

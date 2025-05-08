@@ -13,6 +13,11 @@ class AppState(rx.State):
     @rx.var
     def is_authenticated(self) -> bool:
         return self.user is not None
+    
+    @rx.event
+    def check_params(self):
+        print(self.router.page.path)
+        print(self.router.page.params)
 
     @rx.event
     def check_user_actions(self, action: str) -> bool:

@@ -1,12 +1,13 @@
 import reflex as rx
 
+from TrifleSklad import routes
 from TrifleSklad.administration.roles.backend import *
 
-def item_preview(item: Role):
+def item_preview(item: Tuple[int, Role]) -> rx.Component:
     return rx.vstack(
-        rx.heading(item.title),
-        rx.text(item.description),
-        rx.button("Редактировать", on_click=[RoleState.set_select_item(item), RoleState.set_current_page(RoleState.Pages.EDIT)]),
+        rx.heading(item[1].title),
+        rx.text(item[1].description),
+        rx.button("Редактировать", on_click=[RoleState.set_select_item(item[0]), RoleState.set_current_page(RoleState.Pages.EDIT)]),
         height="100%",
         width="100%"
     )
@@ -16,7 +17,7 @@ def table_row(item: Role) -> rx.Component:
         rx.table.row_header_cell(
             rx.dialog.root(
                 rx.dialog.trigger(
-                    rx.link(item.title)
+                    rx.link(item.title, href=f"{routes.ADMIN_ROLES}/{item.id}"),
                 ),
                 rx.dialog.content(
                     item_preview(item)
@@ -32,15 +33,17 @@ def table() -> rx.Component:
             rx.table.row(
                 rx.table.column_header_cell("Название", color=rx.color("accent", 2)),
             ),
+
             background_color=rx.color("accent", 9),
         ),
         rx.table.body(
-            rx.foreach(RoleState.items, table_row),
+            rx.foreach(RoleState.get_items, table_row),
+
             height="100px",
             width="100%"
         ),
         variant="surface",
-        height="300px",
+        height="100%",
         width="100%"
     )
 
@@ -52,7 +55,12 @@ def view_tab_content() -> rx.Component:
                 table(),
                 rx.text("Записей нет.")
             ),
+            rx.hstack(
+                rx.button("Добавить", on_click=RoleState.set_current_page(RoleState.Pages.ADD)),
+                justify="end"
+            ),
         ),
+
         value=RoleState.Pages.VIEW,
     )
 
@@ -117,6 +125,7 @@ def index():
         view_tab_content(),
         add_tab_content(),
         edit_tab_content(),
+
         value=RoleState.get_current_page,
         default_value=RoleState.Pages.VIEW,
         height="100%",
