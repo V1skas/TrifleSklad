@@ -34,7 +34,7 @@ class Role(rx.Model, table=True):
     # Table columns
     id: int = Field(primary_key=True)
     title: str
-    description: Optional[str]
+    description: str = ""
 
     # Relationships
     actions: Optional[List['Action']] = Relationship(back_populates="roles", link_model=RolesActions)

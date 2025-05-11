@@ -5,13 +5,17 @@ from TrifleSklad import routes
 from TrifleSklad.administration.backend import AdministrationState
 
 import TrifleSklad.administration.actions as actions
+import TrifleSklad.administration.roles as roles
 
-def roles():
+def roles_tab():
     return rx.vstack(
-        rx.heading("Роли", size="7"),
+        roles.frontend.index(),
+
+        width="100%",
+        height="100%",
     )
 
-def users():
+def users_tab():
     return rx.vstack(
         rx.heading("Пользователи", size="7"),
     )
@@ -58,7 +62,7 @@ def sidebar():
                     padding="0",
                 ),
 
-                on_open_change=actions.backend.ActionsState.load_items,
+                on_open_change=actions.backend.ActionsState.on_load([]),
             ),
             rx.box(
                 background_color=rx.color("accent", 9),
@@ -81,12 +85,12 @@ def sidebar():
 def workspace():
     return rx.tabs.root(
         rx.tabs.content(
-            roles(),
+            roles_tab(),
 
             value=AdministrationState.Tabs.ROLES,
         ),
         rx.tabs.content(
-            users(),
+            users_tab(),
 
             value=AdministrationState.Tabs.USERS,
         ),
@@ -97,6 +101,7 @@ def workspace():
         ),
 
         value=AdministrationState.current_tab,
+
         width="100%",
         height="100%",
     )
@@ -107,5 +112,5 @@ def index():
         workspace(),
 
         width="100%",
-        height="100%"
+        height="100%",
     )

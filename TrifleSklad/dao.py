@@ -78,7 +78,8 @@ class RoleDAO:
 
                 session.add(role)
                 session.commit()
-                return True, "Роль успешно добавлена"
+                session.refresh(role)
+                return True, "Роль успешно добавлена", role.id
             
             except IntegrityError:
                 session.rollback()
@@ -105,7 +106,8 @@ class RoleDAO:
                 
                 session.add(role)
                 session.commit()
-                return True, "Роль успешно изменена"
+                session.refresh(role)
+                return True, "Роль успешно изменена", role.id
             
             except IntegrityError:
                 session.rollback()
