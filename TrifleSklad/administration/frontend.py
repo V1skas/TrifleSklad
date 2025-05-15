@@ -75,14 +75,13 @@ def sidebar():
         ),
         
         padding="0",
-        margin_left="1em",
 
         size="4",
         
         width="23em",
     )
 
-def workspace():
+def workspace(**prop):
     return rx.tabs.root(
         rx.tabs.content(
             roles_tab(),
@@ -104,6 +103,8 @@ def workspace():
 
         width="100%",
         height="100%",
+
+        **prop
     )
 
 def index():
@@ -113,4 +114,7 @@ def index():
 
         width="100%",
         height="100%",
+
+        padding_left="1em",
+        padding_right="1em",
     )

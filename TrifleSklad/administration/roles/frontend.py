@@ -6,14 +6,48 @@ import TrifleSklad.administration.actions as actions
 
 from TrifleSklad.models import Role, Action
 
+#TODO: Улучшить внешний вид страниц добавления, редактирования и просмотра ролей
+
 def item_preview(item: Tuple[int, Role]) -> rx.Component:
     return rx.vstack(
         rx.heading(item[1].title, width="100%"),
         rx.text(item[1].description, width="100%"),
-        rx.button(
-            "Редактировать",
+        rx.text("Права"),
+        rx.card(
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        RoleState.has_selected_actions,
+                        rx.foreach(RoleState.selected_actions, list_action_item),
+                        rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
+                    ),
 
-            on_click=rx.redirect(routes.ADMIN_ROLES_EDIT_ID+str(item[1].id))
+                    spacing="1",
+
+                    width="100%",
+                    height="100%",
+                ),
+
+
+                spacing="1",
+                width="100%",
+            ),
+
+            width="100%",
+        ),
+        rx.hstack(
+            rx.button(
+                "Редактировать",
+
+                on_click=rx.redirect(f"{routes.ADMIN_ROLES_EDIT_ID}{item[1].id}")
+            ),
+            rx.spacer(),
+            rx.button(
+                "Удалить",
+                color_scheme="red",
+
+                on_click=RoleState.delete_one
+            ),
         ),
 
         height="100%",
@@ -30,16 +64,9 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: Tuple[int, Role]) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.link(
-                        item[1].title,
-                        href=routes.ADMIN_ROLES_VIEW_ID+str(item[1].id)
-                    ),
-                ),
-                rx.dialog.content(
-                    item_preview(item)
-                ),
+            rx.link(
+                item[1].title,
+                href=f"{routes.ADMIN_ROLES_VIEW_ID}{item[1].id}",
             ),
 
             align="left"
@@ -147,7 +174,7 @@ def add_form() -> rx.Component:
                                 rx.spacer(),
                                 rx.dialog.close(rx.button("Готово",
                                                         size="3",
-                                                        on_click=RoleState.set_selected_actions(actions.backend.ActionsState.get_selected_items_only)),),
+                                                        on_click=[RoleState.set_selected_actions(ActionsState.get_id_selected_items)]),),
 
                                 width="100%",
                             ),
@@ -185,9 +212,56 @@ def edit_form(item: Tuple[int, Role]) -> rx.Component:
                 rx.input(id="title", required=True, default_value=item[1].title),
                 rx.text("Описание"),
                 rx.input(id="description", default_value=item[1].description),
+                rx.text("Права"),
+                rx.card(
+                    rx.scroll_area(
+                        rx.vstack(
+                            rx.cond(
+                                RoleState.has_selected_actions,
+                                rx.foreach(RoleState.selected_actions, list_action_item),
+                                rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
+                            ),
+
+                            spacing="1",
+
+                            width="100%",
+                            height="100%",
+                        ),
+
+
+                        spacing="1",
+                        width="100%",
+                    ),
+
+                    width="100%",
+                ),
+                rx.dialog.root(
+                    rx.dialog.trigger(
+                        rx.button("Выбрать права", size="3", width="12em",)
+                    ),
+                    rx.dialog.content(
+                        actions.frontend.index(
+                            rx.hstack(
+                                rx.dialog.close(rx.button("Отмена", variant="surface", size="3"),),
+                                rx.spacer(),
+                                rx.dialog.close(rx.button("Готово",
+                                                        size="3",
+                                                        on_click=[RoleState.set_selected_actions(ActionsState.get_id_selected_items)]),),
+
+                                width="100%",
+                            ),
+
+                            height="50em",
+                        ),
+
+                        padding="0",
+
+                        on_open_auto_focus=[actions.backend.ActionsState.on_load(RoleState.selected_actions)]
+                    ),
+                ),
                 rx.hstack(
                     rx.button("Отмена", type="reset", color_scheme="red",
-                              on_click=rx.redirect(routes.ADMIN_ROLES_VIEW_ID+str(item[1].id))),
+                              on_click=rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{item[1].id}")),
                     rx.button("Сохранить", color_scheme="green", type="submit"),
 
                     justify="end"

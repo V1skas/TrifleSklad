@@ -18,17 +18,21 @@ def list_item(item: Tuple[int, Action]) -> rx.Component:
         border_color=rx.color("accent", 4),
         border_width="1px",
 
+        padding="calc(0.7em + 2px)",
+
         width="100%",
 
         _hover={
             "background_color": rx.color("accent", 6),
             "border_color": rx.color("accent", 8),
             "border_width": "1px",
+            "padding": "calc(0.7em + 2px)",
         },
         _active={
             "background_color": rx.color("accent", 8),
             "border_color": rx.color("accent", 8),
             "border_width": "3px",
+            "padding": "0.7em",
         },
 
         on_click=ActionsState.select_item(item[0]),
@@ -56,17 +60,21 @@ def list_item_selected(item: Tuple[int, Action]) -> rx.Component:
         border_color=rx.color("accent", 9),
         border_width="2px",
 
+        padding="calc(0.7em + 1px)",
+
         width="100%",
 
         _hover={
             "background_color": rx.color("accent", 6),
             "border_color": rx.color("accent", 8),
             "border_width": "2px",
+            "padding": "calc(0.7em + 1px)",
         },
         _active={
             "background_color": rx.color("accent", 8),
             "border_color": rx.color("accent", 8),
             "border_width": "3px",
+            "padding": "0.7em",
         },
 
         on_click=ActionsState.select_item(item[0]),

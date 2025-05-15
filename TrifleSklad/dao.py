@@ -44,23 +44,33 @@ class RoleDAO:
     @classmethod
     def get_all_with_relationships(cls) -> List[Role]:
         statement = select(Role).options(
-            joinedload(Role.actions),
-            joinedload(Role.users)
-        )
+            selectinload(Role.actions),
+            selectinload(Role.users)
+        ).where(Role.is_deleted == False)
         
         with rx.session() as session:
             return session.exec(statement).all()
         
     @classmethod
     def get_all(cls) -> List[Role]:
-        statement = select(Role)
+        statement = select(Role).where(Role.is_deleted == False)
         
         with rx.session() as session:
             return session.exec(statement).all()
         
     @classmethod
     def get_by_id(cls, id: str) -> Optional[Role]:
-        statement = select(Role).where(Role.id == id)
+        statement = select(Role).where(Role.id == id).where(Role.is_deleted == False)
+        
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod    
+    def get_by_id_with_relationships(cls, id) -> Optional[Role]:
+        statement = select(Role).options(
+            selectinload(Role.actions),
+            selectinload(Role.users)
+        ).where(Role.id == id).where(Role.is_deleted == False)
         
         with rx.session() as session:
             return session.exec(statement).one_or_none()
@@ -74,45 +84,75 @@ class RoleDAO:
                 statement = select(Role).where(Role.title == role.title)
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Роль с таким именем уже существует"
+                    return False, "Ошибка: Роль с таким именем уже существует", -1
 
                 session.add(role)
                 session.commit()
                 session.refresh(role)
                 return True, "Роль успешно добавлена", role.id
             
-            except IntegrityError:
+            except IntegrityError as e:
                 session.rollback()
-                return False, "Ошибка: Роль не может быть добавлена"
+                print("[RoleDAO] IntegrityError: ", e)
+                return False, "Ошибка: Роль не может быть добавлена", -1
             except SQLAlchemyError as e:
                 session.rollback()
-                return False, f"Ошибка: {str(e)}"
+                return False, f"Ошибка: {str(e)}", -1
             
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str]:
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
         with rx.session() as session:
             try:
                 role = session.get(Role, form_data["id"])
                 
                 if role is None:
-                    return False, "Ошибка: Роль не найдена"
+                    return False, "Ошибка: Роль не найдена", -1
                 
                 for key, value in form_data.items():
-                    setattr(role, key, value)
+                    if key == "actions":
+                        # value — список id действий, получаем объекты из базы
+                        actions = session.exec(select(Action).where(Action.id.in_(value))).all()
+                        setattr(role, key, actions)
+                    else:
+                        setattr(role, key, value)
                 
                 statement = select(Role).where(Role.title == role.title).where(Role.id != role.id)
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Роль с таким именем уже существует"
+                    return False, "Ошибка: Роль с таким именем уже существует", role.id
                 
-                session.add(role)
                 session.commit()
                 session.refresh(role)
                 return True, "Роль успешно изменена", role.id
             
+            except IntegrityError as e:
+                session.rollback()
+                print("[RoleDAO] IntegrityError: ", e)
+                return False, "Ошибка: Роль не может быть изменена", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[RoleDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+            
+    @classmethod
+    def delete_one(cls, id: str) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                role = session.get(Role, id)
+                
+                if role is None:
+                    return False, "Ошибка: Роль не найдена"
+                
+                session.delete(role)
+                session.commit()
+                return True, "Роль успешно удалена"
+            
             except IntegrityError:
                 session.rollback()
-                return False, "Ошибка: Роль не может быть изменена"
+                return False, "Ошибка: Роль не может быть удалена"
             except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
                 session.rollback()
                 return False, f"Ошибка: {str(e)}"
             
@@ -121,6 +161,20 @@ class ActionDAO:
     @classmethod
     def get_all(cls) -> List[Action]:
         statement = select(Action)
+        
+        with rx.session() as session:
+            return session.exec(statement).all()
+        
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[Action]:
+        statement = select(Action).where(Action.id == id)
+        
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+        
+    @classmethod
+    def get_by_list_id(cls, id_list: List[str]) -> List[Action]:
+        statement = select(Action).where(Action.id.in_(id_list))
         
         with rx.session() as session:
             return session.exec(statement).all()

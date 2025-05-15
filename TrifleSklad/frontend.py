@@ -104,7 +104,7 @@ def welcome_page() -> rx.Component:
             width="100%",
         ),
 
-        width="100%",
+        width="100vw",
     )
 
 def administration_page() -> rx.Component:
@@ -112,5 +112,5 @@ def administration_page() -> rx.Component:
         navbar(),
         administration.frontend.index(),
 
-        width="100%",
+        width="100vw",
     )

@@ -25,15 +25,15 @@ class ActionsState(rx.State):
         self.set_filter("")
 
     @rx.var
+    def get_id_selected_items(self) -> List[str]:
+        return [self.items[index].id for index in reversed(self.selected_items)] if len(self.selected_items) > 0 else []
+
+    @rx.var
     def get_selected_items(self) -> List[Tuple[int, Action]]:
         if self.filter != "":
             return [(index, self.items[index]) for index in reversed(self.selected_items_filtered)]
         else:
             return [(index, self.items[index]) for index in reversed(self.selected_items)]
-
-    @rx.var    
-    def get_selected_items_only(self) -> List[Action]:
-        return [self.items[index] for index in reversed(self.selected_items)] if len(self.selected_items) > 0 else []
     
     @rx.var
     def get_unselected_items(self) -> List[Tuple[int, Action]]:
