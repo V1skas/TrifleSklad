@@ -35,7 +35,6 @@ class Role(rx.Model, table=True):
     id: int = Field(primary_key=True)
     title: str
     description: str = ""
-    is_deleted: bool = False
 
     # Relationships
     actions: Optional[List['Action']] = Relationship(back_populates="roles", link_model=RolesActions)

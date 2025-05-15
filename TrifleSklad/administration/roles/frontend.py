@@ -6,35 +6,30 @@ import TrifleSklad.administration.actions as actions
 
 from TrifleSklad.models import Role, Action
 
-#TODO: Улучшить внешний вид страниц добавления, редактирования и просмотра ролей
-
 def item_preview(item: Tuple[int, Role]) -> rx.Component:
     return rx.vstack(
-        rx.heading(item[1].title, width="100%"),
+        rx.heading(item[1].title, size="7", width="100%"),
         rx.text(item[1].description, width="100%"),
-        rx.text("Права"),
-        rx.card(
-            rx.scroll_area(
-                rx.vstack(
-                    rx.cond(
-                        RoleState.has_selected_actions,
-                        rx.foreach(RoleState.selected_actions, list_action_item),
-                        rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
-                    ),
-
-                    spacing="1",
-
-                    width="100%",
-                    height="100%",
+        rx.heading("Права", size="3", width="100%"),
+        rx.scroll_area(
+            rx.vstack(
+                rx.cond(
+                    RoleState.has_selected_actions,
+                    rx.foreach(RoleState.selected_actions, list_action_item),
+                    rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
                 ),
 
-
                 spacing="1",
+
                 width="100%",
+                height="100%",
             ),
 
+
+            spacing="1",
             width="100%",
         ),
+        rx.spacer(),
         rx.hstack(
             rx.button(
                 "Редактировать",
@@ -48,7 +43,13 @@ def item_preview(item: Tuple[int, Role]) -> rx.Component:
 
                 on_click=RoleState.delete_one
             ),
+
+            width="100%",
         ),
+
+        justify="end",
+
+        spacing="3",
 
         height="100%",
         width="100%"
@@ -136,36 +137,33 @@ def add_form() -> rx.Component:
     return rx.card(
         rx.form(
             rx.vstack(
-                rx.text("Название"),
+                rx.text("Название:"),
                 rx.input(id="title", required=True, size="3"),
-                rx.text("Описание"),
+                rx.text("Описание:"),
                 rx.text_area(id="description", size="3"),
-                rx.text("Права"),
-                rx.card(
-                    rx.scroll_area(
-                        rx.vstack(
-                            rx.cond(
-                                RoleState.has_selected_actions,
-                                rx.foreach(RoleState.selected_actions, list_action_item),
-                                rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
-                            ),
-
-                            spacing="1",
-
-                            width="100%",
-                            height="100%",
+                rx.text("Права:"),
+                rx.scroll_area(
+                    rx.vstack(
+                        rx.cond(
+                            RoleState.has_selected_actions,
+                            rx.foreach(RoleState.selected_actions, list_action_item),
+                            rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
                         ),
 
-
                         spacing="1",
+
                         width="100%",
+                        height="100%",
                     ),
 
+
+                    spacing="1",
                     width="100%",
+                    max_height="90%",
                 ),
                 rx.dialog.root(
                     rx.dialog.trigger(
-                        rx.button("Выбрать права", size="3", width="12em",)
+                        rx.button("Выбрать права", size="2", width="12em",)
                     ),
                     rx.dialog.content(
                         actions.frontend.index(
@@ -208,36 +206,32 @@ def edit_form(item: Tuple[int, Role]) -> rx.Component:
     return rx.card(
         rx.form(
             rx.vstack(
-                rx.text("Название"),
+                rx.text("Название:"),
                 rx.input(id="title", required=True, default_value=item[1].title),
-                rx.text("Описание"),
-                rx.input(id="description", default_value=item[1].description),
-                rx.text("Права"),
-                rx.card(
-                    rx.scroll_area(
-                        rx.vstack(
-                            rx.cond(
-                                RoleState.has_selected_actions,
-                                rx.foreach(RoleState.selected_actions, list_action_item),
-                                rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
-                            ),
-
-                            spacing="1",
-
-                            width="100%",
-                            height="100%",
+                rx.text("Описание:"),
+                rx.text_area(id="description", default_value=item[1].description),
+                rx.text("Права:"),
+                rx.scroll_area(
+                    rx.vstack(
+                        rx.cond(
+                            RoleState.has_selected_actions,
+                            rx.foreach(RoleState.selected_actions, list_action_item),
+                            rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
                         ),
 
-
                         spacing="1",
+
                         width="100%",
+                        height="100%",
                     ),
 
+
+                    spacing="1",
                     width="100%",
                 ),
                 rx.dialog.root(
                     rx.dialog.trigger(
-                        rx.button("Выбрать права", size="3", width="12em",)
+                        rx.button("Выбрать права", size="2", width="12em",)
                     ),
                     rx.dialog.content(
                         actions.frontend.index(
@@ -279,7 +273,7 @@ def edit_form(item: Tuple[int, Role]) -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Добавление роли", size="7", width="100%"),
+        rx.heading("Добавление роли", size="7", width="100%", margin_bottom="0.5em"),
         add_form(),
 
         value=RoleState.Pages.ADD
@@ -287,7 +281,7 @@ def add_tab_content() -> rx.Component:
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редактирование роли", size="7", width="100%"),
+        rx.heading("Редактирование роли", size="7", width="100%", margin_bottom="0.5em"),
         edit_form(RoleState.get_selected_item),
 
         value=RoleState.Pages.EDIT

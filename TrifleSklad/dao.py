@@ -46,21 +46,21 @@ class RoleDAO:
         statement = select(Role).options(
             selectinload(Role.actions),
             selectinload(Role.users)
-        ).where(Role.is_deleted == False)
+        )
         
         with rx.session() as session:
             return session.exec(statement).all()
         
     @classmethod
     def get_all(cls) -> List[Role]:
-        statement = select(Role).where(Role.is_deleted == False)
+        statement = select(Role)
         
         with rx.session() as session:
             return session.exec(statement).all()
         
     @classmethod
     def get_by_id(cls, id: str) -> Optional[Role]:
-        statement = select(Role).where(Role.id == id).where(Role.is_deleted == False)
+        statement = select(Role).where(Role.id == id)
         
         with rx.session() as session:
             return session.exec(statement).one_or_none()
@@ -70,7 +70,7 @@ class RoleDAO:
         statement = select(Role).options(
             selectinload(Role.actions),
             selectinload(Role.users)
-        ).where(Role.id == id).where(Role.is_deleted == False)
+        ).where(Role.id == id)
         
         with rx.session() as session:
             return session.exec(statement).one_or_none()

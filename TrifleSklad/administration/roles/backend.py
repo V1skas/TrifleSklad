@@ -31,9 +31,10 @@ class RoleState(rx.State):
                 return rx.redirect(routes.ADMIN_ROLES)
             
             # /roles/add
-            # Дейсвтвий не требуется
+            if page == self.Pages.ADD:
+                id = Role()
             # /roles/edit/[id]
-            if page == self.Pages.EDIT:
+            elif page == self.Pages.EDIT:
                 id = self.router.page.params.get("id", "")
                 if id != "":
                     id = RoleDAO.get_by_id_with_relationships(id)
