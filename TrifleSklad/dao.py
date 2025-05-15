@@ -10,19 +10,37 @@ from TrifleSklad.models import *
 
 class UserDAO:
     @classmethod
+    def get_all(cls) -> List[User]:
+        statement = select(User).where(User.is_deleted == False)
+        
+        with rx.session() as session:
+            return session.exec(statement).all()
+        
+    @classmethod
+    def get_all_with_relationships(cls) -> List[User]:
+        statement = select(User).options(
+            selectinload(User.actions),
+            selectinload(User.roles),
+            selectinload(User.worker)
+        ).where(User.is_deleted == False)
+        
+        with rx.session() as session:
+            return session.exec(statement).all()
+
+    @classmethod
     def get_user_by_id_with_relationships(cls, id: str) -> Optional[User]:
         statement = select(User).options(
-                joinedload(User.actions),
-                joinedload(User.roles),
-                joinedload(User.worker)
-            ).where(User.login == id)
+                selectinload(User.actions),
+                selectinload(User.roles),
+                selectinload(User.worker)
+            ).where(User.login == id).where(User.is_deleted == False)
         
         with rx.session() as session:
             return session.exec(statement).one_or_none()
         
     @classmethod
     def get_user_by_id(cls, id: str) -> Optional[User]:
-        statement = select(User).where(User.login == id)
+        statement = select(User).where(User.login == id).where(User.is_deleted == False)
         
         with rx.session() as session:
             return session.exec(statement).one_or_none()
@@ -38,6 +56,95 @@ class UserDAO:
             result = session.exec(statement).all()
             print(result)
             return result
+        
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, str]:
+        user = User(**form_data)
+        
+        with rx.session() as session:
+            try:
+                statement = select(User).where(User.login == user.login)
+
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Пользователь с таким логином уже существует", -1
+
+                session.add(user)
+                session.commit()
+                session.refresh(user)
+                return True, "Пользователь успешно добавлен", user.login
+            
+            except IntegrityError as e:
+                session.rollback()
+                print("[UserDAO] IntegrityError: ", e)
+                return False, "Ошибка: Пользователь не может быть добавлен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}", -1
+            
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, str]:
+        with rx.session() as session:
+            try:
+                user = session.get(User, form_data["login"])
+                
+                if user is None:
+                    return False, "Ошибка: Пользователь не найден", -1
+
+                for key, value in form_data.items():
+                    if key == "actions":
+                        # value — список id действий, получаем объекты из базы
+                        actions = session.exec(select(Action).where(Action.id.in_(value))).all()
+                        setattr(user, key, actions)
+                    elif key == "roles":
+                        # value — список id ролей, получаем объекты из базы
+                        roles = session.exec(select(Role).where(Role.id.in_(value))).all()
+                        setattr(user, key, roles)
+                    else:
+                        setattr(user, key, value)
+                
+                statement = select(User).where(User.login == user.login).where(User.login != user.login)
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Пользователь с таким логином уже существует", user.login
+                
+                session.commit()
+                session.refresh(user)
+                return True, "Пользователь успешно изменен", user.login
+            
+            except IntegrityError as e:
+                session.rollback()
+                print("[UserDAO] IntegrityError: ", e)
+                return False, "Ошибка: Пользователь не может быть изменен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[UserDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+            except Exception as e:
+                session.rollback()
+                print("[UserDAO] Exception: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+            
+    @classmethod
+    def delete_one(cls, id: str) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                user = session.get(User, id)
+                
+                if user is None:
+                    return False, "Ошибка: Пользователь не найден"
+                
+                user.is_deleted = True
+                session.commit()
+                return True, "Пользователь успешно удален"
+            
+            except IntegrityError:
+                session.rollback()
+                return False, "Ошибка: Пользователь не может быть удален"
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
         
 
 class RoleDAO:
@@ -74,6 +181,13 @@ class RoleDAO:
         
         with rx.session() as session:
             return session.exec(statement).one_or_none()
+        
+    @classmethod
+    def get_by_list_id(cls, id_list: List[int]) -> List[Role]:
+        statement = select(Role).where(Role.id.in_(id_list))
+        
+        with rx.session() as session:
+            return session.exec(statement).all()
         
     @classmethod
     def add_one(cls, form_data: dict) -> tuple[bool, str]:
@@ -178,3 +292,106 @@ class ActionDAO:
         
         with rx.session() as session:
             return session.exec(statement).all()
+        
+
+class WorkerDAO:
+    @classmethod
+    def get_all(cls) -> List[Worker]:
+        statement = select(Worker)
+        
+        with rx.session() as session:
+            return session.exec(statement).all()
+        
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[Worker]:
+        statement = select(Worker).where(Worker.id == id)
+        
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+        
+    @classmethod
+    def get_by_fio(cls, fio: str) -> Optional[Worker]:
+        statement = select(Worker).where(Worker.fio == fio)
+        
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+        
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        worker = Worker(**form_data)
+        
+        with rx.session() as session:
+            try:
+                statement = select(Worker).where(Worker.fio == worker.fio)
+
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Работник с таким ФИО уже существует", -1
+
+                session.add(worker)
+                session.commit()
+                session.refresh(worker)
+                return True, "Работник успешно добавлен", worker.id
+            
+            except IntegrityError as e:
+                session.rollback()
+                print("[WorkerDAO] IntegrityError: ", e)
+                return False, "Ошибка: Работник не может быть добавлен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}", -1
+            
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        with rx.session() as session:
+            try:
+                worker = session.get(Worker, form_data["id"])
+                
+                if worker is None:
+                    return False, "Ошибка: Работник не найден", -1
+                
+                for key, value in form_data.items():
+                    setattr(worker, key, value)
+                
+                statement = select(Worker).where(Worker.fio == worker.fio).where(Worker.id != worker.id)
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Работник с таким ФИО уже существует", worker.id
+                
+                session.commit()
+                session.refresh(worker)
+                return True, "Работник успешно изменен", worker.id
+            
+            except IntegrityError as e:
+                session.rollback()
+                print("[WorkerDAO] IntegrityError: ", e)
+                return False, "Ошибка: Работник не может быть изменен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[WorkerDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+            except Exception as e:
+                session.rollback()
+                print("[WorkerDAO] Exception: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+            
+    @classmethod
+    def delete_one(cls, id: str) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                worker = session.get(Worker, id)
+                
+                if worker is None:
+                    return False, "Ошибка: Работник не найден"
+                
+                worker.is_deleted = True
+                session.commit()
+                return True, "Работник успешно удален"
+            
+            except IntegrityError:
+                session.rollback()
+                return False, "Ошибка: Работник не может быть удален"
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"

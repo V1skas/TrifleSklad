@@ -78,21 +78,8 @@ class Worker(rx.Model, table=True):
     fio: str
     phone_number: str
     email: str
-    id_position: int = Field(default=None, foreign_key="positions.id")
+    position: str
     is_deleted: bool = False
 
     # Relationships
     user: Optional[User] = Relationship(back_populates="worker")
-    position: Optional['Position'] = Relationship(back_populates="workers")
-
-
-class Position(rx.Model, table=True):
-    __tablename__ = "positions"
-
-    # Table columns
-    id: int = Field(primary_key=True)
-    title: str
-    id_deleted: bool = False
-
-    # Relationships
-    workers: Optional[List[Worker]] = Relationship(back_populates="position")
