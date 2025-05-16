@@ -21,12 +21,9 @@ pkgs.mkShell {
     gcc
     gnumake
     nodejs_23
-    openldap.dev
-    cyrus_sasl.dev
   ];
 
   shellHook = ''
-    export LD_LIBRARY_PATH="${pkgs.openldap}/lib:${pkgs.cyrus_sasl}/lib:$LD_LIBRARY_PATH"
     pipenv shell
   '';
 }

@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-aiogram = "3.19.0"
 pydantic = "2.10.6"
 pydantic-settings = "2.8.1"
 sqlalchemy = "2.0.39"
@@ -13,11 +12,9 @@ aiomysql = "0.2.0"
 pymysql = "1.1.1"
 reflex = "0.7.4"
 sqlmodel = "0.0.24"
-python-ldap = "*"
-dnspython = "*"
 
 [dev-packages]
-pylance = "*"
+black = "*"
 
 [requires]
 python_version = "3.12"
