@@ -13,8 +13,10 @@ pymysql = "1.1.1"
 reflex = "0.7.4"
 sqlmodel = "0.0.24"
 
+
 [dev-packages]
-black = "*"
+python-lsp-server="*"
+pyright="*"
 
 [requires]
 python_version = "3.12"

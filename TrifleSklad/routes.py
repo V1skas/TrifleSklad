@@ -22,3 +22,14 @@ ADMIN_USERS = "/admin/users"
 ADMIN_USERS_VIEW_ID = "/admin/users/view/"
 ADMIN_USERS_EDIT_ID = "/admin/users/edit/"
 ADMIN_USERS_ADD = "/admin/users/add/"
+
+CATALOG_TAB = "/catalog/[tab]/"
+CATALOG_TAB_PAGE = "/catalog/[tab]/[page]/"
+CATALOG_TAB_PAGE_ID = "/catalog/[tab]/[page]/[id]/"
+
+CATALOG = "/catalog"
+
+CATALOG_CATEGORIES = "/catalog/categories/"
+CATALOG_CATEGORIES_VIEW_ID = "/catalog/categories/view/"
+CATALOG_CATEGORIES_EDIT_ID = "/catalog/categories/edit/"
+CATALOG_CATEGORIES_ADD = "/catalog/categories/add/"

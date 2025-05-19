@@ -4,7 +4,7 @@ import reflex as rx
 
 from rxconfig import config
 
-from TrifleSklad import frontend, routes, state, administration
+from TrifleSklad import frontend, routes, state, administration, catalog
 
 app = rx.App(
     theme=rx.theme(
@@ -21,3 +21,8 @@ app.add_page(frontend.administration_page, route=routes.ADMIN_TAB_PAGE_ID, on_lo
 app.add_page(frontend.administration_page, route=routes.ADMIN_TAB_PAGE, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
 app.add_page(frontend.administration_page, route=routes.ADMIN_TAB, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
 app.add_page(frontend.administration_page, route=routes.ADMIN, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
+
+app.add_page(frontend.catalog_page, route=routes.CATALOG_TAB_PAGE_ID, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+app.add_page(frontend.catalog_page, route=routes.CATALOG_TAB_PAGE, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+app.add_page(frontend.catalog_page, route=routes.CATALOG_TAB, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+app.add_page(frontend.catalog_page, route=routes.CATALOG, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])

@@ -1,4 +1,5 @@
 import reflex as rx
+from reflex.utils.types import is_optional
 
 from TrifleSklad import routes
 from TrifleSklad.administration.workers.backend import *
@@ -172,6 +173,7 @@ def edit_form(item: Tuple[int, Worker]) -> rx.Component:
                     name="position",
                     required=True,
                     default_value=item[1].position,
+                    is_optional=True,
                     width="100%",
                 ),
                 rx.text("Телефон:"),
@@ -180,6 +182,7 @@ def edit_form(item: Tuple[int, Worker]) -> rx.Component:
                     name="phone_number",
                     required=True,
                     default_value=item[1].phone_number,
+                    is_optional=True,
                     width="100%",
                 ),
                 rx.text("Email:"),
@@ -231,7 +234,7 @@ def index() -> rx.Component:
         item_preview_tab_content(),
 
         value=WorkersState.current_page,
- 
+
         height="100%",
         width="100%"
     )

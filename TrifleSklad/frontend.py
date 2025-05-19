@@ -1,7 +1,7 @@
 import reflex as rx
 
 from components import decor
-from TrifleSklad import authorithation, administration, routes
+from TrifleSklad import authorithation, administration, routes, catalog
 
 def navbar_link(text: str, url: str) -> rx.Component:
     return rx.link(
@@ -44,8 +44,7 @@ def navbar() -> rx.Component:
             ),
             rx.hstack(
                 navbar_link("Администрирование", routes.ADMIN),
-                navbar_link("Item 2", "#"),
-                navbar_link("Item 3", "#"),
+                navbar_link("Каталог", routes.CATALOG),
 
                 align_items="center",
                 height="100%",
@@ -55,7 +54,7 @@ def navbar() -> rx.Component:
                 rx.menu.trigger(
                     rx.icon_button(
                         rx.icon("user"),
-                        
+
                         size="2",
                         radius="full",
                     )
@@ -73,13 +72,45 @@ def navbar() -> rx.Component:
             align_items="center",
             height="100%",
         ),
-        
+
         border_bottom=f"1px solid {rx.color('accent', 9)}",
 
         padding_right="1em",
 
         width="100%",
         height="75px",
+    )
+
+def sidebar(*buttons):
+    return rx.box(
+        rx.vstack(
+            rx.heading("Меню", size="6", color=rx.color("accent", 3), bg=rx.color("accent", 9), height="40px", text_align="center", line_height="40px"),
+            *buttons,
+
+            spacing="0",
+            align_items="stretch",
+            width="100%",
+        ),
+
+        border_radius="1em 1em 5px 5px",
+        background_color=rx.color("gray", 4),
+        overflow="hidden",
+
+        padding="0",
+
+        size="4",
+
+        width="23em",
+    )
+
+def workspace(*tabs, **prop):
+    return rx.tabs.root(
+        *tabs,
+
+        width="100%",
+        height="100%",
+
+        **prop
     )
 
 def auth_page() -> rx.Component:
@@ -111,6 +142,14 @@ def administration_page() -> rx.Component:
     return rx.vstack(
         navbar(),
         administration.frontend.index(),
+
+        width="100vw",
+    )
+
+def catalog_page() -> rx.Component:
+    return rx.vstack(
+        navbar(),
+        catalog.frontend.index(),
 
         width="100vw",
     )

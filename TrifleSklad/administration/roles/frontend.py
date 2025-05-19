@@ -209,7 +209,7 @@ def edit_form(item: Tuple[int, Role]) -> rx.Component:
                 rx.text("Название:"),
                 rx.input(id="title", required=True, default_value=item[1].title),
                 rx.text("Описание:"),
-                rx.text_area(id="description", default_value=item[1].description),
+                rx.text_area(id="description", default_value=item[1].description, is_optional=True),
                 rx.text("Права:"),
                 rx.scroll_area(
                     rx.vstack(
@@ -295,7 +295,7 @@ def index() -> rx.Component:
         item_preview_tab_content(),
 
         value=RoleState.current_page,
- 
+
         height="100%",
         width="100%"
     )
