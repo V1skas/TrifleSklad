@@ -404,10 +404,26 @@ class ProductCategoryDAO:
 
         with rx.session() as session:
             return session.exec(statement).all()
+        
+    @classmethod
+    def get_all_with_relationships(cls) -> List[ProductCategory]:
+        statement = select(ProductCategory).options(
+            selectinload(ProductCategory.products)
+        ).where(ProductCategory.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[ProductCategory]:
         statement = select(ProductCategory).where(ProductCategory.id == id).where(ProductCategory.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+        
+    @classmethod
+    def get_by_title(cls, title: str) -> Optional[ProductCategory]:
+        statement = select(ProductCategory).where(ProductCategory.title == title).where(ProductCategory.is_deleted == False)
 
         with rx.session() as session:
             return session.exec(statement).one_or_none()
@@ -490,6 +506,123 @@ class ProductCategoryDAO:
             except IntegrityError:
                 session.rollback()
                 return False, "Ошибка: Категория не может быть удалена"
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+
+
+class ProductCatalogDAO:
+    @classmethod
+    def get_all(cls) -> List[ProductCatalog]:
+        statement = select(ProductCatalog).where(ProductCatalog.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
+        
+    @classmethod
+    def get_all_with_relationships(cls) -> List[ProductCatalog]:
+        statement = select(ProductCatalog).options(
+            selectinload(ProductCatalog.category)
+        ).where(ProductCatalog.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
+
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[ProductCatalog]:
+        statement = select(ProductCatalog).where(ProductCatalog.id == id).where(ProductCatalog.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def get_by_id_with_relationships(cls, id: str) -> Optional[ProductCatalog]:
+        statement = select(ProductCatalog).options(
+            joinedload(ProductCatalog.category)
+        ).where(ProductCatalog.id == id).where(ProductCatalog.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).unique().one_or_none()
+        
+    @classmethod
+    def get_by_title(cls, title: str) -> Optional[ProductCatalog]:
+        statement = select(ProductCatalog).where(ProductCatalog.title == title).where(ProductCatalog.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        product = ProductCatalog(**form_data)
+
+        with rx.session() as session:
+            try:
+                statement = select(ProductCatalog).where(ProductCatalog.title == product.title).where(ProductCatalog.is_deleted == False)
+
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Товар с таким названием уже существует", -1
+
+                session.add(product)
+                session.commit()
+                session.refresh(product)
+                return True, "Товар успешно добавлен", product.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[ProductCatalogDAO] IntegrityError: ", e)
+                return False, "Ошибка: Товар не может быть добавлен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        with rx.session() as session:
+            try:
+                product = session.get(ProductCatalog, form_data["id"])
+
+                if product is None:
+                    return False, "Ошибка: Товар не найден", -1
+
+                for key, value in form_data.items():
+                    setattr(product, key, value)
+
+                statement = select(ProductCatalog).where(ProductCatalog.title == product.title).where(ProductCatalog.id != product.id).where(ProductCatalog.is_deleted == False)
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Товар с таким названием уже существует", product.id
+
+                session.commit()
+                session.refresh(product)
+                return True, "Товар успешно изменен", product.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[ProductCatalogDAO] IntegrityError: ", e)
+                return False, "Ошибка: Товар не может быть изменен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[ProductCatalogDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def delete_one(cls, id: int) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                product = session.get(ProductCatalog, id)
+
+                if product is None:
+                    return False, "Ошибка: Товар не найден"
+
+                product.is_deleted = True
+                session.commit()
+                return True, "Товар успешно удален"
+
+            except IntegrityError:
+                session.rollback()
+                return False, "Ошибка: Товар не может быть удален"
             except SQLAlchemyError as e:
                 session.rollback()
                 return False, f"Ошибка: {str(e)}"

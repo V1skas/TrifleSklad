@@ -33,3 +33,8 @@ CATALOG_CATEGORIES = "/catalog/categories/"
 CATALOG_CATEGORIES_VIEW_ID = "/catalog/categories/view/"
 CATALOG_CATEGORIES_EDIT_ID = "/catalog/categories/edit/"
 CATALOG_CATEGORIES_ADD = "/catalog/categories/add/"
+
+CATALOG_PRODUCTS = "/catalog/products/"
+CATALOG_PRODUCTS_VIEW_ID = "/catalog/products/view/"
+CATALOG_PRODUCTS_EDIT_ID = "/catalog/products/edit/"
+CATALOG_PRODUCTS_ADD = "/catalog/products/add/"
