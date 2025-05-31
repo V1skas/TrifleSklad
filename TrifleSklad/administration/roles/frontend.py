@@ -98,15 +98,19 @@ def table() -> rx.Component:
 def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
-            rx.heading("Роли", size="7", width="100%"),
+            rx.hstack(
+                rx.heading("Роли", size="6"),
+                rx.spacer(),
+                rx.button(
+                    "Добавить",
+                    on_click=rx.redirect(routes.CATALOG_PRODUCTS_ADD)
+                ),
+
+                width="100%"
+            ),
             rx.cond(RoleState.has_items,
                 table(),
                 rx.text("Записей нет.")
-            ),
-            rx.hstack(
-                rx.button("Добавить", on_click=rx.redirect(routes.ADMIN_ROLES_ADD)),
-
-                justify="end"
             ),
 
             width="100%",

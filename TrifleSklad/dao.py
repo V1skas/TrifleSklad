@@ -404,7 +404,7 @@ class ProductCategoryDAO:
 
         with rx.session() as session:
             return session.exec(statement).all()
-        
+
     @classmethod
     def get_all_with_relationships(cls) -> List[ProductCategory]:
         statement = select(ProductCategory).options(
@@ -420,7 +420,7 @@ class ProductCategoryDAO:
 
         with rx.session() as session:
             return session.exec(statement).one_or_none()
-        
+
     @classmethod
     def get_by_title(cls, title: str) -> Optional[ProductCategory]:
         statement = select(ProductCategory).where(ProductCategory.title == title).where(ProductCategory.is_deleted == False)
@@ -521,7 +521,7 @@ class ProductCatalogDAO:
 
         with rx.session() as session:
             return session.exec(statement).all()
-        
+
     @classmethod
     def get_all_with_relationships(cls) -> List[ProductCatalog]:
         statement = select(ProductCatalog).options(
@@ -546,7 +546,7 @@ class ProductCatalogDAO:
 
         with rx.session() as session:
             return session.exec(statement).unique().one_or_none()
-        
+
     @classmethod
     def get_by_title(cls, title: str) -> Optional[ProductCatalog]:
         statement = select(ProductCatalog).where(ProductCatalog.title == title).where(ProductCatalog.is_deleted == False)
@@ -623,6 +623,321 @@ class ProductCatalogDAO:
             except IntegrityError:
                 session.rollback()
                 return False, "Ошибка: Товар не может быть удален"
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+
+
+class StorageDAO:
+    @classmethod
+    def get_all(cls) -> List[Storage]:
+        statement = select(Storage).where(Storage.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
+
+    @classmethod
+    def get_all_with_relationships(cls) -> List[Storage]:
+        statement = select(Storage).options(
+            selectinload(Storage.responsible)
+        ).where(Storage.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
+
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[Storage]:
+        statement = select(Storage).where(Storage.id == id).where(Storage.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def get_by_id_with_relationships(cls, id: str) -> Optional[Storage]:
+        statement = select(Storage).options(
+            joinedload(Storage.responsible)
+        ).where(Storage.id == id).where(Storage.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).unique().one_or_none()
+
+    @classmethod
+    def get_by_title(cls, title: str) -> Optional[Storage]:
+        statement = select(Storage).where(Storage.title == title).where(Storage.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        storage = Storage(**form_data)
+
+        with rx.session() as session:
+            try:
+                statement = select(Storage).where(Storage.title == storage.title).where(Storage.is_deleted == False)
+
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Склад с таким названием уже существует", -1
+
+                session.add(storage)
+                session.commit()
+                session.refresh(storage)
+                return True, "Склад успешно добавлен", storage.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[StorageDAO] IntegrityError: ", e)
+                return False, "Ошибка: Склад не может быть добавлен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        with rx.session() as session:
+            try:
+                storage = session.get(Storage, form_data["id"])
+
+                if storage is None:
+                    return False, "Ошибка: Склад не найден", -1
+
+                for key, value in form_data.items():
+                    setattr(storage, key, value)
+
+                statement = select(Storage).where(Storage.title == storage.title).where(Storage.id != storage.id).where(Storage.is_deleted == False)
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Склад с таким названием уже существует", storage.id
+
+                session.commit()
+                session.refresh(storage)
+                return True, "Склад успешно изменен", storage.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[StorageDAO] IntegrityError: ", e)
+                return False, "Ошибка: Склад не может быть изменен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[StorageDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def delete_one(cls, id: int) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                storage = session.get(Storage, id)
+
+                if storage is None:
+                    return False, "Ошибка: Склад не найден"
+
+                storage.is_deleted = True
+                session.commit()
+                return True, "Склад успешно удален"
+
+            except IntegrityError:
+                session.rollback()
+                return False, "Ошибка: Склад не может быть удален"
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+
+
+class OwnerDAO:
+    @classmethod
+    def get_all(cls) -> List[Owner]:
+        statement = select(Owner).where(Owner.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
+
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[Owner]:
+        statement = select(Owner).where(Owner.id == id).where(Owner.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def get_by_title(cls, title: str) -> Optional[Owner]:
+        statement = select(Owner).where(Owner.title == title).where(Owner.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        owner = Owner(**form_data)
+
+        with rx.session() as session:
+            try:
+                statement = select(Owner).where(Owner.title == owner.title).where(Owner.is_deleted == False)
+
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Владелец с таким названием уже существует", -1
+
+                session.add(owner)
+                session.commit()
+                session.refresh(owner)
+                return True, "Владелец успешно добавлен", owner.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[OwnerDAO] IntegrityError: ", e)
+                return False, "Ошибка: Владелец не может быть добавлен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        with rx.session() as session:
+            try:
+                owner = session.get(Owner, form_data["id"])
+
+                if owner is None:
+                    return False, "Ошибка: Владелец не найден", -1
+
+                for key, value in form_data.items():
+                    setattr(owner, key, value)
+
+                statement = select(Owner).where(Owner.title == owner.title).where(Owner.id != owner.id).where(Owner.is_deleted == False)
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Владелец с таким названием уже существует", owner.id
+
+                session.commit()
+                session.refresh(owner)
+                return True, "Владелец успешно изменен", owner.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[OwnerDAO] IntegrityError: ", e)
+                return False, "Ошибка: Владелец не может быть изменен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[OwnerDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def delete_one(cls, id: int) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                owner = session.get(Owner, id)
+
+                if owner is None:
+                    return False, "Ошибка: Владелец не найден"
+
+                owner.is_deleted = True
+                session.commit()
+                return True, "Владелец успешно удален"
+
+            except IntegrityError:
+                session.rollback()
+                return False, "Ошибка: Владелец не может быть удален"
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+            except Exception as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}"
+
+
+class SupplierDAO:
+    @classmethod
+    def get_all(cls) -> List[Supplier]:
+        statement = select(Supplier).where(Supplier.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).all()
+
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[Supplier]:
+        statement = select(Supplier).where(Supplier.id == id).where(Supplier.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def get_by_title(cls, title: str) -> Optional[Supplier]:
+        statement = select(Supplier).where(Supplier.title == title).where(Supplier.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one_or_none()
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        supplier = Supplier(**form_data)
+
+        with rx.session() as session:
+            try:
+                statement = select(Supplier).where(Supplier.title == supplier.title).where(Supplier.is_deleted == False)
+
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Поставщик с таким названием уже существует", -1
+
+                session.add(supplier)
+                session.commit()
+                session.refresh(supplier)
+                return True, "Поставщик успешно добавлен", supplier.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[SupplierDAO] IntegrityError: ", e)
+                return False, "Ошибка: Поставщик не может быть добавлен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        with rx.session() as session:
+            try:
+                supplier = session.get(Supplier, form_data["id"])
+
+                if supplier is None:
+                    return False, "Ошибка: Поставщик не найден", -1
+
+                for key, value in form_data.items():
+                    setattr(supplier, key, value)
+
+                statement = select(Supplier).where(Supplier.title == supplier.title).where(Supplier.id != supplier.id).where(Supplier.is_deleted == False)
+                if session.exec(statement).one_or_none() is not None:
+                    return False, "Ошибка: Поставщик с таким названием уже существует", supplier.id
+
+                session.commit()
+                session.refresh(supplier)
+                return True, "Поставщик успешно изменен", supplier.id
+
+            except IntegrityError as e:
+                session.rollback()
+                print("[SupplierDAO] IntegrityError: ", e)
+                return False, "Ошибка: Поставщик не может быть изменен", -1
+            except SQLAlchemyError as e:
+                session.rollback()
+                print("[SupplierDAO] SQLAlchemyError: ", e)
+                return False, f"Ошибка: {str(e)}", -1
+
+    @classmethod
+    def delete_one(cls, id: int) -> tuple[bool, str]:
+        with rx.session() as session:
+            try:
+                supplier = session.get(Supplier, id)
+
+                if supplier is None:
+                    return False, "Ошибка: Поставщик не найден"
+
+                supplier.is_deleted = True
+                session.commit()
+                return True, "Поставщик успешно удален"
+
+            except IntegrityError:
+                session.rollback()
+                return False, "Ошибка: Поставщик не может быть удален"
             except SQLAlchemyError as e:
                 session.rollback()
                 return False, f"Ошибка: {str(e)}"

@@ -38,3 +38,18 @@ CATALOG_PRODUCTS = "/catalog/products/"
 CATALOG_PRODUCTS_VIEW_ID = "/catalog/products/view/"
 CATALOG_PRODUCTS_EDIT_ID = "/catalog/products/edit/"
 CATALOG_PRODUCTS_ADD = "/catalog/products/add/"
+
+CATALOG_OWNERS = "/catalog/owners/"
+CATALOG_OWNERS_VIEW_ID = "/catalog/owners/view/"
+CATALOG_OWNERS_EDIT_ID = "/catalog/owners/edit/"
+CATALOG_OWNERS_ADD = "/catalog/owners/add/"
+
+CATALOG_SUPPLIERS = "/catalog/suppliers/"
+CATALOG_SUPPLIERS_VIEW_ID = "/catalog/suppliers/view/"
+CATALOG_SUPPLIERS_EDIT_ID = "/catalog/suppliers/edit/"
+CATALOG_SUPPLIERS_ADD = "/catalog/suppliers/add/"
+
+CATALOG_STORAGES = "/catalog/storages/"
+CATALOG_STORAGES_VIEW_ID = "/catalog/storages/view/"
+CATALOG_STORAGES_EDIT_ID = "/catalog/storages/edit/"
+CATALOG_STORAGES_ADD = "/catalog/storages/add/"

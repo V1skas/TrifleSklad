@@ -81,7 +81,6 @@ class ProductsState(rx.State):
 
     @rx.event
     def add_one(self, form_data: dict):
-        print(form_data)
         if "id_category" in form_data and form_data["id_category"]:
             category: Optional[ProductCatalog] = ProductCategoryDAO.get_by_title(form_data["id_category"])
             if category is None:
@@ -125,7 +124,3 @@ class ProductsState(rx.State):
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не выбрана запись для удаления")
-
-    @rx.event
-    def set_current_page(self, page: str):
-        self.current_page = page

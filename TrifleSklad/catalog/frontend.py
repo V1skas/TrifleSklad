@@ -9,6 +9,9 @@ from TrifleSklad import routes
 from TrifleSklad.catalog.backend import CatalogState
 import TrifleSklad.catalog.categories as categories
 import TrifleSklad.catalog.products as products
+import TrifleSklad.catalog.owners as owners
+import TrifleSklad.catalog.storages as storages
+import TrifleSklad.catalog.suppliers as suppliers
 
 def categories_tab() -> rx.Component:
     return rx.tabs.content(
@@ -34,15 +37,57 @@ def products_tab() -> rx.Component:
         value=CatalogState.Tabs.PRODUCTS,
     )
 
+def owners_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            owners.frontend.index(),
+
+            width="100%",
+            height="100%",
+        ),
+
+        value=CatalogState.Tabs.OWNERS,
+    )
+
+def storages_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            storages.frontend.index(),
+
+            width="100%",
+            height="100%",
+        ),
+
+        value=CatalogState.Tabs.STORAGES,
+    )
+
+def suppliers_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            suppliers.frontend.index(),
+
+            width="100%",
+            height="100%",
+        ),
+
+        value=CatalogState.Tabs.SUPPLIERS,
+    )
+
 def index():
     return rx.hstack(
         sidebar(
             sidebar_link("Категории ТМЦ", routes.CATALOG_CATEGORIES),
             sidebar_link("Каталог ТМЦ", routes.CATALOG_PRODUCTS),
+            sidebar_link("Владельцы ТМЦ", routes.CATALOG_OWNERS),
+            sidebar_link("Хранилища", routes.CATALOG_STORAGES),
+            sidebar_link("Поставщики", routes.CATALOG_SUPPLIERS),
         ),
         workspace(
             categories_tab(),
             products_tab(),
+            owners_tab(),
+            storages_tab(),
+            suppliers_tab(),
 
             size="4",
 

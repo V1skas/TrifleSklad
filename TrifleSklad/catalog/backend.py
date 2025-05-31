@@ -6,15 +6,24 @@ from TrifleSklad.state import AppState
 
 from TrifleSklad.catalog.categories.backend import CategoriesState
 from TrifleSklad.catalog.products.backend import ProductsState
+from TrifleSklad.catalog.owners.backend import OwnerState
+from TrifleSklad.catalog.storages.backend import StorageState
+from TrifleSklad.catalog.suppliers.backend import SupplierState
 
 class CatalogState(AppState):
     class Tabs:
         CATERORIES = "categories"
         PRODUCTS = "products"
+        OWNERS = "owners"
+        STORAGES = "storages"
+        SUPPLIERS = "suppliers"
 
     __tabs_events = {
         Tabs.CATERORIES: CategoriesState.on_load,
-        Tabs.PRODUCTS: ProductsState.on_load
+        Tabs.PRODUCTS: ProductsState.on_load,
+        Tabs.OWNERS: OwnerState.on_load,
+        Tabs.STORAGES: StorageState.on_load,
+        Tabs.SUPPLIERS: SupplierState.on_load,
     }
 
     current_tab: str = ""
@@ -23,7 +32,8 @@ class CatalogState(AppState):
         tab = self.router.page.params.get("tab", "")
 
         if tab != "":
-            if tab not in [self.Tabs.CATERORIES, self.Tabs.PRODUCTS]:
+            if tab not in [self.Tabs.CATERORIES, self.Tabs.PRODUCTS, 
+                           self.Tabs.OWNERS, self.Tabs.STORAGES, self.Tabs.SUPPLIERS]:
                 return rx.redirect(routes.WELCOME)
 
             self.current_tab = tab

@@ -134,123 +134,131 @@ def table_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.form(
-        rx.vstack(
-            rx.heading("Добавить товар", size="6"),
-            
-            rx.text("Название", size="3", width="100%"),
-            rx.input(id="title", required=True, size="3", width="100%"),
-            rx.text("Описание", size="3", width="100%"),
-            rx.text_area(id="description", size="3", width="100%"),
-            rx.text("Категория", size="3", width="100%"),
-            rx.select(
-                [category.title for category in ProductCategoryDAO.get_all()],
+    return rx.card(
+        rx.form(
+            rx.vstack(
+                rx.text("Название", size="3", width="100%"),
+                rx.input(id="title", required=True, size="3", width="100%"),
+                rx.text("Описание", size="3", width="100%"),
+                rx.text_area(id="description", size="3", width="100%"),
+                rx.text("Категория", size="3", width="100%"),
+                rx.select(
+                    [category.title for category in ProductCategoryDAO.get_all()],
 
-                name="id_category",
-                required=True,
-                placeholder="Выберите категорию",
-                size="3",
-                width="100%"
-            ),
-            rx.text("Единица измерения", size="3", width="100%"),
-            rx.input(id="unit", required=True, size="3", width="100%"),
-            rx.text("Вместимость", size="3", width="100%"),
-            rx.input(id="capacity", required=True, size="3", width="100%"),
-            rx.checkbox(
-                "Делимый товар",
-                id="divisible",
-                size="3",
-                width="100%"
-            ),
-            
-            rx.hstack(
-                rx.button(
-                    "Отмена",
-                    type="button",
-                    variant="soft",
-                    on_click=rx.redirect(routes.CATALOG_PRODUCTS)
+                    name="id_category",
+                    required=True,
+                    placeholder="Выберите категорию",
+                    size="3",
+                    width="100%"
                 ),
-                rx.spacer(),
-                rx.button(
-                    "Добавить",
-                    type="submit"
+                rx.text("Единица измерения", size="3", width="100%"),
+                rx.input(id="unit", required=True, size="3", width="100%"),
+                rx.text("Вместимость", size="3", width="100%"),
+                rx.input(id="capacity", required=True, size="3", width="100%"),
+                rx.checkbox(
+                    "Делимый товар",
+                    id="divisible",
+                    size="3",
+                    width="100%"
+                ),
+                
+                rx.hstack(
+                    rx.button(
+                        "Отмена",
+                        type="reset",
+                        color_scheme="red",
+                        on_click=rx.redirect(routes.CATALOG_PRODUCTS)
+                    ),
+                    rx.button(
+                        "Добавить",
+                        color_scheme="green",
+                        type="submit"
+                    ),
+
+                    width="100%"
                 ),
 
+                spacing="3",
                 width="100%"
             ),
 
-            spacing="3",
+            on_submit=ProductsState.add_one,
             width="100%"
         ),
 
-        on_submit=ProductsState.add_one,
-        width="100%"
+        width="100%",
+        height="100%",
     )
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
+        rx.heading("Добавление товара", size="7", width="100%", margin_bottom="0.5em"),
         add_form(),
         value=ProductsState.Pages.ADD
     )
 
 def edit_form(item: Tuple[int, ProductCatalog]) -> rx.Component:
-    return rx.form(
-        rx.vstack(
-            rx.heading("Редактировать товар", size="6"),
-            
-            rx.text("Название", size="3", width="100%"),
-            rx.input(id="title", required=True, default_value=item[1].title, size="3", width="100%"),
-            rx.text("Описание", size="3", width="100%"),
-            rx.text_area(id="description", default_value=item[1].description, is_optional=True, size="3", width="100%"),
-            rx.text("Категория", size="3", width="100%"),
-            rx.select(
-                [category.title for category in ProductCategoryDAO.get_all()],
-                default_value=item[1].category.title,
+    return rx.card(
+        rx.form(
+            rx.vstack(
+                rx.text("Название", size="3", width="100%"),
+                rx.input(id="title", required=True, default_value=item[1].title, size="3", width="100%"),
+                rx.text("Описание", size="3", width="100%"),
+                rx.text_area(id="description", default_value=item[1].description, is_optional=True, size="3", width="100%"),
+                rx.text("Категория", size="3", width="100%"),
+                rx.select(
+                    [category.title for category in ProductCategoryDAO.get_all()],
+                    default_value=item[1].category.title,
 
-                name="id_category",
-                required=True,
-                placeholder="Выберите категорию",
-                size="3",
-                width="100%"
-            ),
-            rx.text("Единица измерения", size="3", width="100%"),
-            rx.input(id="unit", required=True, default_value=item[1].unit, size="3", width="100%"),
-            rx.text("Вместимость", size="3", width="100%"),
-            rx.input(id="capacity", required=True, default_value=str(item[1].capacity), size="3", width="100%"),
-            rx.checkbox(
-                "Делимый товар",
-                default_value=item[1].divisible,
-                id="divisible",
-                size="3",
-                width="100%"
-            ),
-            
-            rx.hstack(
-                rx.button(
-                    "Отмена",
-                    type="button",
-                    variant="soft",
-                    on_click=rx.redirect(routes.CATALOG_PRODUCTS)
+                    name="id_category",
+                    required=True,
+                    placeholder="Выберите категорию",
+                    size="3",
+                    width="100%"
                 ),
-                rx.spacer(),
-                rx.button(
-                    "Добавить",
-                    type="submit"
+                rx.text("Единица измерения", size="3", width="100%"),
+                rx.input(id="unit", required=True, default_value=item[1].unit, size="3", width="100%"),
+                rx.text("Вместимость", size="3", width="100%"),
+                rx.input(id="capacity", required=True, default_value=str(item[1].capacity), size="3", width="100%"),
+                rx.checkbox(
+                    "Делимый товар",
+                    default_value=item[1].divisible,
+                    id="divisible",
+                    size="3",
+                    width="100%"
+                ),
+                
+                rx.hstack(
+                    rx.button(
+                        "Отмена",
+                        type="reset",
+                        color_scheme="red",
+                        on_click=rx.redirect(routes.CATALOG_PRODUCTS)
+                    ),
+                    rx.button(
+                        "Добавить",
+                        type="submit",
+                        color_scheme="green"
+                    ),
+
+                    width="100%"
                 ),
 
+                spacing="3",
                 width="100%"
             ),
 
-            spacing="3",
+            on_submit=ProductsState.edit_one,
             width="100%"
         ),
 
-        on_submit=ProductsState.edit_one,
-        width="100%"
+        width="100%",
+        height="100%",
     )
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
+        rx.heading("Редактирование товара", size="7", width="100%", margin_bottom="0.5em"),
         edit_form(ProductsState.get_selected_item),
         value=ProductsState.Pages.EDIT
     )
@@ -263,7 +271,6 @@ def index() -> rx.Component:
         edit_tab_content(),
 
         value=ProductsState.current_page,
-        on_change=ProductsState.set_current_page,
 
         orientation="horizontal",
         width="100%"

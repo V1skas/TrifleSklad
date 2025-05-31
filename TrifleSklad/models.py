@@ -83,6 +83,7 @@ class Worker(rx.Model, table=True):
 
     # Relationships
     user: Optional[User] = Relationship(back_populates="worker")
+    storages: Optional[List['Storage']] = Relationship(back_populates="responsible")
 
 
 class ProductCategory(rx.Model, table=True):
@@ -115,3 +116,48 @@ class ProductCatalog(rx.Model, table=True):
 
     # Relationships
     category: Optional[ProductCategory] = Relationship(back_populates="products")
+
+
+class Owner(rx.Model, table=True):
+    __tablename__ = "owners" # type: ignore
+
+    # Table columns
+    id: int = Field(primary_key=True) # type: ignore
+    title: str = Field(default="", nullable=False)
+    description: Optional[str] = Field(nullable=True)
+    is_deleted: bool = Field(default=False, nullable=False)
+
+    # Relationships
+
+
+class Supplier(rx.Model, table=True):
+    __tablename__ = "suppliers" # type: ignore
+
+    # Table columns
+    id: int = Field(primary_key=True) # type: ignore
+    title: str = Field(default="", nullable=False)
+    description: Optional[str] = Field(nullable=True)
+    address: str = Field(default="", nullable=False)
+    email: str = Field(default="", nullable=False)
+    contact_person: str = Field(default="", nullable=False)
+    contact_phone: str = Field(default="", nullable=False)
+    okpo: str = Field(default="", nullable=False)
+    is_deleted: bool = Field(default=False, nullable=False)
+
+    # Relationships
+
+
+class Storage(rx.Model, table=True):
+    __tablename__ = "storages" # type: ignore
+
+    # Table columns
+    id: int = Field(primary_key=True) # type: ignore
+    type: str = Field(default="", nullable=False)
+    title: str = Field(default="", nullable=False)
+    description: Optional[str] = Field(nullable=True)
+    address: str = Field(default="", nullable=False)
+    id_responsible: int = Field(default=0, nullable=False, foreign_key="workers.id")
+    is_deleted: bool = Field(default=False, nullable=False)
+
+    # Relationships
+    responsible: Optional[Worker] = Relationship(back_populates="storages")
