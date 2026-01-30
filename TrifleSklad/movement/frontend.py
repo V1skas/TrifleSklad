@@ -1,0 +1,65 @@
+import reflex as rx
+
+from components.elements import sidebar, sidebar_link, workspace
+
+from TrifleSklad import routes
+from TrifleSklad.movement.backend import MovementState
+import TrifleSklad.movement.admissions as admissions
+import TrifleSklad.movement.write_off as write_off
+import TrifleSklad.movement.movements as movements
+import TrifleSklad.movement.issues as issues
+
+def admissions_tab() -> rx.Component:
+    return rx.tabs.content(
+        admissions.frontend.index(),
+
+        value=MovementState.Tabs.ADMISSIONS,
+    )
+
+def write_offs_tab() -> rx.Component:
+    return rx.tabs.content(
+        write_off.frontend.index(),
+
+        value=MovementState.Tabs.WRITE_OFFS,
+    )
+
+def movements_tab() -> rx.Component:
+    return rx.tabs.content(
+        movements.frontend.index(),
+
+        value=MovementState.Tabs.MOVEMENTS,
+    )
+
+def issues_tab() -> rx.Component:
+    return rx.tabs.content(
+        issues.frontend.index(),
+
+        value=MovementState.Tabs.ISSUES,
+    )
+
+def index():
+    return rx.hstack(
+        sidebar(
+            sidebar_link("Поставки", routes.MOVEMENT_ADMISSIONS),
+            sidebar_link("Списания", routes.MOVEMENT_WRITE_OFFS),
+            sidebar_link("Перемещения", routes.MOVEMENT_MOVEMENTS),
+            sidebar_link("Выдачи", routes.MOVEMENT_ISSUES),
+            sidebar_link("Продажи", routes.CATALOG_CATEGORIES),
+        ),
+        workspace(
+            admissions_tab(),
+            write_offs_tab(),
+            movements_tab(),
+            issues_tab(),
+
+            size="4",
+
+            value=MovementState.current_tab
+        ),
+
+        width="100%",
+        height="100%",
+
+        padding_left="1em",
+        padding_right="1em",
+    )

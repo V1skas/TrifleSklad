@@ -18,6 +18,15 @@ class ProductsState(rx.State):
     items: List[ProductCatalog] = []
     selected_item: int = -1
 
+    selected_product_category_id: str = ""
+    product_category_list: List[Tuple[str, str]] = []
+
+    def _load_product_category_list(self):
+        self.product_category_list = [
+            (category.title, str(category.id))
+            for category in ProductCategoryDAO.get_all()
+        ]
+
     def _check_path(self):
         page = self.router.page.params.get('page', '')
         if page != '':
@@ -28,6 +37,8 @@ class ProductsState(rx.State):
             # /products/add
             if page == self.Pages.ADD:
                 id = ProductCatalog()
+                self._load_product_category_list()
+                self.selected_product_category_id = ""
             # /products/edit/[id]
             elif page == self.Pages.EDIT:
                 id = self.router.page.params.get('id', '')
@@ -35,6 +46,8 @@ class ProductsState(rx.State):
                     id = ProductCatalogDAO.get_by_id_with_relationships(id)
                     if id is None:
                         return [rx.redirect(routes.CATALOG_PRODUCTS), rx.toast.error("Запись не была найдена")]
+                    self._load_product_category_list()
+                    self.selected_product_category_id = str(id.id_category) if id.id_category else ""
                 else:
                     return rx.redirect(routes.CATALOG_PRODUCTS)
             # /products/view/[id]
@@ -80,17 +93,13 @@ class ProductsState(rx.State):
         return self._check_path()
 
     @rx.event
+    def on_change_product_category(self, value: str):
+        self.selected_product_category_id = value
+
+    @rx.event
     def add_one(self, form_data: dict):
-        if "id_category" in form_data and form_data["id_category"]:
-            category: Optional[ProductCatalog] = ProductCategoryDAO.get_by_title(form_data["id_category"])
-            if category is None:
-                return rx.toast.error("Категория не найдена")
-            
-            form_data["id_category"] = category.id
-            form_data["category"] = category
-        else:
-            return rx.toast.error("Не указана категория товара")
-            
+        form_data["id_category"] = self.selected_product_category_id
+
         flag, text, id = ProductCatalogDAO.add_one(form_data)
         if flag:
             return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]
@@ -99,16 +108,7 @@ class ProductsState(rx.State):
     @rx.event
     def edit_one(self, form_data: dict):
         form_data["id"] = self.items[self.selected_item].id
-        
-        if "id_category" in form_data and form_data["id_category"]:
-            category: Optional[ProductCatalog] = ProductCategoryDAO.get_by_title(form_data["id_category"])
-            if category is None:
-                return rx.toast.error("Категория не найдена")
-            
-            form_data["id_category"] = category.id
-            form_data["category"] = category
-        else:
-            return rx.toast.error("Не указана категория товара")
+        form_data["id_category"] = self.selected_product_category_id
             
         flag, text, id = ProductCatalogDAO.edit_one(form_data)
         if flag:

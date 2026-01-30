@@ -4,6 +4,7 @@ from components import decor
 
 from TrifleSklad import routes
 from TrifleSklad.authorithation.backend import AuthorizationState
+from TrifleSklad.state import AppState
 
 def login_card() -> rx.Component:
     return rx.card(
@@ -94,3 +95,27 @@ def index() -> rx.Component:
             direction="column",
             spacing="5",
     )
+
+def require_login(page: rx.app.ComponentCallable) -> rx.app.ComponentCallable:
+    """Decorator to require authentication before rendering a page.
+
+    If the user is not authenticated, then redirect to the login page.
+
+    Args:
+        page: The page to wrap.
+
+    Returns:
+        The wrapped page component.
+    """
+
+    def protected_page():
+        return rx.cond(
+            AppState.check_auth,  # type: ignore
+            page(),
+            rx.center(
+                rx.text("Загрузка...", on_mount=AppState.redir),
+            ),
+        )
+
+    protected_page.__name__ = page.__name__
+    return protected_page

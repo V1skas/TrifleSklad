@@ -1,6 +1,8 @@
 import reflex as rx
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
+
+from TrifleSklad import declared
 
 import TrifleSklad.routes as routes
 from TrifleSklad.models import Storage, Worker
@@ -75,6 +77,14 @@ class StorageState(rx.State):
             return (self.selected_item, self.items[self.selected_item])
         return (-1, Storage())
 
+    @rx.var
+    def get_titles_type_storages_list(self) -> List[str]:
+        return list(declared.storage_type_list.values())
+
+    @rx.var
+    def get_titles_type_storages_dict(self) -> Dict[int, str]:
+        return declared.storage_type_list
+
     @rx.event
     def on_load(self):
         self._check_path()
@@ -85,6 +95,11 @@ class StorageState(rx.State):
             worker: Optional[Worker] = WorkerDAO.get_by_fio(form_data["id_responsible"])
             if worker is None:
                 return rx.toast.error("Ответственный не найден")
+
+            for key, value in declared.storage_type_list.items():
+                if value == form_data["type"]:
+                    form_data["type"] = key
+                    break
             
             form_data["id_responsible"] = worker.id
             form_data["worker"] = worker
@@ -99,6 +114,11 @@ class StorageState(rx.State):
     @rx.event
     def edit_one(self, form_data: dict):
         form_data["id"] = self.items[self.selected_item].id
+
+        for key, value in declared.storage_type_list.items():
+            if value == form_data["type"]:
+                form_data["type"] = key
+                break
 
         if "id_responsible" in form_data and form_data["id_responsible"]:
             worker: Optional[Worker] = WorkerDAO.get_by_fio(form_data["id_responsible"])

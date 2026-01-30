@@ -1,0 +1,134 @@
+import reflex as rx
+
+from typing import Tuple
+from TrifleSklad.models import Product
+
+from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
+
+
+def selector_item(item: Tuple[int, Product]) -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.heading(item[1].product_catalog.title, size="3", user_select="none"),
+            rx.text(item[1].id, size="1", user_select="none"),
+
+            spacing="0",
+            width="100%",
+        ),
+
+        background_color=rx.color("accent", 2),
+        border_color=rx.color("accent", 4),
+        border_width="1px",
+
+        padding="calc(0.7em + 2px)",
+
+        width="100%",
+
+        _hover={
+            "background_color": rx.color("accent", 6),
+            "border_color": rx.color("accent", 8),
+            "border_width": "1px",
+            "padding": "calc(0.7em + 2px)",
+        },
+        _active={
+            "background_color": rx.color("accent", 8),
+            "border_color": rx.color("accent", 8),
+            "border_width": "3px",
+            "padding": "0.7em",
+        },
+
+        on_click=ProductsSelectorState.select_item(item[0]),
+    )
+
+def selector_item_selected(item: Tuple[int, Product]) -> rx.Component:
+    return rx.card(
+        rx.hstack(
+            rx.icon("circle-check-big", color=rx.color("accent", 9), height="100%"),
+
+            rx.vstack(
+                rx.heading(item[1].product_catalog.title, color=rx.color("accent", 9), size="3", user_select="none"),
+                rx.text(item[1].id, size="1", user_select="none"),
+
+                flex="1",
+                spacing="0",
+                height="100%",
+            ),
+
+            align="center",
+            width="100%",
+        ),
+
+        background_color=rx.color("accent", 4),
+        border_color=rx.color("accent", 9),
+        border_width="2px",
+
+        padding="calc(0.7em + 1px)",
+
+        width="100%",
+
+        _hover={
+            "background_color": rx.color("accent", 6),
+            "border_color": rx.color("accent", 8),
+            "border_width": "2px",
+            "padding": "calc(0.7em + 1px)",
+        },
+        _active={
+            "background_color": rx.color("accent", 8),
+            "border_color": rx.color("accent", 8),
+            "border_width": "3px",
+            "padding": "0.7em",
+        },
+
+        on_click=ProductsSelectorState.select_item(item[0]),
+    )
+
+def selector_list() -> rx.Component:
+    return rx.scroll_area(
+        rx.vstack(
+            rx.foreach(ProductsSelectorState.get_selected_items, selector_item_selected),
+            rx.foreach(ProductsSelectorState.get_unselected_items, selector_item),
+
+            spacing="1",
+
+            width="100%",
+        ),
+
+        width="100%",
+        height="100%",
+    )
+
+def selector(*child, **prop) -> rx.Component:
+    return rx.vstack(
+        rx.heading(
+            "Выбор ТМЦ:",
+            size="8",
+            color=rx.color("accent", 2),
+            background_color=rx.color("accent", 9),
+            border_radius="0.5em",
+            width="100%",
+            padding="0.5em"),
+
+            rx.input(
+                rx.input.slot(rx.icon("search")),
+
+                placeholder="Поиск",
+                value=ProductsSelectorState.filter_many,
+
+                width="100%",
+                size="3",
+
+                on_change=ProductsSelectorState.filter,
+            ),
+            rx.card(
+                rx.cond(ProductsSelectorState.has_items(),
+                        selector_list(),
+                        rx.text("Нет доступных ТМЦ", color=rx.color("accent", 6), user_select="none")),
+
+            padding="1em",
+            width="100%",
+            height="100%",
+        ),
+
+        *child,
+        **prop,
+    )

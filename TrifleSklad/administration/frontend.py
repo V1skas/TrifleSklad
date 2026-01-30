@@ -1,4 +1,3 @@
-from turtle import width
 import reflex as rx
 
 from components.elements import sidebar, sidebar_link, workspace

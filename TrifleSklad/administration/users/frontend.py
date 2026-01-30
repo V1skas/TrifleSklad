@@ -165,7 +165,7 @@ def list_tab_content() -> rx.Component:
                 rx.spacer(),
                 rx.button(
                     "Добавить",
-                    on_click=rx.redirect(routes.CATALOG_PRODUCTS_ADD)
+                    on_click=rx.redirect(routes.ADMIN_USERS_ADD)
                 ),
 
                 width="100%"
@@ -204,7 +204,7 @@ def add_form() -> rx.Component:
                         rx.cond(
                             UserState.has_selected_roles,
                             rx.foreach(UserState.selected_roles, list_role_item),
-                            rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
+                            rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")
                         ),
 
                         spacing="1",
@@ -248,7 +248,7 @@ def add_form() -> rx.Component:
                         rx.cond(
                             UserState.has_selected_actions,
                             rx.foreach(UserState.selected_actions, list_action_item),
-                            rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
+                            rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")
                         ),
 
                         spacing="1",
@@ -326,7 +326,7 @@ def edit_form(item: Tuple[int, User]) -> rx.Component:
                         rx.cond(
                             UserState.has_selected_roles,
                             rx.foreach(UserState.selected_roles, list_role_item),
-                            rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
+                            rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")
                         ),
 
                         spacing="1",
@@ -369,7 +369,7 @@ def edit_form(item: Tuple[int, User]) -> rx.Component:
                         rx.cond(
                             UserState.has_selected_actions,
                             rx.foreach(UserState.selected_actions, list_action_item),
-                            rx.center(rx.text("Ничего не выбрано"), width="100%", size="3")
+                            rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")
                         ),
 
                         spacing="1",

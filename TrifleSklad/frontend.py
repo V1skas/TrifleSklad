@@ -1,7 +1,10 @@
 import reflex as rx
 
+from TrifleSklad.state import AppState
 from components import decor
-from TrifleSklad import authorithation, administration, routes, catalog
+from TrifleSklad import authorithation, administration, routes, catalog, movement
+
+from TrifleSklad.authorithation.frontend import require_login
 
 def navbar_link(text: str, url: str) -> rx.Component:
     return rx.link(
@@ -45,6 +48,7 @@ def navbar() -> rx.Component:
             rx.hstack(
                 navbar_link("Администрирование", routes.ADMIN),
                 navbar_link("Каталог", routes.CATALOG),
+                navbar_link("Движение ТМЦ", routes.MOVEMENT),
 
                 align_items="center",
                 height="100%",
@@ -57,11 +61,11 @@ def navbar() -> rx.Component:
 
                         size="2",
                         radius="full",
-                    )
+                    ),
                 ),
                 rx.menu.content(
                     rx.menu.separator(),
-                    rx.menu.item("Выйти"),
+                    rx.menu.item("Выйти", on_click=AppState.logout),
                 ),
 
                 justify="end",
@@ -116,6 +120,7 @@ def workspace(*tabs, **prop):
 def auth_page() -> rx.Component:
     return authorithation.frontend.index()
 
+@require_login
 def welcome_page() -> rx.Component:
     return rx.vstack(
         navbar(),
@@ -138,6 +143,7 @@ def welcome_page() -> rx.Component:
         width="100vw",
     )
 
+@require_login
 def administration_page() -> rx.Component:
     return rx.vstack(
         navbar(),
@@ -146,10 +152,20 @@ def administration_page() -> rx.Component:
         width="100vw",
     )
 
+@require_login
 def catalog_page() -> rx.Component:
     return rx.vstack(
         navbar(),
         catalog.frontend.index(),
+
+        width="100vw",
+    )
+
+@require_login
+def movement_page() -> rx.Component:
+    return rx.vstack(
+        navbar(),
+        movement.frontend.index(),
 
         width="100vw",
     )

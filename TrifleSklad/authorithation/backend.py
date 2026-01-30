@@ -4,10 +4,12 @@ import reflex as rx
 import hashlib
 from sqlalchemy.exc import SQLAlchemyError
 
-from TrifleSklad.models import User
-from TrifleSklad.dao import UserDAO
+from utils import generations
+
+from TrifleSklad.models import User, AuthToken
+from TrifleSklad.dao import UserDAO, AuthTokenDAO
 from TrifleSklad.state import AppState
-from TrifleSklad.routes import INDEX
+from TrifleSklad.routes import WELCOME
 
 class AuthorizationState(rx.State):
     flag_err: bool = False
@@ -22,27 +24,34 @@ class AuthorizationState(rx.State):
         return self.text_err
 
     @rx.event
-    def auth_handler(self, form_data: Dict):
+    async def auth_handler(self, form_data: Dict):
         try:
             user: Optional[User] = UserDAO.get_user_by_id_with_relationships(form_data["login"])
             if user is None:
                 self.flag_err = True
                 self.text_err = "Неверный логин или пароль."
-                return
+                return None
             
             hasher = hashlib.sha256()
             salted_password = (form_data["password"] + user.salt).encode('utf-8')
             hasher.update(salted_password)
             calculated_hash = hasher.hexdigest()
 
-            if calculated_hash != user.hash:
+            if calculated_hash != user.password_hash:
                 self.flag_err = True
                 self.text_err = "Неверный логин или пароль."
-                return
+                return None
+
+            app_state = await self.get_state(AppState)
             
-            AppState.user = user
-            AppState.user_actions = UserDAO.get_user_actions_by_id(user.login)
-            return rx.redirect(INDEX)
+            app_state.user = user
+            app_state.user_actions = UserDAO.get_user_actions_by_id(user.login)
+
+            auth_token: str = generations.generate_auth_token()
+            AuthTokenDAO.add_one(AuthToken(token=auth_token, id_user=user.login))
+            app_state.auth_token = auth_token
+
+            return [rx.redirect(WELCOME)]
             
         except SQLAlchemyError as e:
             self.error_message = f"Ошибка при получении пользователя. Обратитесь к администратору."

@@ -53,3 +53,34 @@ CATALOG_STORAGES = "/catalog/storages/"
 CATALOG_STORAGES_VIEW_ID = "/catalog/storages/view/"
 CATALOG_STORAGES_EDIT_ID = "/catalog/storages/edit/"
 CATALOG_STORAGES_ADD = "/catalog/storages/add/"
+
+CATALOG_PAYMENT_TYPES = "/catalog/payment_types/"
+CATALOG_PAYMENT_TYPES_VIEW_ID = "/catalog/payment_types/view/"
+CATALOG_PAYMENT_TYPES_EDIT_ID = "/catalog/payment_types/edit/"
+CATALOG_PAYMENT_TYPES_ADD = "/catalog/payment_types/add/"
+
+MOVEMENT_TAB = "/movement/[tab]/"
+MOVEMENT_TAB_PAGE = "/movement/[tab]/[page]/"
+MOVEMENT_TAB_PAGE_ID = "/movement/[tab]/[page]/[id]/"
+
+MOVEMENT = "/movement"
+
+MOVEMENT_ADMISSIONS = "/movement/admissions/"
+MOVEMENT_ADMISSIONS_VIEW_ID = "/movement/admissions/view/"
+MOVEMENT_ADMISSIONS_EDIT_ID = "/movement/admissions/edit/"
+MOVEMENT_ADMISSIONS_ADD = "/movement/admissions/add/"
+
+MOVEMENT_WRITE_OFFS = "/movement/write_offs/"
+MOVEMENT_WRITE_OFFS_VIEW_ID = "/movement/write_offs/view/"
+MOVEMENT_WRITE_OFFS_EDIT_ID = "/movement/write_offs/edit/"
+MOVEMENT_WRITE_OFFS_ADD = "/movement/write_offs/add/"
+
+MOVEMENT_MOVEMENTS = "/movement/movements/"
+MOVEMENT_MOVEMENTS_VIEW_ID = "/movement/movements/view/"
+MOVEMENT_MOVEMENTS_EDIT_ID = "/movement/movements/edit/"
+MOVEMENT_MOVEMENTS_ADD = "/movement/movements/add/"
+
+MOVEMENT_ISSUES = "/movement/issues/"
+MOVEMENT_ISSUES_VIEW_ID = "/movement/issues/view/"
+MOVEMENT_ISSUES_EDIT_ID = "/movement/issues/edit/"
+MOVEMENT_ISSUES_ADD = "/movement/issues/add/"

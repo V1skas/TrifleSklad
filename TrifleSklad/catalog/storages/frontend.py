@@ -6,7 +6,7 @@ from TrifleSklad.catalog.storages.backend import *
 def item_preview(item: Tuple[int, Storage]) -> rx.Component:
     return rx.vstack(
         rx.heading(item[1].title, size="7", width="100%"),
-        rx.text(item[1].type, width="100%"),
+        rx.text(StorageState.get_titles_type_storages_dict[item[1].type], width="100%"),
         rx.text(item[1].description, is_optional=True, width="100%"),
         rx.text(item[1].address, width="100%"),
         rx.text(item[1].responsible.fio, width="100%"),
@@ -48,7 +48,7 @@ def table_row(item: Tuple[int, Storage]) -> rx.Component:
 
             align="left"
         ),
-        rx.table.cell(item[1].type),
+        rx.table.cell(StorageState.get_titles_type_storages_dict[item[1].type]),
         rx.table.cell(item[1].address),
         rx.table.cell(item[1].responsible.fio),
     )
@@ -114,8 +114,11 @@ def add_form() -> rx.Component:
                     width="100%"
                 ),
                 rx.text("Тип", size="4", width="100%"),
-                rx.input(
+                rx.select(
+                    StorageState.get_titles_type_storages_list,
+
                     name="type",
+                    placeholder="Выберите из списка",
                     required=True,
                     width="100%"
                 ),
@@ -183,10 +186,14 @@ def edit_form(item: Tuple[int, Storage]) -> rx.Component:
                     width="100%"
                 ),
                 rx.text("Тип", size="4", width="100%"),
-                rx.input(
+                rx.select(
+                    StorageState.get_titles_type_storages_list,
+
                     name="type",
+                    placeholder="Выберите из списка",
+                    default_value=StorageState.get_titles_type_storages_dict[item[1].type],
                     required=True,
-                    default_value=item[1].type,
+
                     width="100%"
                 ),
                 rx.text("Описание", size="4", width="100%"),

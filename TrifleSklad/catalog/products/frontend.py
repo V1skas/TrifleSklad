@@ -22,13 +22,23 @@ def item_preview(item: Tuple[int, ProductCatalog]) -> rx.Component:
                 rx.text("Делимый: Нет", width="50%")
             ),
 
-            rx.text(f"Вместимость: {item[1].capacity}", width="50%"),
+            rx.text(f"Вместимость: {rx.cond(item[1].divisible, item[1].capacity, "-")}", width="50%"),
             width="100%"
         ),
-        rx.cond(
-            item[1].category,
-            rx.text(f"Категория: {item[1].category.title}", width="100%"),
-            rx.text("Категория не указана", width="100%")
+        rx.hstack(
+            rx.cond(
+                item[1].uniq,
+                rx.text("Имеет серийный номер: Да", width="50%"),
+                rx.text("Имеет серийный номер: Нет", width="50%")
+            ),
+
+            rx.cond(
+                item[1].category,
+                rx.text(f"Категория: {item[1].category.title}", width="50%"),
+                rx.text("Категория не указана", width="50%")
+            ),
+
+            width="100%"
         ),
         rx.spacer(),
         rx.hstack(
@@ -79,7 +89,10 @@ def table_row(item: Tuple[int, ProductCatalog]) -> rx.Component:
             )
         ),
         rx.table.cell(
-            rx.text(item[1].capacity)
+            rx.cond(item[1].divisible,
+                    rx.text(item[1].capacity),
+                    rx.text("-")
+                    )
         ),
     )
 
@@ -142,12 +155,27 @@ def add_form() -> rx.Component:
                 rx.text("Описание", size="3", width="100%"),
                 rx.text_area(id="description", size="3", width="100%"),
                 rx.text("Категория", size="3", width="100%"),
-                rx.select(
-                    [category.title for category in ProductCategoryDAO.get_all()],
+                rx.select.root(
+                    rx.select.trigger(
+                        placeholder="Выберите из списка",
+                        width="100%",
+                    ),
+                    rx.select.content(
+                        rx.foreach(
+                            ProductsState.product_category_list,
+                            lambda category: rx.select.item(
+                                rx.text(category[0]),
+                                value=category[1],
+                            )),
+
+                        width="100%",
+                    ),
 
                     name="id_category",
                     required=True,
-                    placeholder="Выберите категорию",
+                    value=ProductsState.selected_product_category_id,
+                    on_change=ProductsState.on_change_product_category,
+
                     size="3",
                     width="100%"
                 ),
@@ -155,6 +183,12 @@ def add_form() -> rx.Component:
                 rx.input(id="unit", required=True, size="3", width="100%"),
                 rx.text("Вместимость", size="3", width="100%"),
                 rx.input(id="capacity", required=True, size="3", width="100%"),
+                rx.checkbox(
+                    "Имеет серийный номер",
+                    id="uniq",
+                    size="3",
+                    width="100%"
+                ),
                 rx.checkbox(
                     "Делимый товар",
                     id="divisible",
@@ -206,13 +240,27 @@ def edit_form(item: Tuple[int, ProductCatalog]) -> rx.Component:
                 rx.text("Описание", size="3", width="100%"),
                 rx.text_area(id="description", default_value=item[1].description, is_optional=True, size="3", width="100%"),
                 rx.text("Категория", size="3", width="100%"),
-                rx.select(
-                    [category.title for category in ProductCategoryDAO.get_all()],
-                    default_value=item[1].category.title,
+                rx.select.root(
+                    rx.select.trigger(
+                        placeholder="Выберите из списка",
+                        width="100%",
+                    ),
+                    rx.select.content(
+                        rx.foreach(
+                            ProductsState.product_category_list,
+                            lambda category: rx.select.item(
+                                rx.text(category[0]),
+                                value=category[1],
+                            )),
+
+                        width="100%",
+                    ),
 
                     name="id_category",
                     required=True,
-                    placeholder="Выберите категорию",
+                    value=ProductsState.selected_product_category_id,
+                    on_change=ProductsState.on_change_product_category,
+
                     size="3",
                     width="100%"
                 ),
@@ -220,6 +268,13 @@ def edit_form(item: Tuple[int, ProductCatalog]) -> rx.Component:
                 rx.input(id="unit", required=True, default_value=item[1].unit, size="3", width="100%"),
                 rx.text("Вместимость", size="3", width="100%"),
                 rx.input(id="capacity", required=True, default_value=str(item[1].capacity), size="3", width="100%"),
+                rx.checkbox(
+                    "Имеет серийный номер",
+                    default_value=item[1].uniq,
+                    id="uniq",
+                    size="3",
+                    width="100%"
+                ),
                 rx.checkbox(
                     "Делимый товар",
                     default_value=item[1].divisible,
