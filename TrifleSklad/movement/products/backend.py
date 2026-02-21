@@ -1,10 +1,10 @@
-import reflex as rx
-
 from typing import List, Optional, Tuple
 
-from TrifleSklad.models import Product
+import reflex as rx
 
+from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
+
 
 class ProductsMovementListState(rx.State):
     items: List[Product] = []
@@ -19,7 +19,7 @@ class ProductsMovementListState(rx.State):
 
     async def on_load(self):
         # FUTURE: обследовать работу, возможно есть способ лучше
-        self.products_selector_state = (await self.get_state(ProductsSelectorState))
+        self.products_selector_state = await self.get_state(ProductsSelectorState)
         self.products_selector_state.clear()
 
     def set_view_mode(self, is_view: bool):
@@ -34,8 +34,10 @@ class ProductsMovementListState(rx.State):
         return len(self.items) > 0
 
     @rx.var
-    def ability_open_dialog(self) ->  bool:
-        return True if self.filter_by_owner > -1 and self.filter_by_storage > -1 else False
+    def ability_open_dialog(self) -> bool:
+        return (
+            True if self.filter_by_owner > -1 and self.filter_by_storage > -1 else False
+        )
 
     @rx.var
     def get_items(self) -> List[Tuple[int, Product]]:
@@ -43,8 +45,10 @@ class ProductsMovementListState(rx.State):
 
     @rx.event
     def open_dialog(self):
-        filter_products = [ item.id for item in self.items ]
-        self.products_selector_state.set_filter(self.filter_by_owner, self.filter_by_storage, filter_products)
+        filter_products = [item.id for item in self.items]
+        self.products_selector_state.set_filter(
+            self.filter_by_owner, self.filter_by_storage, filter_products
+        )
         self.dialog_open = True
 
     @rx.event

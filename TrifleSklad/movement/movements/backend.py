@@ -1,16 +1,15 @@
+from datetime import date
+from typing import List, Optional, Tuple
+
 import reflex as rx
 
-from typing import List, Tuple, Optional
-from datetime import date
-
-from TrifleSklad.declared import movements_status_list, MovementsType, MovementsStatus
-
 import TrifleSklad.routes as routes
+from TrifleSklad.dao import MovementDAO, OwnerDAO, ProductDAO, StorageDAO
+from TrifleSklad.declared import MovementsStatus, MovementsType, movements_status_list
+from TrifleSklad.models import Movement, Product
+from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
-from TrifleSklad.models import Movement, Product
-from TrifleSklad.dao import MovementDAO, StorageDAO, OwnerDAO, ProductDAO
-from TrifleSklad.movement.products.backend import ProductsMovementListState
 
 class MovementsState(rx.State):
     class Pages:
@@ -40,8 +39,8 @@ class MovementsState(rx.State):
     products_movement_list_state: Optional[ProductsMovementListState] = None
 
     def _check_path(self):
-        page = self.router.page.params.get('page', '')
-        if page != '':
+        page = self.router.page.params.get("page", "")
+        if page != "":
             id = -1
 
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
@@ -63,11 +62,14 @@ class MovementsState(rx.State):
                 self.search_name_destination_storage = ""
             # /movements/edit/[id]
             elif page == self.Pages.EDIT:
-                id = self.router.page.params.get('id', '')
-                if id != '':
+                id = self.router.page.params.get("id", "")
+                if id != "":
                     id = MovementDAO.get_by_id_with_product_storage_owner(id)
                     if id is None:
-                        return [rx.redirect(routes.MOVEMENT_MOVEMENTS), rx.toast.error("Запись не найдена")]
+                        return [
+                            rx.redirect(routes.MOVEMENT_MOVEMENTS),
+                            rx.toast.error("Запись не найдена"),
+                        ]
 
                     self.__load_list_storages()
                     self.__load_list_owners()
@@ -82,11 +84,14 @@ class MovementsState(rx.State):
                     return rx.redirect(routes.MOVEMENT_MOVEMENTS)
             # /movements/view/[id]
             elif page == self.Pages.VIEW:
-                id = self.router.page.params.get('id', '')
-                if id != '':
+                id = self.router.page.params.get("id", "")
+                if id != "":
                     id = MovementDAO.get_by_id_with_product_storage_owner(id)
                     if id is None:
-                        return [rx.redirect(routes.MOVEMENT_MOVEMENTS), rx.toast.error("Запись не найдена")]
+                        return [
+                            rx.redirect(routes.MOVEMENT_MOVEMENTS),
+                            rx.toast.error("Запись не найдена"),
+                        ]
                 else:
                     return rx.redirect(routes.MOVEMENT_MOVEMENTS)
 
@@ -116,23 +121,35 @@ class MovementsState(rx.State):
             self.selected_item = -1
             self.selected_item = -1
             self.current_page = self.Pages.LIST
-            self.items = MovementDAO.get_all_by_type_with_storage_owner(MovementsType.MOVEMENT)
+            self.items = MovementDAO.get_all_by_type_with_storage_owner(
+                MovementsType.MOVEMENT
+            )
 
     def __load_list_storages(self):
-        self.list_storages = [(item.title, str(item.id)) for item in StorageDAO.get_all()]
+        self.list_storages = [
+            (item.title, str(item.id)) for item in StorageDAO.get_all()
+        ]
 
     def __load_list_owners(self):
         self.list_owners = [(item.title, str(item.id)) for item in OwnerDAO.get_all()]
 
     @rx.var
     def filtered_incoming_storages(self) -> List[Tuple[str, str]]:
-        return [item for item in self.list_storages if self.search_name_incoming_storage == "" or
-                              self.search_name_incoming_storage.lower() in item[0].lower() ]
+        return [
+            item
+            for item in self.list_storages
+            if self.search_name_incoming_storage == ""
+            or self.search_name_incoming_storage.lower() in item[0].lower()
+        ]
 
     @rx.var
     def filtered_destination_storages(self) -> List[Tuple[str, str]]:
-        return [item for item in self.list_storages if self.search_name_destination_storage == "" or
-                              self.search_name_destination_storage.lower() in item[0].lower() ]
+        return [
+            item
+            for item in self.list_storages
+            if self.search_name_destination_storage == ""
+            or self.search_name_destination_storage.lower() in item[0].lower()
+        ]
 
     @rx.var
     def has_items(self) -> bool:
@@ -166,11 +183,17 @@ class MovementsState(rx.State):
     def get_selected_movement_status(self) -> str:
         if self.current_page == MovementsState.Pages.ADD:
             return ""
-        return movements_status_list[self.items[self.selected_item].status] if self.selected_item >= 0 else ""
+        return (
+            movements_status_list[self.items[self.selected_item].status]
+            if self.selected_item >= 0
+            else ""
+        )
 
     @rx.event
     async def on_load(self):
-        self.products_movement_list_state = (await self.get_state(ProductsMovementListState))
+        self.products_movement_list_state = await self.get_state(
+            ProductsMovementListState
+        )
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self._check_path()
@@ -178,15 +201,17 @@ class MovementsState(rx.State):
     @rx.event
     def on_change_id_incoming_storage(self, value: str):
         self.id_incoming_storage = value
-        self.products_movement_list_state.filter_by_storage = int(
-            self.id_incoming_storage) if self.id_incoming_storage != "" else -1
+        self.products_movement_list_state.filter_by_storage = (
+            int(self.id_incoming_storage) if self.id_incoming_storage != "" else -1
+        )
         self.products_movement_list_state.items = []
 
     @rx.event
     def on_change_id_incoming_owner(self, value: str):
         self.id_incoming_owner = value
-        self.products_movement_list_state.filter_by_owner = int(
-            self.id_incoming_owner) if self.id_incoming_owner != "" else -1
+        self.products_movement_list_state.filter_by_owner = (
+            int(self.id_incoming_owner) if self.id_incoming_owner != "" else -1
+        )
         self.products_movement_list_state.items = []
 
     @rx.event
@@ -229,13 +254,21 @@ class MovementsState(rx.State):
         form_data["movement_products_list"] = self.products_movement_list_state.items
         form_data["id_user"] = (await self.get_state(AppState)).user.login
 
-        list_id_item_for_delete: List[int] = [product.id for product in self.products_movement_list_state.items]
+        list_id_item_for_delete: List[int] = [
+            product.id for product in self.products_movement_list_state.items
+        ]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
-            flat, text = ProductDAO.update_owner_storage(list_id_item_for_delete, self.id_destination_owner, self.id_destination_storage)
+            flat, text = ProductDAO.update_owner_storage(
+                list_id_item_for_delete,
+                self.id_destination_owner,
+                self.id_destination_storage,
+            )
             if flag:
-                return [rx.toast.success("Перемещение проведено!"),
-                        rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}")]
+                return [
+                    rx.toast.success("Перемещение проведено!"),
+                    rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}"),
+                ]
         return rx.toast.error(text)
 
     @rx.event

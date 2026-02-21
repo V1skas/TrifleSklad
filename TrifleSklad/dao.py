@@ -1,16 +1,32 @@
+from typing import List, Optional
+
 import reflex as rx
-
-from typing import Optional, List
-from sqlmodel import select
-from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import joinedload, selectinload
+from sqlmodel import select
 
+from TrifleSklad.declared import MovementsStatus, MovementsType, get_status_by_text
 from TrifleSklad.models import (
-    User, AuthToken, Role, Action, Worker, ProductCategory, ProductCatalog,
-    Storage, Owner, Supplier, Product, Movement, MovementProductsCatalog,
-    PaymentType, Admission, Issue, Sale, UsersActions, MovementProducts
+    Action,
+    Admission,
+    AuthToken,
+    Issue,
+    Movement,
+    MovementProducts,
+    MovementProductsCatalog,
+    Owner,
+    PaymentType,
+    Product,
+    ProductCatalog,
+    ProductCategory,
+    Role,
+    Sale,
+    Storage,
+    Supplier,
+    User,
+    UsersActions,
+    Worker,
 )
-from TrifleSklad.declared import MovementsType, get_status_by_text, MovementsStatus
 
 
 class UserDAO:
@@ -27,11 +43,15 @@ class UserDAO:
 
     @classmethod
     def get_all_with_relationships(cls) -> List[User]:
-        statement = select(User).options(
-            selectinload(User.actions),
-            selectinload(User.roles),
-            selectinload(User.worker)
-        ).where(User.is_deleted == False)
+        statement = (
+            select(User)
+            .options(
+                selectinload(User.actions),
+                selectinload(User.roles),
+                selectinload(User.worker),
+            )
+            .where(User.is_deleted == False)
+        )
 
         with rx.session() as session:
             users = session.exec(statement).all()
@@ -42,11 +62,16 @@ class UserDAO:
 
     @classmethod
     def get_user_by_id_with_relationships(cls, id: str) -> Optional[User]:
-        statement = select(User).options(
+        statement = (
+            select(User)
+            .options(
                 selectinload(User.actions),
                 selectinload(User.roles),
-                selectinload(User.worker)
-            ).where(User.login == id).where(User.is_deleted == False)
+                selectinload(User.worker),
+            )
+            .where(User.login == id)
+            .where(User.is_deleted == False)
+        )
 
         with rx.session() as session:
             user = session.exec(statement).one_or_none()
@@ -84,7 +109,11 @@ class UserDAO:
                 statement = select(User).where(User.login == user.login)
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Пользователь с таким логином уже существует", -1
+                    return (
+                        False,
+                        "Ошибка: Пользователь с таким логином уже существует",
+                        -1,
+                    )
 
                 session.add(user)
                 session.commit()
@@ -111,18 +140,30 @@ class UserDAO:
                 for key, value in form_data.items():
                     if key == "actions":
                         # value — список id действий, получаем объекты из базы
-                        actions = session.exec(select(Action).where(Action.id.in_(value))).all()
+                        actions = session.exec(
+                            select(Action).where(Action.id.in_(value))
+                        ).all()
                         setattr(user, key, actions)
                     elif key == "roles":
                         # value — список id ролей, получаем объекты из базы
-                        roles = session.exec(select(Role).where(Role.id.in_(value))).all()
+                        roles = session.exec(
+                            select(Role).where(Role.id.in_(value))
+                        ).all()
                         setattr(user, key, roles)
                     else:
                         setattr(user, key, value)
 
-                statement = select(User).where(User.login == user.login).where(User.login != user.login)
+                statement = (
+                    select(User)
+                    .where(User.login == user.login)
+                    .where(User.login != user.login)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Пользователь с таким логином уже существует", user.login
+                    return (
+                        False,
+                        "Ошибка: Пользователь с таким логином уже существует",
+                        user.login,
+                    )
 
                 session.commit()
                 session.refresh(user)
@@ -168,10 +209,10 @@ class UserDAO:
 class AuthTokenDAO:
     @classmethod
     def get_by_token_user_actions(cls, token: str) -> Optional[AuthToken]:
-        statement = select(AuthToken).where(AuthToken.token == token).options(
-            joinedload(AuthToken.user).options(
-                selectinload(User.actions)
-            )
+        statement = (
+            select(AuthToken)
+            .where(AuthToken.token == token)
+            .options(joinedload(AuthToken.user).options(selectinload(User.actions)))
         )
 
         with rx.session() as session:
@@ -202,7 +243,9 @@ class AuthTokenDAO:
     def delete_one(cls, token: str):
         with rx.session() as session:
             try:
-                auth_token = session.exec(select(AuthToken).where(AuthToken.token == token)).one_or_none()
+                auth_token = session.exec(
+                    select(AuthToken).where(AuthToken.token == token)
+                ).one_or_none()
 
                 if auth_token is None:
                     return False, "Ошибка: Токен не найден"
@@ -225,7 +268,9 @@ class AuthTokenDAO:
     def delete_all_by_user(cls, login: str):
         with rx.session() as session:
             try:
-                auth_tokens = session.exec(select(AuthToken).where(AuthToken.user_login == login)).all()
+                auth_tokens = session.exec(
+                    select(AuthToken).where(AuthToken.user_login == login)
+                ).all()
 
                 if not auth_tokens:
                     return False, "Ошибка: Токены не найдены"
@@ -251,8 +296,7 @@ class RoleDAO:
     @classmethod
     def get_all_with_relationships(cls) -> List[Role]:
         statement = select(Role).options(
-            selectinload(Role.actions),
-            selectinload(Role.users)
+            selectinload(Role.actions), selectinload(Role.users)
         )
 
         with rx.session() as session:
@@ -286,10 +330,11 @@ class RoleDAO:
 
     @classmethod
     def get_by_id_with_relationships(cls, id) -> Optional[Role]:
-        statement = select(Role).options(
-            selectinload(Role.actions),
-            selectinload(Role.users)
-        ).where(Role.id == id)
+        statement = (
+            select(Role)
+            .options(selectinload(Role.actions), selectinload(Role.users))
+            .where(Role.id == id)
+        )
 
         with rx.session() as session:
             role = session.exec(statement).one_or_none()
@@ -345,12 +390,18 @@ class RoleDAO:
                 for key, value in form_data.items():
                     if key == "actions":
                         # value — список id действий, получаем объекты из базы
-                        actions = session.exec(select(Action).where(Action.id.in_(value))).all()
+                        actions = session.exec(
+                            select(Action).where(Action.id.in_(value))
+                        ).all()
                         setattr(role, key, actions)
                     else:
                         setattr(role, key, value)
 
-                statement = select(Role).where(Role.title == role.title).where(Role.id != role.id)
+                statement = (
+                    select(Role)
+                    .where(Role.title == role.title)
+                    .where(Role.id != role.id)
+                )
                 if session.exec(statement).one_or_none() is not None:
                     return False, "Ошибка: Роль с таким именем уже существует", role.id
 
@@ -496,9 +547,17 @@ class WorkerDAO:
                 for key, value in form_data.items():
                     setattr(worker, key, value)
 
-                statement = select(Worker).where(Worker.fio == worker.fio).where(Worker.id != worker.id)
+                statement = (
+                    select(Worker)
+                    .where(Worker.fio == worker.fio)
+                    .where(Worker.id != worker.id)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Работник с таким ФИО уже существует", worker.id
+                    return (
+                        False,
+                        "Ошибка: Работник с таким ФИО уже существует",
+                        worker.id,
+                    )
 
                 session.commit()
                 session.refresh(worker)
@@ -555,9 +614,11 @@ class ProductCategoryDAO:
 
     @classmethod
     def get_all_with_relationships(cls) -> List[ProductCategory]:
-        statement = select(ProductCategory).options(
-            selectinload(ProductCategory.products)
-        ).where(ProductCategory.is_deleted == False)
+        statement = (
+            select(ProductCategory)
+            .options(selectinload(ProductCategory.products))
+            .where(ProductCategory.is_deleted == False)
+        )
 
         with rx.session() as session:
             categories = session.exec(statement).all()
@@ -568,7 +629,11 @@ class ProductCategoryDAO:
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[ProductCategory]:
-        statement = select(ProductCategory).where(ProductCategory.id == id).where(ProductCategory.is_deleted == False)
+        statement = (
+            select(ProductCategory)
+            .where(ProductCategory.id == id)
+            .where(ProductCategory.is_deleted == False)
+        )
 
         with rx.session() as session:
             category = session.exec(statement).one_or_none()
@@ -579,7 +644,11 @@ class ProductCategoryDAO:
 
     @classmethod
     def get_by_title(cls, title: str) -> Optional[ProductCategory]:
-        statement = select(ProductCategory).where(ProductCategory.title == title).where(ProductCategory.is_deleted == False)
+        statement = (
+            select(ProductCategory)
+            .where(ProductCategory.title == title)
+            .where(ProductCategory.is_deleted == False)
+        )
 
         with rx.session() as session:
             category = session.exec(statement).one_or_none()
@@ -590,9 +659,12 @@ class ProductCategoryDAO:
 
     @classmethod
     def get_by_id_with_relationships(cls, id: str) -> Optional[ProductCategory]:
-        statement = select(ProductCategory).options(
-            joinedload(ProductCategory.products)
-        ).where(ProductCategory.id == id).where(ProductCategory.is_deleted == False)
+        statement = (
+            select(ProductCategory)
+            .options(joinedload(ProductCategory.products))
+            .where(ProductCategory.id == id)
+            .where(ProductCategory.is_deleted == False)
+        )
 
         with rx.session() as session:
             category = session.exec(statement).unique().one_or_none()
@@ -607,10 +679,18 @@ class ProductCategoryDAO:
 
         with rx.session() as session:
             try:
-                statement = select(ProductCategory).where(ProductCategory.title == category.title).where(ProductCategory.is_deleted == False)
+                statement = (
+                    select(ProductCategory)
+                    .where(ProductCategory.title == category.title)
+                    .where(ProductCategory.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Категория с таким названием уже существует", -1
+                    return (
+                        False,
+                        "Ошибка: Категория с таким названием уже существует",
+                        -1,
+                    )
 
                 session.add(category)
                 session.commit()
@@ -637,9 +717,18 @@ class ProductCategoryDAO:
                 for key, value in form_data.items():
                     setattr(category, key, value)
 
-                statement = select(ProductCategory).where(ProductCategory.title == category.title).where(ProductCategory.id != category.id).where(ProductCategory.is_deleted == False)
+                statement = (
+                    select(ProductCategory)
+                    .where(ProductCategory.title == category.title)
+                    .where(ProductCategory.id != category.id)
+                    .where(ProductCategory.is_deleted == False)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Категория с таким названием уже существует", category.id
+                    return (
+                        False,
+                        "Ошибка: Категория с таким названием уже существует",
+                        category.id,
+                    )
 
                 session.commit()
                 session.refresh(category)
@@ -692,7 +781,11 @@ class ProductCatalogDAO:
 
     @classmethod
     def get_all_exclude_ids(cls, exclude_ids: List[int]) -> List[ProductCatalog]:
-        statement = select(ProductCatalog).where(ProductCatalog.is_deleted == False).where(ProductCatalog.id.not_in(exclude_ids))
+        statement = (
+            select(ProductCatalog)
+            .where(ProductCatalog.is_deleted == False)
+            .where(ProductCatalog.id.not_in(exclude_ids))
+        )
 
         with rx.session() as session:
             products = session.exec(statement).all()
@@ -703,16 +796,20 @@ class ProductCatalogDAO:
 
     @classmethod
     def get_all_titles(cls) -> List[str]:
-        statement = select(ProductCatalog.title).where(ProductCatalog.is_deleted == False)
+        statement = select(ProductCatalog.title).where(
+            ProductCatalog.is_deleted == False
+        )
 
         with rx.session() as session:
             return session.exec(statement).all()
 
     @classmethod
     def get_all_with_relationships(cls) -> List[ProductCatalog]:
-        statement = select(ProductCatalog).options(
-            selectinload(ProductCatalog.category)
-        ).where(ProductCatalog.is_deleted == False)
+        statement = (
+            select(ProductCatalog)
+            .options(selectinload(ProductCatalog.category))
+            .where(ProductCatalog.is_deleted == False)
+        )
 
         with rx.session() as session:
             products = session.exec(statement).all()
@@ -723,7 +820,11 @@ class ProductCatalogDAO:
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[ProductCatalog]:
-        statement = select(ProductCatalog).where(ProductCatalog.id == id).where(ProductCatalog.is_deleted == False)
+        statement = (
+            select(ProductCatalog)
+            .where(ProductCatalog.id == id)
+            .where(ProductCatalog.is_deleted == False)
+        )
 
         with rx.session() as session:
             product = session.exec(statement).one_or_none()
@@ -734,9 +835,12 @@ class ProductCatalogDAO:
 
     @classmethod
     def get_by_id_with_relationships(cls, id: str) -> Optional[ProductCatalog]:
-        statement = select(ProductCatalog).options(
-            joinedload(ProductCatalog.category)
-        ).where(ProductCatalog.id == id).where(ProductCatalog.is_deleted == False)
+        statement = (
+            select(ProductCatalog)
+            .options(joinedload(ProductCatalog.category))
+            .where(ProductCatalog.id == id)
+            .where(ProductCatalog.is_deleted == False)
+        )
 
         with rx.session() as session:
             product = session.exec(statement).unique().one_or_none()
@@ -747,7 +851,11 @@ class ProductCatalogDAO:
 
     @classmethod
     def get_by_title(cls, title: str) -> Optional[ProductCatalog]:
-        statement = select(ProductCatalog).where(ProductCatalog.title == title).where(ProductCatalog.is_deleted == False)
+        statement = (
+            select(ProductCatalog)
+            .where(ProductCatalog.title == title)
+            .where(ProductCatalog.is_deleted == False)
+        )
 
         with rx.session() as session:
             product = session.exec(statement).one_or_none()
@@ -762,7 +870,11 @@ class ProductCatalogDAO:
 
         with rx.session() as session:
             try:
-                statement = select(ProductCatalog).where(ProductCatalog.title == product.title).where(ProductCatalog.is_deleted == False)
+                statement = (
+                    select(ProductCatalog)
+                    .where(ProductCatalog.title == product.title)
+                    .where(ProductCatalog.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
                     return False, "Ошибка: Товар с таким названием уже существует", -1
@@ -792,9 +904,18 @@ class ProductCatalogDAO:
                 for key, value in form_data.items():
                     setattr(product, key, value)
 
-                statement = select(ProductCatalog).where(ProductCatalog.title == product.title).where(ProductCatalog.id != product.id).where(ProductCatalog.is_deleted == False)
+                statement = (
+                    select(ProductCatalog)
+                    .where(ProductCatalog.title == product.title)
+                    .where(ProductCatalog.id != product.id)
+                    .where(ProductCatalog.is_deleted == False)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Товар с таким названием уже существует", product.id
+                    return (
+                        False,
+                        "Ошибка: Товар с таким названием уже существует",
+                        product.id,
+                    )
 
                 session.commit()
                 session.refresh(product)
@@ -847,9 +968,11 @@ class StorageDAO:
 
     @classmethod
     def get_all_with_relationships(cls) -> List[Storage]:
-        statement = select(Storage).options(
-            selectinload(Storage.responsible)
-        ).where(Storage.is_deleted == False)
+        statement = (
+            select(Storage)
+            .options(selectinload(Storage.responsible))
+            .where(Storage.is_deleted == False)
+        )
 
         with rx.session() as session:
             storages = session.exec(statement).all()
@@ -860,7 +983,9 @@ class StorageDAO:
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[Storage]:
-        statement = select(Storage).where(Storage.id == id).where(Storage.is_deleted == False)
+        statement = (
+            select(Storage).where(Storage.id == id).where(Storage.is_deleted == False)
+        )
 
         with rx.session() as session:
             storage = session.exec(statement).one_or_none()
@@ -871,9 +996,12 @@ class StorageDAO:
 
     @classmethod
     def get_by_id_with_relationships(cls, id: str) -> Optional[Storage]:
-        statement = select(Storage).options(
-            joinedload(Storage.responsible)
-        ).where(Storage.id == id).where(Storage.is_deleted == False)
+        statement = (
+            select(Storage)
+            .options(joinedload(Storage.responsible))
+            .where(Storage.id == id)
+            .where(Storage.is_deleted == False)
+        )
 
         with rx.session() as session:
             storage = session.exec(statement).unique().one_or_none()
@@ -884,7 +1012,11 @@ class StorageDAO:
 
     @classmethod
     def get_by_title(cls, title: str) -> Optional[Storage]:
-        statement = select(Storage).where(Storage.title == title).where(Storage.is_deleted == False)
+        statement = (
+            select(Storage)
+            .where(Storage.title == title)
+            .where(Storage.is_deleted == False)
+        )
 
         with rx.session() as session:
             storage = session.exec(statement).one_or_none()
@@ -895,14 +1027,20 @@ class StorageDAO:
 
     @classmethod
     def get_titles_by_type(cls, t: int) -> Optional[List[str]]:
-        statement = select(Storage.title).where(Storage.type == t).where(Storage.is_deleted == False)
+        statement = (
+            select(Storage.title)
+            .where(Storage.type == t)
+            .where(Storage.is_deleted == False)
+        )
 
         with rx.session() as session:
             return session.exec(statement).all()
 
     @classmethod
     def get_all_by_type(cls, t: int) -> List[Storage]:
-        statement = select(Storage).where(Storage.type == t).where(Storage.is_deleted == False)
+        statement = (
+            select(Storage).where(Storage.type == t).where(Storage.is_deleted == False)
+        )
 
         with rx.session() as session:
             storages = session.exec(statement).all()
@@ -917,7 +1055,11 @@ class StorageDAO:
 
         with rx.session() as session:
             try:
-                statement = select(Storage).where(Storage.title == storage.title).where(Storage.is_deleted == False)
+                statement = (
+                    select(Storage)
+                    .where(Storage.title == storage.title)
+                    .where(Storage.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
                     return False, "Ошибка: Склад с таким названием уже существует", -1
@@ -947,9 +1089,18 @@ class StorageDAO:
                 for key, value in form_data.items():
                     setattr(storage, key, value)
 
-                statement = select(Storage).where(Storage.title == storage.title).where(Storage.id != storage.id).where(Storage.is_deleted == False)
+                statement = (
+                    select(Storage)
+                    .where(Storage.title == storage.title)
+                    .where(Storage.id != storage.id)
+                    .where(Storage.is_deleted == False)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Склад с таким названием уже существует", storage.id
+                    return (
+                        False,
+                        "Ошибка: Склад с таким названием уже существует",
+                        storage.id,
+                    )
 
                 session.commit()
                 session.refresh(storage)
@@ -1013,7 +1164,9 @@ class OwnerDAO:
 
     @classmethod
     def get_by_title(cls, title: str) -> Optional[Owner]:
-        statement = select(Owner).where(Owner.title == title).where(Owner.is_deleted == False)
+        statement = (
+            select(Owner).where(Owner.title == title).where(Owner.is_deleted == False)
+        )
 
         with rx.session() as session:
             owner = session.exec(statement).one_or_none()
@@ -1035,10 +1188,18 @@ class OwnerDAO:
 
         with rx.session() as session:
             try:
-                statement = select(Owner).where(Owner.title == owner.title).where(Owner.is_deleted == False)
+                statement = (
+                    select(Owner)
+                    .where(Owner.title == owner.title)
+                    .where(Owner.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Владелец с таким названием уже существует", -1
+                    return (
+                        False,
+                        "Ошибка: Владелец с таким названием уже существует",
+                        -1,
+                    )
 
                 session.add(owner)
                 session.commit()
@@ -1065,9 +1226,18 @@ class OwnerDAO:
                 for key, value in form_data.items():
                     setattr(owner, key, value)
 
-                statement = select(Owner).where(Owner.title == owner.title).where(Owner.id != owner.id).where(Owner.is_deleted == False)
+                statement = (
+                    select(Owner)
+                    .where(Owner.title == owner.title)
+                    .where(Owner.id != owner.id)
+                    .where(Owner.is_deleted == False)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Владелец с таким названием уже существует", owner.id
+                    return (
+                        False,
+                        "Ошибка: Владелец с таким названием уже существует",
+                        owner.id,
+                    )
 
                 session.commit()
                 session.refresh(owner)
@@ -1116,14 +1286,22 @@ class SupplierDAO:
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[Supplier]:
-        statement = select(Supplier).where(Supplier.id == id).where(Supplier.is_deleted == False)
+        statement = (
+            select(Supplier)
+            .where(Supplier.id == id)
+            .where(Supplier.is_deleted == False)
+        )
 
         with rx.session() as session:
             return session.exec(statement).one_or_none()
 
     @classmethod
     def get_by_title(cls, title: str) -> Optional[Supplier]:
-        statement = select(Supplier).where(Supplier.title == title).where(Supplier.is_deleted == False)
+        statement = (
+            select(Supplier)
+            .where(Supplier.title == title)
+            .where(Supplier.is_deleted == False)
+        )
 
         with rx.session() as session:
             return session.exec(statement).one_or_none()
@@ -1141,10 +1319,18 @@ class SupplierDAO:
 
         with rx.session() as session:
             try:
-                statement = select(Supplier).where(Supplier.title == supplier.title).where(Supplier.is_deleted == False)
+                statement = (
+                    select(Supplier)
+                    .where(Supplier.title == supplier.title)
+                    .where(Supplier.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Поставщик с таким названием уже существует", -1
+                    return (
+                        False,
+                        "Ошибка: Поставщик с таким названием уже существует",
+                        -1,
+                    )
 
                 session.add(supplier)
                 session.commit()
@@ -1171,9 +1357,18 @@ class SupplierDAO:
                 for key, value in form_data.items():
                     setattr(supplier, key, value)
 
-                statement = select(Supplier).where(Supplier.title == supplier.title).where(Supplier.id != supplier.id).where(Supplier.is_deleted == False)
+                statement = (
+                    select(Supplier)
+                    .where(Supplier.title == supplier.title)
+                    .where(Supplier.id != supplier.id)
+                    .where(Supplier.is_deleted == False)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Поставщик с таким названием уже существует", supplier.id
+                    return (
+                        False,
+                        "Ошибка: Поставщик с таким названием уже существует",
+                        supplier.id,
+                    )
 
                 session.commit()
                 session.refresh(supplier)
@@ -1212,7 +1407,7 @@ class SupplierDAO:
                 return False, f"Ошибка: {str(e)}"
 
 
-class ProductDAO():
+class ProductDAO:
     @classmethod
     def get_all(cls) -> List[Product]:
         statement = select(Product)
@@ -1236,11 +1431,16 @@ class ProductDAO():
             return product
 
     @classmethod
-    def get_by_owner_storage_with_product_catalog(cls, owner_id: int, storage_id: int) -> List[Product]:
-        statement = select(Product).options(joinedload(Product.product_catalog)).where(
-            Product.id_owner == owner_id).where(
-            Product.id_storage == storage_id).where(
-            Product.is_deleted == False)
+    def get_by_owner_storage_with_product_catalog(
+        cls, owner_id: int, storage_id: int
+    ) -> List[Product]:
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_owner == owner_id)
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
 
         with rx.session() as session:
             products = session.exec(statement).all()
@@ -1342,7 +1542,9 @@ class ProductDAO():
                 return False, f"Ошибка: {str(e)}"
 
     @classmethod
-    def update_owner_storage(cls, id_list: List[int], new_owner_id: int, new_storage_id: int) -> tuple[bool, str]:
+    def update_owner_storage(
+        cls, id_list: List[int], new_owner_id: int, new_storage_id: int
+    ) -> tuple[bool, str]:
         with rx.session() as session:
             try:
                 statement = select(Product).where(Product.id.in_(id_list))
@@ -1366,7 +1568,8 @@ class ProductDAO():
                 session.rollback()
                 return False, f"Ошибка: {str(e)}"
 
-class MovementDAO():
+
+class MovementDAO:
     @classmethod
     def get_all(cls) -> List[Movement]:
         statement = select(Movement)
@@ -1402,8 +1605,9 @@ class MovementDAO():
 
     @classmethod
     def get_all_with_storage_owner(cls) -> List[Movement]:
-        statement = select(Movement).options(joinedload(Movement.incoming_storage),
-                                                  joinedload(Movement.incoming_owner))
+        statement = select(Movement).options(
+            joinedload(Movement.incoming_storage), joinedload(Movement.incoming_owner)
+        )
 
         with rx.session() as session:
             movements = session.exec(statement).all()
@@ -1414,10 +1618,16 @@ class MovementDAO():
 
     @classmethod
     def get_all_by_type_with_storage_owner(cls, type: int) -> List[Movement]:
-        statement = select(Movement).options(joinedload(Movement.incoming_storage),
-                                             joinedload(Movement.incoming_owner),
-                                             joinedload(Movement.destination_storage),
-                                             joinedload(Movement.destination_owner)).where(Movement.type == type)
+        statement = (
+            select(Movement)
+            .options(
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.incoming_owner),
+                joinedload(Movement.destination_storage),
+                joinedload(Movement.destination_owner),
+            )
+            .where(Movement.type == type)
+        )
 
         with rx.session() as session:
             movements = session.exec(statement).all()
@@ -1428,14 +1638,20 @@ class MovementDAO():
 
     @classmethod
     def get_by_id_with_product_storage_owner(cls, id: str) -> Optional[Movement]:
-        statement = select(Movement).options(selectinload(Movement.products_catalog).options(
-                                                      joinedload(MovementProductsCatalog.product),
-                                                      selectinload(MovementProductsCatalog.products)),
-                                                joinedload(Movement.incoming_storage),
-                                                joinedload(Movement.incoming_owner),
-                                                joinedload(Movement.destination_owner),
-                                                joinedload(Movement.destination_storage)
-                                                ).where(Movement.id == id)
+        statement = (
+            select(Movement)
+            .options(
+                selectinload(Movement.products_catalog).options(
+                    joinedload(MovementProductsCatalog.product),
+                    selectinload(MovementProductsCatalog.products),
+                ),
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.incoming_owner),
+                joinedload(Movement.destination_owner),
+                joinedload(Movement.destination_storage),
+            )
+            .where(Movement.id == id)
+        )
 
         with rx.session() as session:
             movement = session.exec(statement).one_or_none()
@@ -1452,7 +1668,9 @@ class MovementDAO():
                 movement.id_incoming_owner = form_data.get("id_incoming_owner")
                 movement.id_incoming_storage = form_data.get("id_incoming_storage")
                 movement.id_destination_owner = form_data.get("id_destination_owner")
-                movement.id_destination_storage = form_data.get("id_destination_storage")
+                movement.id_destination_storage = form_data.get(
+                    "id_destination_storage"
+                )
                 movement.type = form_data.get("type")
                 movement.date = form_data.get("date")
                 movement.comment = form_data.get("comment")
@@ -1466,14 +1684,18 @@ class MovementDAO():
 
                 for product in products_list:
                     if product.product_catalog not in products_catalog:
-                        products_catalog.append(product.product_catalog) # FUTURES: можно оптимизировать
+                        products_catalog.append(
+                            product.product_catalog
+                        )  # FUTURES: можно оптимизировать
 
                 for product_catalog in products_catalog:
-                    movement_product_catalog: MovementProductsCatalog = MovementProductsCatalog(
-                        id_movement=movement.id,
-                        id_product_catalog=product_catalog.id,
-                        count=0,
-                        products=[]
+                    movement_product_catalog: MovementProductsCatalog = (
+                        MovementProductsCatalog(
+                            id_movement=movement.id,
+                            id_product_catalog=product_catalog.id,
+                            count=0,
+                            products=[],
+                        )
                     )
                     for product in products_list:
                         if product.id_product_catalog == product_catalog.id:
@@ -1546,7 +1768,7 @@ class MovementDAO():
                 return False, f"Ошибка: {str(e)}"
 
 
-class MovementProductsCatalogDAO():
+class MovementProductsCatalogDAO:
     @classmethod
     def get_all(cls) -> List[MovementProductsCatalog]:
         statement = select(MovementProductsCatalog)
@@ -1560,7 +1782,9 @@ class MovementProductsCatalogDAO():
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[MovementProductsCatalog]:
-        statement = select(MovementProductsCatalog).where(MovementProductsCatalog.id == id)
+        statement = select(MovementProductsCatalog).where(
+            MovementProductsCatalog.id == id
+        )
 
         with rx.session() as session:
             movement_products_catalog = session.exec(statement).one_or_none()
@@ -1592,7 +1816,9 @@ class MovementProductsCatalogDAO():
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
         with rx.session() as session:
             try:
-                movement_products_catalog = session.get(MovementProductsCatalog, form_data["id"])
+                movement_products_catalog = session.get(
+                    MovementProductsCatalog, form_data["id"]
+                )
 
                 if movement_products_catalog is None:
                     return False, "Ошибка: Движение товара не найдено", -1
@@ -1602,7 +1828,11 @@ class MovementProductsCatalogDAO():
 
                 session.commit()
                 session.refresh(movement_products_catalog)
-                return True, "Движение товара успешно изменено", movement_products_catalog.id
+                return (
+                    True,
+                    "Движение товара успешно изменено",
+                    movement_products_catalog.id,
+                )
 
             except IntegrityError as e:
                 session.rollback()
@@ -1643,10 +1873,18 @@ class PaymentTypeDAO:
 
         with rx.session() as session:
             try:
-                statement = select(PaymentType).where(PaymentType.title == payment_type.title).where(PaymentType.is_deleted == False)
+                statement = (
+                    select(PaymentType)
+                    .where(PaymentType.title == payment_type.title)
+                    .where(PaymentType.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Тип оплаты с таким названием уже существует", -1
+                    return (
+                        False,
+                        "Ошибка: Тип оплаты с таким названием уже существует",
+                        -1,
+                    )
 
                 session.add(payment_type)
                 session.commit()
@@ -1673,10 +1911,18 @@ class PaymentTypeDAO:
                 for key, value in form_data.items():
                     setattr(payment_type, key, value)
 
-                statement = select(PaymentType).where(PaymentType.title == payment_type.title).where(PaymentType.id != payment_type.id).where(
-                    PaymentType.is_deleted == False)
+                statement = (
+                    select(PaymentType)
+                    .where(PaymentType.title == payment_type.title)
+                    .where(PaymentType.id != payment_type.id)
+                    .where(PaymentType.is_deleted == False)
+                )
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Тип оплаты с таким названием уже существует", payment_type.id
+                    return (
+                        False,
+                        "Ошибка: Тип оплаты с таким названием уже существует",
+                        payment_type.id,
+                    )
 
                 session.commit()
                 session.refresh(payment_type)
@@ -1715,7 +1961,7 @@ class PaymentTypeDAO:
                 return False, f"Ошибка: {str(e)}"
 
 
-class AdmissionDAO():
+class AdmissionDAO:
     @classmethod
     def get_all(cls) -> List[Admission]:
         statement = select(Admission)
@@ -1723,23 +1969,24 @@ class AdmissionDAO():
         with rx.session() as session:
             return session.exec(statement).all()
 
-
     @classmethod
     def get_all_with_all_relationship(cls) -> List[Admission]:
-        statement = select(Admission).options(joinedload(Admission.supplier),
-                                              joinedload(Admission.payment_type),
-                                              joinedload(Admission.movement).options(
-                                                  selectinload(Movement.products_catalog).options(
-                                                      joinedload(MovementProductsCatalog.product),
-                                                      selectinload(MovementProductsCatalog.products).options(
-                                                          joinedload(Product.product_catalog),
-                                                          joinedload(Product.owner),
-                                                          joinedload(Product.storage)
-                                                      )
-                                                  ),
-                                                  joinedload(Movement.destination_storage),
-                                                  joinedload(Movement.destination_owner)
-                                              ))
+        statement = select(Admission).options(
+            joinedload(Admission.supplier),
+            joinedload(Admission.payment_type),
+            joinedload(Admission.movement).options(
+                selectinload(Movement.products_catalog).options(
+                    joinedload(MovementProductsCatalog.product),
+                    selectinload(MovementProductsCatalog.products).options(
+                        joinedload(Product.product_catalog),
+                        joinedload(Product.owner),
+                        joinedload(Product.storage),
+                    ),
+                ),
+                joinedload(Movement.destination_storage),
+                joinedload(Movement.destination_owner),
+            ),
+        )
 
         with rx.session() as session:
             admissions = session.exec(statement).all()
@@ -1748,15 +1995,16 @@ class AdmissionDAO():
                 session.expunge_all()
             return list(admissions)
 
-
     @classmethod
     def get_all_with_supplier_movement_storage_owner(cls) -> List[Admission]:
-        statement = select(Admission).options(joinedload(Admission.supplier),
-                                              joinedload(Admission.payment_type),
-                                              joinedload(Admission.movement).options(
-                                                  joinedload(Movement.destination_storage),
-                                                  joinedload(Movement.destination_owner)
-                                              ))
+        statement = select(Admission).options(
+            joinedload(Admission.supplier),
+            joinedload(Admission.payment_type),
+            joinedload(Admission.movement).options(
+                joinedload(Movement.destination_storage),
+                joinedload(Movement.destination_owner),
+            ),
+        )
 
         with rx.session() as session:
             admissions = session.exec(statement).all()
@@ -1778,20 +2026,26 @@ class AdmissionDAO():
 
     @classmethod
     def get_by_id_with_all_relationship(cls, id: str) -> Optional[Admission]:
-        statement = select(Admission).options(joinedload(Admission.supplier),
-                                              joinedload(Admission.payment_type),
-                                              joinedload(Admission.movement).options(
-                                                  selectinload(Movement.products_catalog).options(
-                                                      joinedload(MovementProductsCatalog.product),
-                                                      selectinload(MovementProductsCatalog.products).options(
-                                                          joinedload(Product.product_catalog),
-                                                          joinedload(Product.owner),
-                                                          joinedload(Product.storage)
-                                                      )
-                                                  ),
-                                                  joinedload(Movement.destination_storage),
-                                                  joinedload(Movement.destination_owner)
-                                              )).where(Admission.id == id)
+        statement = (
+            select(Admission)
+            .options(
+                joinedload(Admission.supplier),
+                joinedload(Admission.payment_type),
+                joinedload(Admission.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                            joinedload(Product.owner),
+                            joinedload(Product.storage),
+                        ),
+                    ),
+                    joinedload(Movement.destination_storage),
+                    joinedload(Movement.destination_owner),
+                ),
+            )
+            .where(Admission.id == id)
+        )
 
         with rx.session() as session:
             admission = session.exec(statement).one_or_none()
@@ -1801,16 +2055,24 @@ class AdmissionDAO():
             return admission
 
     @classmethod
-    def get_by_id_with_supplier_movement_product_storage_owner(cls, id: str) -> Optional[Admission]:
-        statement = select(Admission).options(joinedload(Admission.supplier),
-                                              joinedload(Admission.payment_type),
-                                              joinedload(Admission.movement).options(
-                                                  selectinload(Movement.products_catalog).options(
-                                                      joinedload(MovementProductsCatalog.product),
-                                                  ),
-                                                  joinedload(Movement.destination_storage),
-                                                  joinedload(Movement.destination_owner)
-                                              )).where(Admission.id == id)
+    def get_by_id_with_supplier_movement_product_storage_owner(
+        cls, id: str
+    ) -> Optional[Admission]:
+        statement = (
+            select(Admission)
+            .options(
+                joinedload(Admission.supplier),
+                joinedload(Admission.payment_type),
+                joinedload(Admission.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                    ),
+                    joinedload(Movement.destination_storage),
+                    joinedload(Movement.destination_owner),
+                ),
+            )
+            .where(Admission.id == id)
+        )
 
         with rx.session() as session:
             admission = session.exec(statement).one_or_none()
@@ -1859,26 +2121,52 @@ class AdmissionDAO():
             try:
                 admission: Admission = session.get(Admission, id)
                 movement: Movement = session.get(Movement, id)
-                movements_products_catalog: Optional[List[MovementProductsCatalog]] = session.exec(
-                    select(MovementProductsCatalog).where(MovementProductsCatalog.id_movement == id)
-                ).all()
+                movements_products_catalog: Optional[List[MovementProductsCatalog]] = (
+                    session.exec(
+                        select(MovementProductsCatalog).where(
+                            MovementProductsCatalog.id_movement == id
+                        )
+                    ).all()
+                )
                 products_in_movement: Optional[List[MovementProducts]] = session.exec(
-                    select(MovementProducts).where(MovementProducts.id_movement_product.in_([movement.id for movement in movements_products_catalog]))
+                    select(MovementProducts).where(
+                        MovementProducts.id_movement_product.in_(
+                            [movement.id for movement in movements_products_catalog]
+                        )
+                    )
                 ).all()
                 products: Optional[List[Product]] = session.exec(
-                    select(Product).where(Product.id.in_([product.id_product for product in products_in_movement]))
+                    select(Product).where(
+                        Product.id.in_(
+                            [product.id_product for product in products_in_movement]
+                        )
+                    )
                 ).all()
 
-                other_movements_with_current_products: Optional[List[MovementProducts]] = session.exec(
-                    select(MovementProducts).where(MovementProducts.id_product.in_([product.id for product in products])).where(
-                        MovementProducts.id_movement_product.not_in([ mpc.id for mpc in movements_products_catalog ]))
+                other_movements_with_current_products: Optional[
+                    List[MovementProducts]
+                ] = session.exec(
+                    select(MovementProducts)
+                    .where(
+                        MovementProducts.id_product.in_(
+                            [product.id for product in products]
+                        )
+                    )
+                    .where(
+                        MovementProducts.id_movement_product.not_in(
+                            [mpc.id for mpc in movements_products_catalog]
+                        )
+                    )
                 ).all()
 
                 if admission is None:
                     return False, "Ошибка: Поставка не найдена"
 
                 if len(other_movements_with_current_products) > 0:
-                    return False, "Ошибка: Поставка не может быть удалена, так как товары уже используются в других движениях"
+                    return (
+                        False,
+                        "Ошибка: Поставка не может быть удалена, так как товары уже используются в других движениях",
+                    )
 
                 for item in products_in_movement:
                     session.delete(item)
@@ -1903,7 +2191,7 @@ class AdmissionDAO():
                 return False, f"Ошибка: {str(e)}"
 
 
-class IssueDAO():
+class IssueDAO:
     @classmethod
     def get_all(cls) -> List[Issue]:
         statement = select(Issue)
@@ -1914,22 +2202,24 @@ class IssueDAO():
             if len(issues) > 0:
                 session.expunge_all()
             return list(issues)
-        
+
     @classmethod
     def get_all_with_all_relationship(cls) -> List[Issue]:
-        statement = select(Issue).options(joinedload(Issue.movement).options(
-                                              selectinload(Movement.products_catalog).options(
-                                                  joinedload(MovementProductsCatalog.product),
-                                                  selectinload(MovementProductsCatalog.products).options(
-                                                      joinedload(Product.product_catalog),
-                                                      joinedload(Product.owner),
-                                                      joinedload(Product.storage)
-                                                  )
-                                              ),
-                                              joinedload(Movement.incoming_storage),
-                                              joinedload(Movement.incoming_owner),
-                                          ),
-                                          joinedload(Issue.recipient))
+        statement = select(Issue).options(
+            joinedload(Issue.movement).options(
+                selectinload(Movement.products_catalog).options(
+                    joinedload(MovementProductsCatalog.product),
+                    selectinload(MovementProductsCatalog.products).options(
+                        joinedload(Product.product_catalog),
+                        joinedload(Product.owner),
+                        joinedload(Product.storage),
+                    ),
+                ),
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.incoming_owner),
+            ),
+            joinedload(Issue.recipient),
+        )
 
         with rx.session() as session:
             issues = session.exec(statement).all()
@@ -1948,24 +2238,30 @@ class IssueDAO():
             if issue:
                 session.expunge(issue)
             return issue
-        
+
     @classmethod
     def get_by_id_with_all_relationship(cls, id: str) -> Optional[Issue]:
-        statement = select(Issue).options(joinedload(Issue.movement).options(
-                                              selectinload(Movement.products_catalog).options(
-                                                  joinedload(MovementProductsCatalog.product),
-                                                  selectinload(MovementProductsCatalog.products).options(
-                                                      joinedload(Product.product_catalog),
-                                                      joinedload(Product.owner),
-                                                      joinedload(Product.storage)
-                                                  )
-                                              ),
-                                              joinedload(Movement.incoming_storage),
-                                              joinedload(Movement.incoming_owner),
-                                              joinedload(Movement.destination_owner),
-                                              joinedload(Movement.destination_storage)
-                                          ),
-                                          joinedload(Issue.recipient)).where(Issue.id == id)
+        statement = (
+            select(Issue)
+            .options(
+                joinedload(Issue.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                            joinedload(Product.owner),
+                            joinedload(Product.storage),
+                        ),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_owner),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(Issue.recipient),
+            )
+            .where(Issue.id == id)
+        )
 
         with rx.session() as session:
             issue = session.exec(statement).one_or_none()
@@ -1975,16 +2271,25 @@ class IssueDAO():
             return issue
 
     @classmethod
-    def get_by_id_with_movement_product_storage_owner_recipient(cls, id: str) -> Optional[Issue]:
-        statement = select(Issue).options(joinedload(Issue.movement).options(
-                                              selectinload(Movement.products_catalog).options(
-                                                  joinedload(MovementProductsCatalog.product),
-                                                  selectinload(MovementProductsCatalog.products),
-                                              ),
-                                              joinedload(Movement.incoming_storage),
-                                              joinedload(Movement.incoming_owner)
-                                          ),
-                                          joinedload(Issue.recipient)).where(Issue.id == id)
+    def get_by_id_with_movement_product_storage_owner_recipient(
+        cls, id: str
+    ) -> Optional[Issue]:
+        statement = (
+            select(Issue)
+            .options(
+                joinedload(Issue.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(Issue.recipient),
+            )
+            .where(Issue.id == id)
+        )
 
         with rx.session() as session:
             issue = session.exec(statement).one_or_none()
@@ -2029,7 +2334,7 @@ class IssueDAO():
                 return False, f"Ошибка: {str(e)}", -1
 
 
-class SaleDAO():
+class SaleDAO:
     @classmethod
     def get_all(cls) -> List[Sale]:
         statement = select(Sale)

@@ -8,21 +8,29 @@ from TrifleSklad.dao import (
     AdmissionDAO,
     OwnerDAO,
     PaymentTypeDAO,
+    ProductCatalogDAO,
     StorageDAO,
     SupplierDAO,
-    ProductCatalogDAO,
 )
-from TrifleSklad.declared import StorageType, movements_status_list, MovementsType, MovementsStatus
-from TrifleSklad.models import Admission, Movement, MovementProductsCatalog, Product, ProductCatalog
-
+from TrifleSklad.declared import (
+    MovementsStatus,
+    MovementsType,
+    StorageType,
+    movements_status_list,
+)
+from TrifleSklad.models import (
+    Admission,
+    Movement,
+    MovementProductsCatalog,
+    Product,
+    ProductCatalog,
+)
 from TrifleSklad.state import AppState
+
 
 class MovementProductCatalogAddEditFormState(rx.State):
     item: MovementProductsCatalog = MovementProductsCatalog(
-        count=0,
-        price=0.0,
-        id_product_catalog=-1,
-        products=[]
+        count=0, price=0.0, id_product_catalog=-1, products=[]
     )
 
     exclude_products_catalog_list: List[int] = []
@@ -42,8 +50,13 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # ======================
     @rx.var
     def products_catalog_list(self) -> List[Tuple[str, str]]:
-        self.cache_products_catalog_list = ProductCatalogDAO.get_all_exclude_ids(self.exclude_products_catalog_list)
-        return [(item[1].title, str(item[0])) for item in enumerate(self.cache_products_catalog_list)]
+        self.cache_products_catalog_list = ProductCatalogDAO.get_all_exclude_ids(
+            self.exclude_products_catalog_list
+        )
+        return [
+            (item[1].title, str(item[0]))
+            for item in enumerate(self.cache_products_catalog_list)
+        ]
 
     @rx.var
     def item_products_list(self) -> List[Tuple[int, Product]]:
@@ -51,17 +64,22 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     @rx.var
     def has_errors(self) -> bool:
-        return self.error_count or self.error_price or self.item.id_product_catalog == -1
-    
+        return (
+            self.error_count or self.error_price or self.item.id_product_catalog == -1
+        )
+
     @rx.var
     def product_is_uniq(self) -> bool:
         return self.is_product_uniq
+
     # ======================
 
     # Backend only
     # ======================
     def __load_products_catalog_list(self):
-        self.cache_products_catalog_list = ProductCatalogDAO.get_all_exclude_ids(self.exclude_products_catalog_list)
+        self.cache_products_catalog_list = ProductCatalogDAO.get_all_exclude_ids(
+            self.exclude_products_catalog_list
+        )
 
     def set_exclude_products_catalog_list(self, exclude_list: List[int]):
         self.exclude_products_catalog_list = exclude_list
@@ -78,6 +96,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             self.error_price = True
         else:
             self.error_price = False
+
     # ======================
 
     # Getters for form fields
@@ -93,6 +112,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
     @rx.var
     def price(self) -> str:
         return str(self.item.price)
+
     # ======================
 
     # Event handlers for form fields
@@ -123,17 +143,17 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
         list_len = len(self.item.products)
         if int(value) < list_len:
-            self.item.products = self.item.products[:int(value)]
+            self.item.products = self.item.products[: int(value)]
             return
 
-        for _ in range(int(value)-list_len):
+        for _ in range(int(value) - list_len):
             self.item.products.append(
                 Product(
                     id_product_catalog=self.item.id_product_catalog,
                     id_storage=-1,
                     id_owner=-1,
                     serial_number="",
-                    count=1
+                    count=1,
                 )
             )
 
@@ -153,6 +173,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.__check_price_correct()
         if self.error_price:
             return
+
     # ======================
 
     # Action handlers
@@ -167,10 +188,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
     @rx.event
     def clear(self):
         self.item = MovementProductsCatalog(
-            count=0,
-            price=0.0,
-            id_product_catalog=-1,
-            products=[]
+            count=0, price=0.0, id_product_catalog=-1, products=[]
         )
 
         self.is_product_uniq = False
@@ -178,15 +196,13 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.id_product_catalog_in_cache = ""
         self.error_count = False
         self.error_price = False
+
     # ======================
 
 
 class MovementProductCatalogDetailedViewState(rx.State):
     item: MovementProductsCatalog = MovementProductsCatalog(
-        count=0,
-        price=0.0,
-        id_product_catalog=-1,
-        products=[]
+        count=0, price=0.0, id_product_catalog=-1, products=[]
     )
 
     @rx.var
@@ -202,11 +218,9 @@ class MovementProductCatalogDetailedViewState(rx.State):
     @rx.event
     def clear(self):
         self.item = MovementProductsCatalog(
-            count=0,
-            price=0.0,
-            id_product_catalog=-1,
-            products=[]
+            count=0, price=0.0, id_product_catalog=-1, products=[]
         )
+
     # ======================
 
 
@@ -226,6 +240,7 @@ class ListAdmissionState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
     # ======================
 
     # Action handlers
@@ -233,6 +248,7 @@ class ListAdmissionState(rx.State):
     @rx.event
     def refresh_list(self):
         self.items = AdmissionDAO.get_all_with_supplier_movement_storage_owner()
+
     # ======================
 
 
@@ -245,21 +261,21 @@ class AddAdmissionState(rx.State):
     # Form fields
     # ======================
     item: Admission = Admission(
-            id_payment_type="-1",
-            id_supplier=-1,
-            flag_nds=False,
-            dollar_rate=0.0,
-            movement=Movement(
-                id_destination_storage=-1,
-                id_destination_owner=-1,
-                date=date.today().__str__(),
-                comment="",
-                status=MovementsStatus.CREATED,
-                type=MovementsType.ADMISSION,
-                total_cost=0.0,
-                products_catalog=[],
-            )
-        )
+        id_payment_type="-1",
+        id_supplier=-1,
+        flag_nds=False,
+        dollar_rate=0.0,
+        movement=Movement(
+            id_destination_storage=-1,
+            id_destination_owner=-1,
+            date=date.today().__str__(),
+            comment="",
+            status=MovementsStatus.CREATED,
+            type=MovementsType.ADMISSION,
+            total_cost=0.0,
+            products_catalog=[],
+        ),
+    )
     current_product_catalog_index: int
     # ======================
 
@@ -285,8 +301,12 @@ class AddAdmissionState(rx.State):
 
     # Nested form states
     # ======================
-    addedit_product_catalog_form_state: Optional[MovementProductCatalogAddEditFormState] = None
-    view_product_catalog_form_state: Optional[MovementProductCatalogDetailedViewState] = None
+    addedit_product_catalog_form_state: Optional[
+        MovementProductCatalogAddEditFormState
+    ] = None
+    view_product_catalog_form_state: Optional[
+        MovementProductCatalogDetailedViewState
+    ] = None
     # ======================
 
     # Backend only
@@ -302,8 +322,8 @@ class AddAdmissionState(rx.State):
             for item in StorageDAO.get_all()
             if item.type == StorageType.WAREHOUSE
             and (
-               self.search_name_destination_storage == ""
-               or self.search_name_destination_storage.lower() in item.title.lower()
+                self.search_name_destination_storage == ""
+                or self.search_name_destination_storage.lower() in item.title.lower()
             )
         ]
 
@@ -311,9 +331,11 @@ class AddAdmissionState(rx.State):
         self.list_owners = [(item.title, str(item.id)) for item in OwnerDAO.get_all()]
 
     def __load_payment_types(self):
-        self.list_payment_types = [(item.title, str(item.id)) for item in PaymentTypeDAO.get_all()]
-
-    async def on_load(self):
+        self.list_payment_types = [
+            (item.title, str(item.id)) for item in PaymentTypeDAO.get_all()
+        ]
+    
+    async def _on_load(self):
         self.item = Admission(
             id_payment_type="-1",
             id_supplier=-1,
@@ -328,7 +350,7 @@ class AddAdmissionState(rx.State):
                 type=MovementsType.ADMISSION,
                 total_cost=0.0,
                 products_catalog=[],
-            )
+            ),
         )
 
         self.current_product_catalog_index = -1
@@ -341,8 +363,16 @@ class AddAdmissionState(rx.State):
         self.__load_owners()
         self.__load_payment_types()
 
-        self.addedit_product_catalog_form_state = await self.get_state(MovementProductCatalogAddEditFormState)
-        self.view_product_catalog_form_state = await self.get_state(MovementProductCatalogDetailedViewState)
+        self.addedit_product_catalog_form_state = await self.get_state(
+            MovementProductCatalogAddEditFormState
+        )
+        self.view_product_catalog_form_state = await self.get_state(
+            MovementProductCatalogDetailedViewState
+        )        
+        
+    async def on_load(self):
+        self._on_load()
+
     # ======================
 
     # Getters for form fields
@@ -374,6 +404,7 @@ class AddAdmissionState(rx.State):
     @rx.var
     def dollar_rate(self) -> str:
         return str(self.item.dollar_rate)
+
     # ======================
 
     # Event handlers for form fields
@@ -431,6 +462,7 @@ class AddAdmissionState(rx.State):
     @rx.event
     def on_close_product_catalog_dialog(self):
         self.is_open_product_catalog_dialog = False
+
     # ======================
 
     # Dynamic variables
@@ -444,12 +476,17 @@ class AddAdmissionState(rx.State):
         return movements_status_list
 
     @rx.var
-    def item_movement_products_catalog_list(self) -> List[Tuple[int, MovementProductsCatalog]]:
-        return [(index, pc) for index, pc in enumerate(self.item.movement.products_catalog)]
+    def item_movement_products_catalog_list(
+        self,
+    ) -> List[Tuple[int, MovementProductsCatalog]]:
+        return [
+            (index, pc) for index, pc in enumerate(self.item.movement.products_catalog)
+        ]
 
     @rx.var
     def has_item_movement_products_catalog(self) -> bool:
         return len(self.item.movement.products_catalog) > 0
+
     # ======================
 
     # Action handlers
@@ -460,20 +497,24 @@ class AddAdmissionState(rx.State):
             return
         self.is_product_dialog_view_mode = True
         self.current_product_catalog_index = index
-        self.view_product_catalog_form_state.item = self.item.movement.products_catalog[index]
+        self.view_product_catalog_form_state.item = self.item.movement.products_catalog[
+            index
+        ]
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.VIEW
         self.is_open_product_catalog_dialog = True
 
     @rx.event
     def add_product_catalog_dialog_open(self):
         if self.addedit_product_catalog_form_state is None:
-            return rx.toast.error("Состояние формы добавления/редактирования товарной позиции не инициализировано")
+            return rx.toast.error(
+                "Состояние формы добавления/редактирования товарной позиции не инициализировано"
+            )
         self.is_product_dialog_view_mode = False
         self.current_product_catalog_index = -1
         self.addedit_product_catalog_form_state.clear()
-        self.addedit_product_catalog_form_state.set_exclude_products_catalog_list([
-            pc.product.id for pc in self.item.movement.products_catalog
-        ])
+        self.addedit_product_catalog_form_state.set_exclude_products_catalog_list(
+            [pc.product.id for pc in self.item.movement.products_catalog]
+        )
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
         return None
@@ -483,9 +524,13 @@ class AddAdmissionState(rx.State):
         if self.addedit_product_catalog_form_state is None:
             return
         self.is_product_dialog_view_mode = False
-        self.addedit_product_catalog_form_state.set_item(self.item.movement.products_catalog[self.current_product_catalog_index])
+        self.addedit_product_catalog_form_state.set_item(
+            self.item.movement.products_catalog[self.current_product_catalog_index]
+        )
         self.addedit_product_catalog_form_state.exclude_products_catalog_list = [
-            pc.product.id for i, pc in enumerate(self.item.movement.products_catalog) if i != self.current_product_catalog_index
+            pc.product.id
+            for i, pc in enumerate(self.item.movement.products_catalog)
+            if i != self.current_product_catalog_index
         ]
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
@@ -497,11 +542,13 @@ class AddAdmissionState(rx.State):
 
         if self.addedit_product_catalog_form_state.has_errors:
             return
-        
+
         item = self.addedit_product_catalog_form_state.item
-        
+
         if self.current_product_catalog_index > -1:
-            self.item.movement.products_catalog[self.current_product_catalog_index] = item
+            self.item.movement.products_catalog[self.current_product_catalog_index] = (
+                item
+            )
         else:
             self.item.movement.products_catalog.append(item)
 
@@ -529,6 +576,7 @@ class AddAdmissionState(rx.State):
     @rx.event
     def cancel(self):
         return rx.redirect(routes.MOVEMENT_ADMISSIONS)
+
     # ======================
 
 
@@ -536,8 +584,9 @@ class EditAdmissionState(AddAdmissionState):
     # Backend only
     # ======================
     async def on_load(self, id: int):
-        super().on_load()
+        super()._on_load()
         self.item = AdmissionDAO.get_by_id_with_all_relationship(id)
+
     # ======================
 
     # Action handlers
@@ -557,42 +606,48 @@ class EditAdmissionState(AddAdmissionState):
                 rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
+
     # ======================
 
 
 class ViewAdmissionState(rx.State):
     item: Admission = Admission(
-            id_payment_type="-1",
-            id_supplier=-1,
-            flag_nds=False,
-            dollar_rate=0.0,
-            movement=Movement(
-                id_destination_storage=-1,
-                id_destination_owner=-1,
-                date=date.today().__str__(),
-                comment="",
-                status=MovementsStatus.CREATED,
-                type=MovementsType.ADMISSION,
-                total_cost=0.0,
-                products_catalog=[],
-            )
-        )
+        id_payment_type="-1",
+        id_supplier=-1,
+        flag_nds=False,
+        dollar_rate=0.0,
+        movement=Movement(
+            id_destination_storage=-1,
+            id_destination_owner=-1,
+            date=date.today().__str__(),
+            comment="",
+            status=MovementsStatus.CREATED,
+            type=MovementsType.ADMISSION,
+            total_cost=0.0,
+            products_catalog=[],
+        ),
+    )
 
     dialog_open: bool = False
     current_product_catalog_index: int = -1
 
     # Nested form states
     # ======================
-    view_product_catalog_form_state: Optional[MovementProductCatalogDetailedViewState] = None
+    view_product_catalog_form_state: Optional[
+        MovementProductCatalogDetailedViewState
+    ] = None
     # ======================
 
     # Backend only
     # ======================
     async def on_load(self, id: int):
-        self.view_product_catalog_form_state = await self.get_state(MovementProductCatalogDetailedViewState)
+        self.view_product_catalog_form_state = await self.get_state(
+            MovementProductCatalogDetailedViewState
+        )
         self.item = AdmissionDAO.get_by_id_with_all_relationship(id)
         self.dialog_open = False
         self.current_product_catalog_index = -1
+
     # ======================
 
     # Getters for form fields
@@ -600,14 +655,23 @@ class ViewAdmissionState(rx.State):
     @rx.var
     def item_status(self) -> str:
         return movements_status_list[self.item.movement.status]
-    
+
     @rx.var
-    def item_movement_products_catalog_list(self) -> List[Tuple[int, MovementProductsCatalog]]:
-        return [(index, pc) for index, pc in enumerate(self.item.movement.products_catalog)]
-    
+    def item_movement_products_catalog_list(
+        self,
+    ) -> List[Tuple[int, MovementProductsCatalog]]:
+        return [
+            (index, pc) for index, pc in enumerate(self.item.movement.products_catalog)
+        ]
+
     @rx.var
     def item_movement_product_catalog(self) -> MovementProductsCatalog:
-        return self.item.movement.products_catalog[self.current_product_catalog_index] if len(self.item.movement.products_catalog) > 0 else MovementProductsCatalog()
+        return (
+            self.item.movement.products_catalog[self.current_product_catalog_index]
+            if len(self.item.movement.products_catalog) > 0
+            else MovementProductsCatalog()
+        )
+
     # ======================
 
     # Action handlers
@@ -617,13 +681,16 @@ class ViewAdmissionState(rx.State):
         if self.view_product_catalog_form_state is None:
             return
         self.current_product_catalog_index = index
-        self.view_product_catalog_form_state.set_item(self.item.movement.products_catalog[index])
+        self.view_product_catalog_form_state.set_item(
+            self.item.movement.products_catalog[index]
+        )
         self.dialog_open = True
 
     @rx.event
     def close_dialog(self):
         self.dialog_open = False
         self.current_product_catalog_index = -1
+
     # ======================
 
 
@@ -653,16 +720,20 @@ class AdmissionState(rx.State):
             # /admisions/add
             if page == self.Pages.ADD:
                 if self.add_addmission_form_state is None:
-                    return rx.toast.error("Состояние формы добавления поступления не инициализировано")
+                    return rx.toast.error(
+                        "Состояние формы добавления поступления не инициализировано"
+                    )
                 await self.add_addmission_form_state.on_load()
                 self.current_page = self.Pages.ADD
                 return None
             # /admisions/edit/[id]
             elif page == self.Pages.EDIT:
-                id = self.router.page.params.get('id', '')
-                if id != '':
+                id = self.router.page.params.get("id", "")
+                if id != "":
                     if self.edit_admission_form_state is None:
-                        return rx.toast.error("Состояние формы редактирования поступления не инициализировано")
+                        return rx.toast.error(
+                            "Состояние формы редактирования поступления не инициализировано"
+                        )
                     await self.edit_admission_form_state.on_load(int(id))
                     self.current_page = self.Pages.EDIT
                     return None
@@ -670,10 +741,12 @@ class AdmissionState(rx.State):
                     return rx.redirect(routes.MOVEMENT_ADMISSIONS)
             # /admisions/view/[id]
             elif page == self.Pages.VIEW:
-                id = self.router.page.params.get('id', '')
-                if id != '':
+                id = self.router.page.params.get("id", "")
+                if id != "":
                     if self.view_admission_state is None:
-                        return rx.toast.error("Состояние просмотра поступления не инициализировано")
+                        return rx.toast.error(
+                            "Состояние просмотра поступления не инициализировано"
+                        )
                     await self.view_admission_state.on_load(id)
                     self.current_page = self.Pages.VIEW
                     return None
@@ -682,7 +755,9 @@ class AdmissionState(rx.State):
         else:
             # /admissions
             if self.list_admission_state is None:
-                return rx.toast.error("Состояние списка поступлений не инициализировано")
+                return rx.toast.error(
+                    "Состояние списка поступлений не инициализировано"
+                )
             self.list_admission_state.refresh_list()
             self.current_page = self.Pages.LIST
             return None

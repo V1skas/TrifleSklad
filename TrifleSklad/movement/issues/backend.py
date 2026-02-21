@@ -1,20 +1,31 @@
 from ast import Add
-from re import I
-from annotated_types import T
-import reflex as rx
-
-from typing import List, Tuple, Optional
 from datetime import date
+from re import I
+from typing import List, Optional, Tuple
 
-from TrifleSklad import movement
-from TrifleSklad.declared import movements_status_list, MovementsType, MovementsStatus, StorageType
+import reflex as rx
+from annotated_types import T
 
-from TrifleSklad.models import Issue, Worker, Movement, ProductCatalog, MovementProductsCatalog, Product
-from TrifleSklad.dao import IssueDAO, StorageDAO, OwnerDAO, WorkerDAO
-
-from TrifleSklad.movement.products.backend import ProductsMovementListState
 import TrifleSklad.routes as routes
+from TrifleSklad import movement
+from TrifleSklad.dao import IssueDAO, OwnerDAO, StorageDAO, WorkerDAO
+from TrifleSklad.declared import (
+    MovementsStatus,
+    MovementsType,
+    StorageType,
+    movements_status_list,
+)
+from TrifleSklad.models import (
+    Issue,
+    Movement,
+    MovementProductsCatalog,
+    Product,
+    ProductCatalog,
+    Worker,
+)
+from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
+
 
 class ListIssueState(rx.State):
     items: List[Issue] = []
@@ -23,6 +34,7 @@ class ListIssueState(rx.State):
     # ======================
     def on_load(self):
         self.items = IssueDAO.get_all_with_all_relationship()
+
     # ======================
 
     # Dynamic variables
@@ -38,23 +50,25 @@ class ListIssueState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
     # ======================
+
 
 class ViewIssueState(rx.State):
     item: Issue = Issue(
-            id_recipient=-1,
-            movement = Movement(
-                id_incoming_storage=-1,
-                id_incoming_owner=-1,
-                date=date.today().__str__(),
-                comment="",
-                status=MovementsStatus.CREATED,
-                type=MovementsType.ISSUE,
-                total_cost=0.0,
-                products_catalog=[],
-            )
-        )
-    
+        id_recipient=-1,
+        movement=Movement(
+            id_incoming_storage=-1,
+            id_incoming_owner=-1,
+            date=date.today().__str__(),
+            comment="",
+            status=MovementsStatus.CREATED,
+            type=MovementsType.ISSUE,
+            total_cost=0.0,
+            products_catalog=[],
+        ),
+    )
+
     # Nested form states
     # ======================
     products_selector_state: Optional[ProductsMovementListState] = None
@@ -69,12 +83,15 @@ class ViewIssueState(rx.State):
         self.products_selector_state.set_view_mode(True)
 
         all_products: List[Product] = []
-        for product_category in self.item.movement.products_catalog: # FUTURE: Оптимизировать
+        for (
+            product_category
+        ) in self.item.movement.products_catalog:  # FUTURE: Оптимизировать
             for product in product_category.products:
                 product.product_catalog = product_category.product
                 all_products.append(product)
 
         self.products_selector_state.items = all_products
+
     # ======================
 
     # Getters for form fields
@@ -82,24 +99,26 @@ class ViewIssueState(rx.State):
     @rx.var
     def item_status(self) -> str:
         return movements_status_list[self.item.movement.status]
+
     # ======================
+
 
 class AddIssueState(rx.State):
     item: Issue = Issue(
-            id_recipient=-1,
-            movement = Movement(
-                id_incoming_storage=-1,
-                id_incoming_owner=-1,
-                id_destination_storage=-1,
-                id_destination_owner=-1,
-                date=date.today().__str__(),
-                comment="",
-                status=MovementsStatus.CREATED,
-                type=MovementsType.ISSUE,
-                total_cost=0.0,
-                products_catalog=[],
-            )
-        )
+        id_recipient=-1,
+        movement=Movement(
+            id_incoming_storage=-1,
+            id_incoming_owner=-1,
+            id_destination_storage=-1,
+            id_destination_owner=-1,
+            date=date.today().__str__(),
+            comment="",
+            status=MovementsStatus.CREATED,
+            type=MovementsType.ISSUE,
+            total_cost=0.0,
+            products_catalog=[],
+        ),
+    )
 
     # Preloaded lists
     # ======================
@@ -127,14 +146,17 @@ class AddIssueState(rx.State):
     # Backend only
     # ======================
     def __load_incoming_storages(self):
-        self.list_incoming_storages = [(item.title, str(item.id)) for item in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)]
+        self.list_incoming_storages = [
+            (item.title, str(item.id))
+            for item in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)
+        ]
 
     def __load_destination_storages(self):
         self.list_destination_storages = [
             (item.title, str(item.id))
             for item in StorageDAO.get_all()
             if self.search_name_destination_storage == ""
-               or self.search_name_destination_storage.lower() in item.title.lower()
+            or self.search_name_destination_storage.lower() in item.title.lower()
         ]
 
     def __load_owners(self):
@@ -144,9 +166,12 @@ class AddIssueState(rx.State):
         self.list_workers = [(item.fio, str(item.id)) for item in WorkerDAO.get_all()]
 
     async def on_load(self):
+        await self._on_load()
+
+    async def _on_load(self):
         self.item = Issue(
             id_recipient=-1,
-            movement = Movement(
+            movement=Movement(
                 id_incoming_storage=-1,
                 id_incoming_owner=-1,
                 id_destination_storage=-1,
@@ -157,7 +182,7 @@ class AddIssueState(rx.State):
                 type=MovementsType.ISSUE,
                 total_cost=0.0,
                 products_catalog=[],
-            )
+            ),
         )
         self.is_open_product_dialog = False
 
@@ -169,6 +194,7 @@ class AddIssueState(rx.State):
         self.products_selector_state = await self.get_state(ProductsMovementListState)
         await self.products_selector_state.on_load()
         self.products_selector_state.set_view_mode(False)
+
     # ======================
 
     # Getters for form fields
@@ -180,15 +206,15 @@ class AddIssueState(rx.State):
     @rx.var
     def id_incoming_owner(self) -> str:
         return str(self.item.movement.id_incoming_owner)
-    
+
     @rx.var
     def id_destination_storage(self) -> str:
         return str(self.item.movement.id_destination_storage)
-    
+
     @rx.var
     def id_destination_owner(self) -> str:
         return str(self.item.movement.id_destination_owner)
-    
+
     @rx.var
     def id_recipient(self) -> str:
         return str(self.item.id_recipient)
@@ -196,6 +222,7 @@ class AddIssueState(rx.State):
     @rx.var
     def status(self) -> str:
         return movements_status_list[self.item.movement.status]
+
     # ======================
 
     # Event handlers for form fields
@@ -211,14 +238,22 @@ class AddIssueState(rx.State):
     @rx.event
     def on_change_id_incoming_storage(self, value: str):
         self.item.movement.id_incoming_storage = int(value)
-        self.products_selector_state.filter_by_storage = int(self.item.movement.id_incoming_storage) if self.item.movement.id_incoming_storage != "" else -1
+        self.products_selector_state.filter_by_storage = (
+            int(self.item.movement.id_incoming_storage)
+            if self.item.movement.id_incoming_storage != ""
+            else -1
+        )
         self.products_selector_state.items = []
 
     @rx.event
     def on_change_id_incoming_owner(self, value: str):
         self.item.movement.id_incoming_owner = int(value)
         self.item.movement.id_destination_owner = int(value)
-        self.products_selector_state.filter_by_owner = int(self.item.movement.id_incoming_owner) if self.item.movement.id_incoming_owner != "" else -1
+        self.products_selector_state.filter_by_owner = (
+            int(self.item.movement.id_incoming_owner)
+            if self.item.movement.id_incoming_owner != ""
+            else -1
+        )
         self.products_selector_state.items = []
 
     @rx.event
@@ -250,6 +285,7 @@ class AddIssueState(rx.State):
     @rx.event
     def on_close_product_dialog(self):
         self.is_open_product_dialog = False
+
     # ======================
 
     # Dynamic variables
@@ -261,12 +297,17 @@ class AddIssueState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
     # ======================
 
     # Action handlers
     # ======================
     @rx.event
     async def add_one(self):
+        if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
+            or self.item.id_recipient == -1 or self.products_selector_state is None or len(self.products_selector_state.items) == 0:
+            return rx.toast.error("Не всі обов'язкові поля заповнені!")
+
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
         products_catalog: List[ProductCatalog] = []
@@ -275,14 +316,16 @@ class AddIssueState(rx.State):
 
         for product in products_list:
             if product.product_catalog not in products_catalog:
-                products_catalog.append(product.product_catalog) # FUTURES: можно оптимизировать
+                products_catalog.append(
+                    product.product_catalog
+                )  # FUTURES: можно оптимизировать
 
         for product_catalog in products_catalog:
             movement_product_catalog: MovementProductsCatalog = MovementProductsCatalog(
                 id_movement=self.item.movement.id,
                 id_product_catalog=product_catalog.id,
                 count=0,
-                products=[]
+                products=[],
             )
             for product in products_list:
                 if product.id_product_catalog == product_catalog.id:
@@ -299,14 +342,17 @@ class AddIssueState(rx.State):
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
+
     # ======================
+
 
 class EditIssueState(AddIssueState):
     # Backend only
     # ======================
     async def on_load(self, id: int):
-        super().on_load()
+        await super()._on_load()
         self.item = IssueDAO.get_by_id_with_all_relationship(id)
+
     # ======================
 
     # Action handlers
@@ -317,6 +363,10 @@ class EditIssueState(AddIssueState):
 
     @rx.event
     async def edit_one(self):
+        if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
+            or self.item.id_recipient == -1 or self.products_selector_state is None or len(self.products_selector_state.items) == 0:
+            return rx.toast.error("Не всі обов'язкові поля заповнені!")
+        
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
         flag, text, id = IssueDAO.edit_one(self.item)
@@ -326,7 +376,9 @@ class EditIssueState(AddIssueState):
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
+
     # ======================
+
 
 class IssueState(rx.State):
     class Pages:
@@ -354,16 +406,26 @@ class IssueState(rx.State):
             # /issues/add
             if page == self.Pages.ADD:
                 if self.issues_add_state is None:
-                    return [rx.redirect(routes.MOVEMENT_ISSUES), rx.toast.error("Состояние добавления выдачи не инициализировано")]
+                    return [
+                        rx.redirect(routes.MOVEMENT_ISSUES),
+                        rx.toast.error(
+                            "Состояние добавления выдачи не инициализировано"
+                        ),
+                    ]
                 await self.issues_add_state.on_load()
                 self.current_page = self.Pages.ADD
                 return None
             # /issues/edit/[id]
             elif page == self.Pages.EDIT:
-                id = self.router.page.params.get('id', '')
-                if id != '':
+                id = self.router.page.params.get("id", "")
+                if id != "":
                     if self.issues_edit_state is None:
-                        return [rx.redirect(routes.MOVEMENT_ISSUES), rx.toast.error("Состояние редактирования выдачи не инициализировано")]
+                        return [
+                            rx.redirect(routes.MOVEMENT_ISSUES),
+                            rx.toast.error(
+                                "Состояние редактирования выдачи не инициализировано"
+                            ),
+                        ]
                     await self.issues_edit_state.on_load(id)
                     self.issues_edit_state.products_selector_state.set_view_mode(True)
                     self.current_page = self.Pages.EDIT
@@ -372,10 +434,15 @@ class IssueState(rx.State):
                     return rx.redirect(routes.MOVEMENT_ISSUES)
             # /issues/view/[id]
             elif page == self.Pages.VIEW:
-                id = self.router.page.params.get('id', '')
-                if id != '':
+                id = self.router.page.params.get("id", "")
+                if id != "":
                     if self.issues_view_state is None:
-                        return [rx.redirect(routes.MOVEMENT_ISSUES), rx.toast.error("Состояние просмотра выдачи не инициализировано")]
+                        return [
+                            rx.redirect(routes.MOVEMENT_ISSUES),
+                            rx.toast.error(
+                                "Состояние просмотра выдачи не инициализировано"
+                            ),
+                        ]
                     await self.issues_view_state.on_load(id)
                     self.current_page = self.Pages.VIEW
                     return None
@@ -384,11 +451,14 @@ class IssueState(rx.State):
         else:
             # /issues
             if self.isseues_list_state is None:
-                return [rx.redirect(routes.MOVEMENT_ISSUES), rx.toast.error("Состояние списка выдачи не инициализировано")]
+                return [
+                    rx.redirect(routes.MOVEMENT_ISSUES),
+                    rx.toast.error("Состояние списка выдачи не инициализировано"),
+                ]
             self.isseues_list_state.on_load()
             self.current_page = self.Pages.LIST
             return None
-        
+
     @rx.event
     async def on_load(self):
         self.isseues_list_state = await self.get_state(ListIssueState)
@@ -396,3 +466,7 @@ class IssueState(rx.State):
         self.issues_view_state = await self.get_state(ViewIssueState)
         self.issues_edit_state = await self.get_state(EditIssueState)
         await self._check_path()
+
+    @rx.event
+    def delete_one(self, id):
+        pass
