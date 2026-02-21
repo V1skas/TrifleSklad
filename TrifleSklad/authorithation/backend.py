@@ -1,5 +1,6 @@
 from typing import Optional, Dict, List
 
+from httpx import Auth
 import reflex as rx
 import hashlib
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,6 +13,8 @@ from TrifleSklad.state import AppState
 from TrifleSklad.routes import WELCOME
 
 class AuthorizationState(rx.State):
+    login: str = ""
+    password: str = ""
     flag_err: bool = False
     text_err: str = ""
 
@@ -22,24 +25,47 @@ class AuthorizationState(rx.State):
     @rx.var
     def login_error_text(self) -> str:
         return self.text_err
+    
+    @rx.event
+    def reset_all(self):
+        self.login = ""
+        self.password = ""
+        self.reset_error()
+    
+    @rx.event
+    def reset_error(self):
+        self.flag_err = False
+        self.text_err = ""
 
     @rx.event
-    async def auth_handler(self, form_data: Dict):
+    def set_login(self, value: str):
+        self.login = value
+        self.reset_error()
+
+    @rx.event
+    def set_password(self, value: str):
+        self.password = value
+        self.reset_error()
+
+    @rx.event
+    async def auth_handler(self):
         try:
-            user: Optional[User] = UserDAO.get_user_by_id_with_relationships(form_data["login"])
+            user: Optional[User] = UserDAO.get_user_by_id_with_relationships(self.login)
             if user is None:
                 self.flag_err = True
-                self.text_err = "Неверный логин или пароль."
+                self.text_err = "Невірний логін або пароль."
+                self.password = ""
                 return None
             
             hasher = hashlib.sha256()
-            salted_password = (form_data["password"] + user.salt).encode('utf-8')
+            salted_password = (self.password + user.salt).encode('utf-8')
             hasher.update(salted_password)
             calculated_hash = hasher.hexdigest()
 
             if calculated_hash != user.password_hash:
                 self.flag_err = True
-                self.text_err = "Неверный логин или пароль."
+                self.text_err = "Невірний логін або пароль."
+                self.password = ""
                 return None
 
             app_state = await self.get_state(AppState)
@@ -51,10 +77,10 @@ class AuthorizationState(rx.State):
             AuthTokenDAO.add_one(AuthToken(token=auth_token, id_user=user.login))
             app_state.auth_token = auth_token
 
-            return [rx.redirect(WELCOME)]
+            return [rx.redirect(WELCOME), AuthorizationState.reset_all()]
             
         except SQLAlchemyError as e:
-            self.error_message = f"Ошибка при получении пользователя. Обратитесь к администратору."
+            self.error_message = f"Помилка при обробці запиту. Зверніться до адміністратора."
             print(f"[AuthorizationState][ERROR] {e}")
 
     

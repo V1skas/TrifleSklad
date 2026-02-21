@@ -46,9 +46,9 @@ def navbar() -> rx.Component:
                 href=routes.WELCOME,
             ),
             rx.hstack(
-                navbar_link("Администрирование", routes.ADMIN),
+                navbar_link("Адміністрування", routes.ADMIN),
                 navbar_link("Каталог", routes.CATALOG),
-                navbar_link("Движение ТМЦ", routes.MOVEMENT),
+                navbar_link("Рух ТМЦ", routes.MOVEMENT),
 
                 align_items="center",
                 height="100%",
@@ -56,16 +56,29 @@ def navbar() -> rx.Component:
             ),
             rx.menu.root(
                 rx.menu.trigger(
-                    rx.icon_button(
+                    rx.button(
                         rx.icon("user"),
+                        rx.text(AppState.fio, size="3"),
 
-                        size="2",
-                        radius="full",
+                        variant="ghost",
+                        color=rx.color("accent", 11),
+
+                        border_radius="0",
+
+                        _hover={
+                            "color": rx.color("accent", 12),
+                            "transform": "translateY(-1px)",
+                            "transition": "all 0.1s ease-in-out",
+                            "border_bottom": f"4px solid {rx.color('accent', 9)}",
+                        },
+
+                        size="4",
+                        height="75%",
                     ),
                 ),
                 rx.menu.content(
                     rx.menu.separator(),
-                    rx.menu.item("Выйти", on_click=AppState.logout),
+                    rx.menu.item("Вийти", on_click=AppState.logout),
                 ),
 
                 justify="end",
@@ -125,9 +138,9 @@ def welcome_page() -> rx.Component:
     return rx.vstack(
         navbar(),
         rx.vstack(
-            rx.heading("Приветствую в Trifle Склад!", size="9", color=rx.color("accent", 9)),
+            rx.heading("Ласкаво просимо до Trifle Склад!", size="9", color=rx.color("accent", 9)),
             rx.text(
-                "Для начала работы, выберите нужный раздел в шапке страницы.",
+                "Для початку роботи, оберіть потрібний розділ у шапці сторінки.",
 
                 size="5",
             ),

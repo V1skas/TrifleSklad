@@ -101,6 +101,19 @@ class UserDAO:
             return result
 
     @classmethod
+    def get_user_fio_by_login(cls, login: str) -> Optional[str]:
+        statement = (
+            select(Worker.fio)
+            .join(User.worker)
+            .where(User.login == login)
+            .where(User.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            fio = session.exec(statement).one_or_none()
+            return fio
+
+    @classmethod
     def add_one(cls, form_data: dict) -> tuple[bool, str, str]:
         user = User(**form_data)
 

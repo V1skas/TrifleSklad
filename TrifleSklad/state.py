@@ -10,6 +10,7 @@ from TrifleSklad.dao import UserDAO, AuthTokenDAO
 class AppState(rx.State):
     """The app state."""
 
+    fio: Optional[str] = None
     user: Optional[User] = None
     user_actions: List[str] = []
     auth_token: Optional[str] = rx.LocalStorage(name="auth_token")
@@ -48,6 +49,8 @@ class AppState(rx.State):
             self.user = token.user
             if self.user is not None:
                 self.user_actions = UserDAO.get_user_actions_by_id(self.user.login)
+            if self.fio is None:
+                self.fio = UserDAO.get_user_fio_by_login(self.user.login)
             else:
                 self.logout()
                 return False
