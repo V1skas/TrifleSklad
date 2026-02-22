@@ -20,11 +20,13 @@ from TrifleSklad.models import (
     ProductCatalog,
     ProductCategory,
     Role,
+    RolesActions,
     Sale,
     Storage,
     Supplier,
     User,
     UsersActions,
+    UsersRoles,
     Worker,
 )
 
@@ -92,13 +94,29 @@ class UserDAO:
             return user
 
     @classmethod
-    def get_user_actions_by_id(cls, id: str) -> List[str]:
-        statement = select(UsersActions.id_action).where(UsersActions.id_user == id)
-
+    def get_user_actions_by_id(cls, user_login: str) -> List[str]:
         with rx.session() as session:
-            result = session.exec(statement).all()
-            print(result)
-            return result
+            direct_stmt = (
+                select(Action.code)
+                .join(UsersActions, Action.id == UsersActions.id_action)
+                .where(UsersActions.id_user == user_login)
+            )
+            direct_actions = session.exec(direct_stmt).all()
+
+            role_stmt = (
+                select(Action.code)
+                .join(RolesActions, Action.id == RolesActions.action_id)
+                .join(UsersRoles, UsersRoles.id_role == RolesActions.role_id)
+                .where(UsersRoles.id_user == user_login)
+            )
+            role_actions = session.exec(role_stmt).all()
+
+            effective_actions = set(direct_actions).union(set(role_actions))
+
+            print(f"Пользователь {user_login}. Прямые: {direct_actions}. Из ролей: {role_actions}")
+            print(f"Итоговые права: {effective_actions}")
+
+            return list(effective_actions)
 
     @classmethod
     def get_user_fio_by_login(cls, login: str) -> Optional[str]:

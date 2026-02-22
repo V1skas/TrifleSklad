@@ -10,7 +10,7 @@ class RolesActions(rx.Model, table=True):
 
     # Table columns
     role_id: int = Field(default=None, foreign_key="roles.id", primary_key=True)
-    action_id: str = Field(default=None, foreign_key="actions.id", primary_key=True)
+    action_id: int = Field(default=None, foreign_key="actions.id", primary_key=True)
 
 
 class UsersActions(rx.Model, table=True):
@@ -18,14 +18,14 @@ class UsersActions(rx.Model, table=True):
 
     # Table columns
     id_user: str = Field(default=None, foreign_key="users.login", primary_key=True)
-    id_action: str = Field(default=None, foreign_key="actions.id", primary_key=True)
+    id_action: int = Field(default=None, foreign_key="actions.id", primary_key=True)
 
 
 class UsersRoles(rx.Model, table=True):
     __tablename__ = "users_roles" # type: ignore
 
     # Table columns
-    id_user: int = Field(default=None, foreign_key="users.login", primary_key=True)
+    id_user: str = Field(default=None, foreign_key="users.login", primary_key=True)
     id_role: int = Field(default=None, foreign_key="roles.id", primary_key=True)
 
 
@@ -46,8 +46,9 @@ class Action(rx.Model, table=True):
     __tablename__ = "actions" # type: ignore
 
     # Table columns
-    id: str = Field(primary_key=True) # type: ignore
-    title: str = Field(default=None, )
+    id: int = Field(primary_key=True) # type: ignore
+    code: str = Field(default=None, nullable=False, unique=True)
+    title: str = Field(default=None, nullable=False)
     description: Optional[str] = Field(nullable=True)
 
     # Relationships

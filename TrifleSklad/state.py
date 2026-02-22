@@ -1,73 +1,48 @@
 import reflex as rx
-
-from typing import Optional, Dict, List
-
+from typing import Optional, List
 from TrifleSklad import routes
-
-from TrifleSklad.models import User, AuthToken
+from TrifleSklad.models import User
 from TrifleSklad.dao import UserDAO, AuthTokenDAO
+from TrifleSklad.actions import Action as SystemAction
 
 class AppState(rx.State):
-    """The app state."""
-
     fio: Optional[str] = None
     user: Optional[User] = None
     user_actions: List[str] = []
-    auth_token: Optional[str] = rx.LocalStorage(name="auth_token")
-
-    @rx.var
-    def is_authenticated(self) -> bool:
-        return self.user is not None
     
-    @rx.event
+    auth_token: str = rx.LocalStorage(name="auth_token")
+
     def check_params(self):
         print(self.router.page.path)
         print(self.router.page.params)
 
-    @rx.event
-    def check_user_actions(self, action: str) -> bool:
-        if self.user is None:
-            return False
-        return action in self.user_actions
-
-    @rx.event
-    def logout(self):
-        AuthTokenDAO.delete_one(self.auth_token)
-        self.reset()
-        return rx.redirect(routes.LOGIN)
-
     @rx.var
-    def check_auth(self) -> bool:
-        if self.auth_token is None:
-            return False
+    def is_authenticated(self) -> bool:
+        return self.user is not None
+
+    @rx.event
+    def require_auth(self):
+        if not self.auth_token:
+            return rx.redirect(routes.LOGIN)
 
         if self.user is None:
             token = AuthTokenDAO.get_by_token_user_actions(self.auth_token)
-            if token is None:
-                self.logout()
-                return False
+            if token is None or token.user is None:
+                return self.logout()
+            
             self.user = token.user
-            if self.user is not None:
-                self.user_actions = UserDAO.get_user_actions_by_id(self.user.login)
-            if self.fio is None:
-                self.fio = UserDAO.get_user_fio_by_login(self.user.login)
-            else:
-                self.logout()
-                return False
-        return True
+
+            self.user_actions = UserDAO.get_user_actions_by_id(self.user.login) 
+            self.fio = UserDAO.get_user_fio_by_login(self.user.login)
 
     @rx.event
-    def check_actions(self, action: str) -> bool:
-        if self.user is None:
+    def logout(self):
+        if self.auth_token:
+            AuthTokenDAO.delete_one(self.auth_token)
+        self.reset() # Очищает весь стейт
+        return rx.redirect(routes.LOGIN)
+
+    def has_permission(self, action: SystemAction) -> bool:
+        if not self.user:
             return False
-        return action in self.user_actions
-
-    @rx.event
-    def redir(self):
-        if not self.is_hydrated:
-            return AppState.redir()
-
-        if not self.is_authenticated:
-            return rx.redirect(routes.LOGIN)
-
-        return None
+        return action.value in self.user_actions
