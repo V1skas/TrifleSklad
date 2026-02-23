@@ -48,9 +48,9 @@ def users_tab():
 def index():
     return rx.hstack(
         sidebar(
-            sidebar_link("Сотрудники", routes.ADMIN_WORKERS),
-            sidebar_link("Роли", routes.ADMIN_ROLES),
-            sidebar_link("Пользователи", routes.ADMIN_USERS),
+            sidebar_link("Співробітники", routes.ADMIN_WORKERS),
+            sidebar_link("Ролі", routes.ADMIN_ROLES),
+            sidebar_link("Користувачі", routes.ADMIN_USERS),
         ),
         workspace(
             workers_tab(),

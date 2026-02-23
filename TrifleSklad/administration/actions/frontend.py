@@ -95,12 +95,12 @@ def list() -> rx.Component:
 
 def index(*child, **prop) -> rx.Component:
     return rx.vstack(
-        rx.heading("Выбор действий:", size="8", color=rx.color("accent", 2), background_color=rx.color("accent", 9), width="100%", padding="0.5em"),
+        rx.heading("Обрати дію:", size="8", color=rx.color("accent", 2), background_color=rx.color("accent", 9), width="100%", padding="0.5em"),
         rx.vstack(
             rx.input(
                 rx.input.slot(rx.icon("search")),
 
-                placeholder="Поиск",
+                placeholder="Пошук",
                 value=ActionsState.filter,
 
                 width="100%",

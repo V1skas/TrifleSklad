@@ -1,10 +1,165 @@
 import reflex as rx
 from typing import List, Tuple
 
+from reflex import app
+
 import TrifleSklad.routes as routes
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action
 
 from TrifleSklad.models import Worker
 from TrifleSklad.dao import WorkerDAO
+
+
+class ListWorkersState(rx.State):
+    items: List[Worker] = []
+
+    @rx.var
+    def has_items(self) -> bool:
+        return len(self.items) > 0
+    
+    @rx.var
+    def get_items(self) -> List[Tuple[int, Worker]]:
+        return [(index, item) for index, item in enumerate(self.items)]
+    
+    # Actions handlers
+    # ======================
+    @rx.event
+    def refresh_list(self):
+        self.items = WorkerDAO.get_all()
+    # ======================
+
+
+class ViewWorkerState(rx.State):
+    item: Worker = Worker(
+        id=-1,
+        fio="",
+        phone_number="",
+        email="",
+        position=""
+    )
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    def load_item(self, id: int):
+        item = WorkerDAO.get_by_id(id)
+        if item is not None:
+            self.item = item
+        else:
+            return [rx.redirect(routes.ADMIN_WORKERS, replace=True), rx.toast.error("Запис не було знайдено")]
+    # ======================
+
+
+class AddWorkerState(rx.State):
+    item: Worker = Worker(
+        id=-1,
+        fio="",
+        phone_number=None,
+        email=None,
+        position=None
+    )
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    def reset_item(self):
+        self.item = Worker(
+            id=-1,
+            fio="",
+            phone_number=None,
+            email=None,
+            position=None
+        )
+
+    @rx.event
+    def change_fio(self, value: str):
+        self.item.fio = value
+
+    @rx.event
+    def change_position(self, value: str):
+        self.item.position = value if value != "" else None
+
+    @rx.event
+    def change_phone_number(self, value: str):
+        self.item.phone_number = value if value != "" else None
+
+    @rx.event
+    def change_email(self, value: str):
+        self.item.email = value if value != "" else None
+
+    @rx.event
+    async def add_one(self):
+        app_state: AppState = await self.get_state(AppState)
+        if not app_state.has_permission(Action.WORKERS_CREATE):
+            yield rx.redirect(routes.WELCOME, replace=True)
+            return
+
+        if self.item.fio == "" or self.item.position is None:
+            yield rx.toast.error("Будь ласка, заповніть всі обов'язкові поля")
+            return
+        flag, text, id = WorkerDAO.add_one(self.item.dict())
+        if flag:
+            yield [rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
+            return
+        yield rx.toast.error(text)
+        return
+    # ======================
+
+
+class EditWorkerState(rx.State):
+    item: Worker = Worker(
+        id=-1,
+        fio="",
+        phone_number=None,
+        email=None,
+        position=None
+    )
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    def load_item(self, id: int):
+        item = WorkerDAO.get_by_id(id)
+        if item is not None:
+            self.item = item
+        else:
+            return [rx.redirect(routes.ADMIN_WORKERS, replace=True), rx.toast.error("Запис не було знайдено")]
+
+    @rx.event
+    def change_fio(self, value: str):
+        self.item.fio = value
+
+    @rx.event
+    def change_position(self, value: str):
+        self.item.position = value if value != "" else None
+
+    @rx.event
+    def change_phone_number(self, value: str):
+        self.item.phone_number = value if value != "" else None
+
+    @rx.event
+    def change_email(self, value: str):
+        self.item.email = value if value != "" else None
+
+    @rx.event
+    async def edit_one(self):
+        app_state: AppState = await self.get_state(AppState)
+        if not app_state.has_permission(Action.WORKERS_EDIT):
+            yield rx.redirect(routes.WELCOME, replace=True)
+            return
+
+        if self.item.fio == "" or self.item.position is None:
+            yield rx.toast.error("Будь ласка, заповніть всі обов'язкові поля")
+            return
+        flag, text, id = WorkerDAO.edit_one(self.item.dict())
+        if flag:
+            yield [rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
+            return
+        yield rx.toast.error(text)
+        return
+    # ======================
+
 
 class WorkersState(rx.State):
     class Pages:
@@ -15,90 +170,71 @@ class WorkersState(rx.State):
 
     current_page: str = Pages.LIST
 
-    items: List[Worker] = []
-    selected_item: int = -1
-
-    def _check_path(self):
+    async def _check_path(self):
         page = self.router.page.params.get("page", "")
+        app_state: AppState = await self.get_state(AppState)
+
         if page != "":
             id = -1
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.ADMIN_WORKERS)
-            
+                yield rx.redirect(routes.ADMIN_WORKERS)
+                return
+
             # /workers/add
             if page == self.Pages.ADD:
-                id = Worker()
+                if not app_state.has_permission(Action.WORKERS_CREATE):
+                    yield rx.redirect(routes.WELCOME)
+                    return
+                
+                yield AddWorkerState.reset_item()
             # /workers/edit/[id]
             elif page == self.Pages.EDIT:
+                if not app_state.has_permission(Action.WORKERS_EDIT):
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get("id", "")
                 if id != "":
-                    id = WorkerDAO.get_by_id(id)
-                    if id is None:
-                        return [rx.redirect(routes.ADMIN_WORKERS), rx.toast.error("Запись не была найдена")]
+                    yield EditWorkerState.load_item(id)
                 else:
-                    return rx.redirect(routes.ADMIN_WORKERS)
+                    yield rx.redirect(routes.ADMIN_WORKERS)
+                    return
+                
             # /workers/view/[id]
             elif page == self.Pages.VIEW:
+                if not app_state.has_permission(Action.WORKERS_VIEW):
+                    yield rx.redirect(routes.WELCOME)
+                    return
+                
                 id = self.router.page.params.get("id", "")
                 if id != "":
-                    id = WorkerDAO.get_by_id(id)
-                    if id is None:
-                        return [rx.redirect(routes.ADMIN_WORKERS), rx.toast.error("Запись не была найдена")]
+                    yield ViewWorkerState.load_item(id)
                 else:
-                    return rx.redirect(routes.ADMIN_WORKERS)
-                
-            self.items = []
-            self.items.append(id)
-            self.selected_item = 0
+                    yield rx.redirect(routes.ADMIN_WORKERS)
+                    return
             self.current_page = page
         else:
             # /workers
-            self.selected_item = -1
+            if not app_state.has_permission(Action.WORKERS_LIST):
+                yield rx.redirect(routes.WELCOME)
+                return
+            yield ListWorkersState.refresh_list()
             self.current_page = self.Pages.LIST
-            self.items = WorkerDAO.get_all()
-
-    @rx.var
-    def has_items(self) -> bool:
-        return len(self.items) > 0
-    
-    @rx.var
-    def get_items(self) -> List[Tuple[int, Worker]]:
-        return [(index, item) for index, item in enumerate(self.items)]
-    
-    @rx.var
-    def has_selected_item(self) -> bool:
-        return self.selected_item != -1
-
-    @rx.var
-    def get_selected_item(self) -> Tuple[int, Worker]:
-        if self.selected_item != -1:
-            return (self.selected_item, self.items[self.selected_item])
-        return (-1, Worker())
+            return
     
     @rx.event
-    def on_load(self):
+    async def on_load(self):
         return self._check_path()
     
     @rx.event
-    def add_one(self, form_data: dict):
-        flag, text, id = WorkerDAO.add_one(form_data)
+    async def delete_one(self, id: int):
+        app_state: AppState = await self.get_state(AppState)
+        if not app_state.has_permission(Action.WORKERS_DELETE):
+            yield rx.redirect(routes.WELCOME)
+            return
+        
+        flag, text = WorkerDAO.delete_one(id)
         if flag:
-            return [rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
-        return rx.toast.error(text)
-    
-    @rx.event
-    def edit_one(self, form_data: dict):
-        form_data["id"] = self.items[self.selected_item].id
-        flag, text, id = WorkerDAO.edit_one(form_data)
-        if flag:
-            return [rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
-        return rx.toast.error(text)
-    
-    @rx.event
-    def delete_one(self):
-        if self.selected_item != -1:
-            flag, text = WorkerDAO.delete_one(self.items[self.selected_item].id)
-            if flag:
-                return [rx.redirect(routes.ADMIN_WORKERS), rx.toast.success(text)]
-            return rx.toast.error(text)
-        return rx.toast.error("Не выбрана запись для удаления")
+            yield [rx.redirect(routes.ADMIN_WORKERS), rx.toast.success(text)]
+            return
+        yield rx.toast.error(text)
+        return
