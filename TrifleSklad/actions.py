@@ -7,6 +7,12 @@ class Action(StrEnum):
     WORKERS_LIST = ('workers:list', 'Список співробітників', 'Дозволяє переглядати список співробітників')
     WORKERS_VIEW = ('workers:view', 'Перегляд співробітників', 'Дозволяє переглядати інформацію про співробітників')
 
+    ROLES_CREATE = ('roles:create', 'Додавання ролей', 'Дозволяє додавати ролі')
+    ROLES_DELETE = ('roles:delete', 'Видалення ролей', 'Дозволяє видаляти роли')
+    ROLES_EDIT = ('roles:edit', 'Редагування ролей', 'Дозволяє редагувати інформацию про роли')
+    ROLES_LIST = ('roles:list', 'Список ролей', 'Дозволяє переглядати список ролей')
+    ROLES_VIEW = ('roles:view', 'Перегляд ролей', 'Дозволяє переглядати информацию про роли')
+
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
         obj._value_ = code

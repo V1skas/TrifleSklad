@@ -135,8 +135,8 @@ class UserDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, str]:
         user = User(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = select(User).where(User.login == user.login)
 
                 if session.exec(statement).one_or_none() is not None:
@@ -151,18 +151,16 @@ class UserDAO:
                 session.refresh(user)
                 return True, "Пользователь успешно добавлен", user.login
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[UserDAO] IntegrityError: ", e)
-                return False, "Ошибка: Пользователь не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[UserDAO] IntegrityError: ", e)
+            return False, "Ошибка: Пользователь не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 user = session.get(User, form_data["login"])
 
                 if user is None:
@@ -200,23 +198,20 @@ class UserDAO:
                 session.refresh(user)
                 return True, "Пользователь успешно изменен", user.login
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[UserDAO] IntegrityError: ", e)
-                return False, "Ошибка: Пользователь не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[UserDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
-            except Exception as e:
-                session.rollback()
-                print("[UserDAO] Exception: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[UserDAO] IntegrityError: ", e)
+            return False, "Ошибка: Пользователь не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[UserDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
+        except Exception as e:
+            print("[UserDAO] Exception: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: str) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 user = session.get(User, id)
 
                 if user is None:
@@ -226,15 +221,12 @@ class UserDAO:
                 session.commit()
                 return True, "Пользователь успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Пользователь не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Пользователь не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class AuthTokenDAO:
@@ -255,25 +247,23 @@ class AuthTokenDAO:
 
     @classmethod
     def add_one(cls, auth_token: AuthToken) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 session.add(auth_token)
                 session.commit()
                 session.refresh(auth_token)
                 return True, "Токен успешно добавлен", auth_token.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[AuthTokenDAO] IntegrityError: ", e)
-                return False, "Ошибка: Токен не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[AuthTokenDAO] IntegrityError: ", e)
+            return False, "Ошибка: Токен не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, token: str):
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 auth_token = session.exec(
                     select(AuthToken).where(AuthToken.token == token)
                 ).one_or_none()
@@ -285,20 +275,17 @@ class AuthTokenDAO:
                 session.commit()
                 return True, "Токен успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Токен не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Токен не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
     @classmethod
     def delete_all_by_user(cls, login: str):
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 auth_tokens = session.exec(
                     select(AuthToken).where(AuthToken.user_login == login)
                 ).all()
@@ -312,15 +299,12 @@ class AuthTokenDAO:
                 session.commit()
                 return True, "Все токены пользователя успешно удалены"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Токены не могут быть удалены"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Токены не могут быть удалены"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class RoleDAO:
@@ -386,11 +370,9 @@ class RoleDAO:
             return list(roles)
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        role = Role(**form_data)
-
-        with rx.session() as session:
-            try:
+    def add_one(cls, role: Role) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
                 statement = select(Role).where(Role.title == role.title)
 
                 if session.exec(statement).one_or_none() is not None:
@@ -401,76 +383,49 @@ class RoleDAO:
                 session.refresh(role)
                 return True, "Роль успешно добавлена", role.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[RoleDAO] IntegrityError: ", e)
-                return False, "Ошибка: Роль не может быть добавлена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[RoleDAO] IntegrityError: ", e)
+            return False, "Ошибка: Роль не может быть добавлена", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
-                role = session.get(Role, form_data["id"])
-
-                if role is None:
-                    return False, "Ошибка: Роль не найдена", -1
-
-                for key, value in form_data.items():
-                    if key == "actions":
-                        # value — список id действий, получаем объекты из базы
-                        actions = session.exec(
-                            select(Action).where(Action.id.in_(value))
-                        ).all()
-                        setattr(role, key, actions)
-                    else:
-                        setattr(role, key, value)
-
-                statement = (
-                    select(Role)
-                    .where(Role.title == role.title)
-                    .where(Role.id != role.id)
-                )
-                if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Роль с таким именем уже существует", role.id
-
+    def edit_one(cls, role: Role) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                role = session.merge(role)
+                session.add(role)
                 session.commit()
                 session.refresh(role)
-                return True, "Роль успешно изменена", role.id
-
-            except IntegrityError as e:
-                session.rollback()
-                print("[RoleDAO] IntegrityError: ", e)
-                return False, "Ошибка: Роль не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[RoleDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+                return True, "Роль успішно змінена!", role.id
+        except IntegrityError as e:
+            print("[RoleDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Роль не може бути змінена.", -1
+        except SQLAlchemyError as e:
+            print("[RoleDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка! Зверніться до розробника.", -1
 
     @classmethod
     def delete_one(cls, id: str) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 role = session.get(Role, id)
 
                 if role is None:
-                    return False, "Ошибка: Роль не найдена"
+                    return False, "Помилка! Роль для видалення не знайдена."
 
                 session.delete(role)
                 session.commit()
-                return True, "Роль успешно удалена"
+                return True, "Роль видалено."
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Роль не может быть удалена"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError as e:
+            print("[RoleDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Роль не може бути видалена."
+        except SQLAlchemyError as e:
+            print("[RoleDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
+        except Exception as e:
+            return False, "Системна помилка!"
 
 
 class ActionDAO:
@@ -546,8 +501,8 @@ class WorkerDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         worker = Worker(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = select(Worker).where(Worker.fio == worker.fio)
 
                 if session.exec(statement).one_or_none() is not None:
@@ -558,18 +513,16 @@ class WorkerDAO:
                 session.refresh(worker)
                 return True, "Работник успешно добавлен", worker.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[WorkerDAO] IntegrityError: ", e)
-                return False, "Ошибка: Работник не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[WorkerDAO] IntegrityError: ", e)
+            return False, "Ошибка: Работник не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 worker = session.get(Worker, form_data["id"])
 
                 if worker is None:
@@ -594,23 +547,20 @@ class WorkerDAO:
                 session.refresh(worker)
                 return True, "Работник успешно изменен", worker.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[WorkerDAO] IntegrityError: ", e)
-                return False, "Ошибка: Работник не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[WorkerDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
-            except Exception as e:
-                session.rollback()
-                print("[WorkerDAO] Exception: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[WorkerDAO] IntegrityError: ", e)
+            return False, "Ошибка: Работник не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[WorkerDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
+        except Exception as e:
+            print("[WorkerDAO] Exception: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: str) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 worker = session.get(Worker, id)
 
                 if worker is None:
@@ -620,15 +570,12 @@ class WorkerDAO:
                 session.commit()
                 return True, "Работник успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Работник не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Работник не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class ProductCategoryDAO:
@@ -708,8 +655,8 @@ class ProductCategoryDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         category = ProductCategory(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
@@ -728,18 +675,16 @@ class ProductCategoryDAO:
                 session.refresh(category)
                 return True, "Категория успешно добавлена", category.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[ProductCategoryDAO] IntegrityError: ", e)
-                return False, "Ошибка: Категория не может быть добавлена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[ProductCategoryDAO] IntegrityError: ", e)
+            return False, "Ошибка: Категория не может быть добавлена", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 category = session.get(ProductCategory, form_data["id"])
 
                 if category is None:
@@ -765,19 +710,17 @@ class ProductCategoryDAO:
                 session.refresh(category)
                 return True, "Категория успешно изменена", category.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[ProductCategoryDAO] IntegrityError: ", e)
-                return False, "Ошибка: Категория не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[ProductCategoryDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[ProductCategoryDAO] IntegrityError: ", e)
+            return False, "Ошибка: Категория не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[ProductCategoryDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 category = session.get(ProductCategory, id)
 
                 if category is None:
@@ -787,15 +730,12 @@ class ProductCategoryDAO:
                 session.commit()
                 return True, "Категория успешно удалена"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Категория не может быть удалена"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Категория не может быть удалена"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class ProductCatalogDAO:
@@ -899,8 +839,8 @@ class ProductCatalogDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         product = ProductCatalog(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = (
                     select(ProductCatalog)
                     .where(ProductCatalog.title == product.title)
@@ -915,18 +855,16 @@ class ProductCatalogDAO:
                 session.refresh(product)
                 return True, "Товар успешно добавлен", product.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[ProductCatalogDAO] IntegrityError: ", e)
-                return False, "Ошибка: Товар не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[ProductCatalogDAO] IntegrityError: ", e)
+            return False, "Ошибка: Товар не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 product = session.get(ProductCatalog, form_data["id"])
 
                 if product is None:
@@ -952,19 +890,17 @@ class ProductCatalogDAO:
                 session.refresh(product)
                 return True, "Товар успешно изменен", product.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[ProductCatalogDAO] IntegrityError: ", e)
-                return False, "Ошибка: Товар не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[ProductCatalogDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[ProductCatalogDAO] IntegrityError: ", e)
+            return False, "Ошибка: Товар не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[ProductCatalogDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 product = session.get(ProductCatalog, id)
 
                 if product is None:
@@ -974,15 +910,12 @@ class ProductCatalogDAO:
                 session.commit()
                 return True, "Товар успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Товар не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Товар не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class StorageDAO:
@@ -1084,8 +1017,8 @@ class StorageDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         storage = Storage(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
@@ -1100,18 +1033,16 @@ class StorageDAO:
                 session.refresh(storage)
                 return True, "Склад успешно добавлен", storage.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[StorageDAO] IntegrityError: ", e)
-                return False, "Ошибка: Склад не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[StorageDAO] IntegrityError: ", e)
+            return False, "Ошибка: Склад не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 storage = session.get(Storage, form_data["id"])
 
                 if storage is None:
@@ -1137,19 +1068,17 @@ class StorageDAO:
                 session.refresh(storage)
                 return True, "Склад успешно изменен", storage.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[StorageDAO] IntegrityError: ", e)
-                return False, "Ошибка: Склад не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[StorageDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[StorageDAO] IntegrityError: ", e)
+            return False, "Ошибка: Склад не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[StorageDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 storage = session.get(Storage, id)
 
                 if storage is None:
@@ -1159,15 +1088,12 @@ class StorageDAO:
                 session.commit()
                 return True, "Склад успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Склад не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Склад не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class OwnerDAO:
@@ -1217,8 +1143,8 @@ class OwnerDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         owner = Owner(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = (
                     select(Owner)
                     .where(Owner.title == owner.title)
@@ -1237,18 +1163,16 @@ class OwnerDAO:
                 session.refresh(owner)
                 return True, "Владелец успешно добавлен", owner.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[OwnerDAO] IntegrityError: ", e)
-                return False, "Ошибка: Владелец не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[OwnerDAO] IntegrityError: ", e)
+            return False, "Ошибка: Владелец не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 owner = session.get(Owner, form_data["id"])
 
                 if owner is None:
@@ -1274,19 +1198,17 @@ class OwnerDAO:
                 session.refresh(owner)
                 return True, "Владелец успешно изменен", owner.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[OwnerDAO] IntegrityError: ", e)
-                return False, "Ошибка: Владелец не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[OwnerDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[OwnerDAO] IntegrityError: ", e)
+            return False, "Ошибка: Владелец не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[OwnerDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 owner = session.get(Owner, id)
 
                 if owner is None:
@@ -1296,15 +1218,12 @@ class OwnerDAO:
                 session.commit()
                 return True, "Владелец успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Владелец не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Владелец не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class SupplierDAO:
@@ -1348,8 +1267,8 @@ class SupplierDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         supplier = Supplier(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = (
                     select(Supplier)
                     .where(Supplier.title == supplier.title)
@@ -1368,18 +1287,16 @@ class SupplierDAO:
                 session.refresh(supplier)
                 return True, "Поставщик успешно добавлен", supplier.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[SupplierDAO] IntegrityError: ", e)
-                return False, "Ошибка: Поставщик не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[SupplierDAO] IntegrityError: ", e)
+            return False, "Ошибка: Поставщик не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 supplier = session.get(Supplier, form_data["id"])
 
                 if supplier is None:
@@ -1405,19 +1322,17 @@ class SupplierDAO:
                 session.refresh(supplier)
                 return True, "Поставщик успешно изменен", supplier.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[SupplierDAO] IntegrityError: ", e)
-                return False, "Ошибка: Поставщик не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[SupplierDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[SupplierDAO] IntegrityError: ", e)
+            return False, "Ошибка: Поставщик не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[SupplierDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 supplier = session.get(Supplier, id)
 
                 if supplier is None:
@@ -1427,15 +1342,12 @@ class SupplierDAO:
                 session.commit()
                 return True, "Поставщик успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Поставщик не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Поставщик не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class ProductDAO:
@@ -1484,25 +1396,23 @@ class ProductDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         product = Product(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 session.add(product)
                 session.commit()
                 session.refresh(product)
                 return True, "Единица товара успешно добавлена", product.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[ProductDAO] IntegrityError: ", e)
-                return False, "Ошибка: Единица товара не может быть добавлена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[ProductDAO] IntegrityError: ", e)
+            return False, "Ошибка: Единица товара не может быть добавлена", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 product = session.get(Product, form_data["id"])
 
                 if product is None:
@@ -1515,19 +1425,17 @@ class ProductDAO:
                 session.refresh(product)
                 return True, "Единица товара успешно изменена", product.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[ProductDAO] IntegrityError: ", e)
-                return False, "Ошибка: Единица товара не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[ProductDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[ProductDAO] IntegrityError: ", e)
+            return False, "Ошибка: Единица товара не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[ProductDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_list(cls, id_list: List[int]) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = select(Product).where(Product.id.in_(id_list))
                 products = session.exec(statement).all()
 
@@ -1538,20 +1446,17 @@ class ProductDAO:
                 session.commit()
                 return True, "Единицы товара успешно удалены"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Единицы товара не могут быть удалены"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Единицы товара не могут быть удалены"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
     @classmethod
     def undelete_list(cls, id_list: List[int]) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = select(Product).where(Product.id.in_(id_list))
                 products = session.exec(statement).all()
 
@@ -1562,22 +1467,19 @@ class ProductDAO:
                 session.commit()
                 return True, "Единицы товара успешно восстановлены"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Единицы товара не могут быть восстановлены"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Единицы товара не могут быть восстановлены"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
     @classmethod
     def update_owner_storage(
         cls, id_list: List[int], new_owner_id: int, new_storage_id: int
     ) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = select(Product).where(Product.id.in_(id_list))
                 products = session.exec(statement).all()
 
@@ -1589,15 +1491,12 @@ class ProductDAO:
                 session.commit()
                 return True, "Единицы товара успешно перемещены"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Единицы товара не могут быть перемещены"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Единицы товара не могут быть перемещены"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class MovementDAO:
@@ -1693,8 +1592,8 @@ class MovementDAO:
 
     @classmethod
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 movement: Movement = Movement()
                 movement.id_incoming_owner = form_data.get("id_incoming_owner")
                 movement.id_incoming_storage = form_data.get("id_incoming_storage")
@@ -1741,18 +1640,16 @@ class MovementDAO:
 
                 return True, "Движение товара успешно добавлено", movement.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[MovementDAO] IntegrityError: ", e)
-                return False, "Ошибка: Движение товара не может быть добавлено", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[MovementDAO] IntegrityError: ", e)
+            return False, "Ошибка: Движение товара не может быть добавлено", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 movement = session.get(Movement, form_data["id"])
 
                 if movement is None:
@@ -1765,19 +1662,17 @@ class MovementDAO:
                 session.refresh(movement)
                 return True, "Движение товара успешно изменено", movement.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[MovementDAO] IntegrityError: ", e)
-                return False, "Ошибка: Единица товара не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[MovementDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[MovementDAO] IntegrityError: ", e)
+            return False, "Ошибка: Единица товара не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[MovementDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def cancel_movement(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 movement = session.get(Movement, id)
 
                 if movement is None:
@@ -1788,15 +1683,12 @@ class MovementDAO:
                 session.commit()
                 return True, "Движение товара успешно отменено"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Движение товара не может быть отменено"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Движение товара не может быть отменено"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class MovementProductsCatalogDAO:
@@ -1828,25 +1720,23 @@ class MovementProductsCatalogDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         movement_products_catalog = MovementProductsCatalog(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 session.add(movement_products_catalog)
                 session.commit()
                 session.refresh(movement_products_catalog)
                 return True, "Товар успешно добавлен", movement_products_catalog.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[MovementProductsCatalogDAO] IntegrityError: ", e)
-                return False, "Ошибка: Товар не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[MovementProductsCatalogDAO] IntegrityError: ", e)
+            return False, "Ошибка: Товар не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 movement_products_catalog = session.get(
                     MovementProductsCatalog, form_data["id"]
                 )
@@ -1865,14 +1755,12 @@ class MovementProductsCatalogDAO:
                     movement_products_catalog.id,
                 )
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[MovementProductsCatalogDAO] IntegrityError: ", e)
-                return False, "Ошибка: Единица товара не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[MovementProductsCatalogDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[MovementProductsCatalogDAO] IntegrityError: ", e)
+            return False, "Ошибка: Единица товара не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[MovementProductsCatalogDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
 
 class PaymentTypeDAO:
@@ -1902,8 +1790,8 @@ class PaymentTypeDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         payment_type = PaymentType(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 statement = (
                     select(PaymentType)
                     .where(PaymentType.title == payment_type.title)
@@ -1922,18 +1810,16 @@ class PaymentTypeDAO:
                 session.refresh(payment_type)
                 return True, "Тип оплаты успешно добавлен", payment_type.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[PaymentTypeDAO] IntegrityError: ", e)
-                return False, "Ошибка: Тип оплаты не может быть добавлен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[PaymentTypeDAO] IntegrityError: ", e)
+            return False, "Ошибка: Тип оплаты не может быть добавлен", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 payment_type = session.get(PaymentType, form_data["id"])
 
                 if payment_type is None:
@@ -1959,19 +1845,17 @@ class PaymentTypeDAO:
                 session.refresh(payment_type)
                 return True, "Тип оплаты успешно изменен", payment_type.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[PaymentTypeDAO] IntegrityError: ", e)
-                return False, "Ошибка: Тип оплаты не может быть изменен", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[PaymentTypeDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[PaymentTypeDAO] IntegrityError: ", e)
+            return False, "Ошибка: Тип оплаты не может быть изменен", -1
+        except SQLAlchemyError as e:
+            print("[PaymentTypeDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 payment_type = session.get(PaymentType, id)
 
                 if payment_type is None:
@@ -1981,15 +1865,12 @@ class PaymentTypeDAO:
                 session.commit()
                 return True, "Тип оплаты успешно удален"
 
-            except IntegrityError:
-                session.rollback()
-                return False, "Ошибка: Тип оплаты не может быть удален"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError:
+            return False, "Ошибка: Тип оплаты не может быть удален"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class AdmissionDAO:
@@ -2114,42 +1995,38 @@ class AdmissionDAO:
 
     @classmethod
     def add_one(cls, movement: Admission) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            session.expire_on_commit = False
-            try:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
                 session.add(movement)
                 session.commit()
                 return True, "Поставка успешно добавлена", movement.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[AdmissionDAO] IntegrityError: ", e)
-                return False, "Ошибка: Поставка не может быть добавлена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[AdmissionDAO] IntegrityError: ", e)
+            return False, "Ошибка: Поставка не может быть добавлена", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, admission: Admission) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 session.merge(admission)
                 session.commit()
                 return True, "Движение товара успешно изменено", admission.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[AdmissionDAO] IntegrityError: ", e)
-                return False, "Ошибка: Единица товара не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[AdmissionDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[AdmissionDAO] IntegrityError: ", e)
+            return False, "Ошибка: Единица товара не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[AdmissionDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 admission: Admission = session.get(Admission, id)
                 movement: Movement = session.get(Movement, id)
                 movements_products_catalog: Optional[List[MovementProductsCatalog]] = (
@@ -2211,15 +2088,12 @@ class AdmissionDAO:
                 session.commit()
                 return True, "Поставка успешно удалена"
 
-            except IntegrityError as e:
-                session.rollback()
-                return False, f"Ошибка: Поставка не может быть удалена: {e}"
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
-            except Exception as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}"
+        except IntegrityError as e:
+            return False, f"Ошибка: Поставка не может быть удалена: {e}"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
 
 class IssueDAO:
@@ -2331,38 +2205,34 @@ class IssueDAO:
 
     @classmethod
     def add_one(cls, issue: Issue) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            session.expire_on_commit = False
-            try:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
                 session.add(issue)
                 session.commit()
                 return True, "Выдача успешно добавлена", issue.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[IssueDAO] IntegrityError: ", e)
-                return False, "Ошибка: Выдача не может быть добавлена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[IssueDAO] IntegrityError: ", e)
+            return False, "Ошибка: Выдача не может быть добавлена", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, issue: Issue) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            session.expire_on_commit = False
-            try:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
                 session.add(issue)
                 session.commit()
                 return True, "Выдача успешно изменена", issue.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[IssueDAO] IntegrityError: ", e)
-                return False, "Ошибка: Выдача не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[IssueDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[IssueDAO] IntegrityError: ", e)
+            return False, "Ошибка: Выдача не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[IssueDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1
 
 
 class SaleDAO:
@@ -2392,25 +2262,23 @@ class SaleDAO:
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         sale = Sale(**form_data)
 
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 session.add(sale)
                 session.commit()
                 session.refresh(sale)
                 return True, "Продажа успешно добавлена", sale.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[SaleDAO] IntegrityError: ", e)
-                return False, "Ошибка: Продажа не может быть добавлена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[SaleDAO] IntegrityError: ", e)
+            return False, "Ошибка: Продажа не может быть добавлена", -1
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        with rx.session() as session:
-            try:
+        try:
+            with rx.session() as session:
                 sale = session.get(Sale, form_data["id"])
 
                 if sale is None:
@@ -2423,11 +2291,9 @@ class SaleDAO:
                 session.refresh(sale)
                 return True, "Продажа успешно изменена", sale.id
 
-            except IntegrityError as e:
-                session.rollback()
-                print("[SaleDAO] IntegrityError: ", e)
-                return False, "Ошибка: Продажа не может быть изменена", -1
-            except SQLAlchemyError as e:
-                session.rollback()
-                print("[SaleDAO] SQLAlchemyError: ", e)
-                return False, f"Ошибка: {str(e)}", -1
+        except IntegrityError as e:
+            print("[SaleDAO] IntegrityError: ", e)
+            return False, "Ошибка: Продажа не может быть изменена", -1
+        except SQLAlchemyError as e:
+            print("[SaleDAO] SQLAlchemyError: ", e)
+            return False, f"Ошибка: {str(e)}", -1

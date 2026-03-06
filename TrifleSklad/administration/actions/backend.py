@@ -24,8 +24,11 @@ class ActionsState(rx.State):
         self.unselected_items = [i for i in range(len(self.items)) if self.items[i] not in items]
         self.set_filter("")
 
+    def _get_selected_items(self) -> List[Action]:
+        return [self.items[index] for index in self.selected_items]
+
     @rx.var
-    def get_id_selected_items(self) -> List[str]:
+    def get_id_selected_items(self) -> List[int]:
         return [self.items[index].id for index in reversed(self.selected_items)] if len(self.selected_items) > 0 else []
 
     @rx.var

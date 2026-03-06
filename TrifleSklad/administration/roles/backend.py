@@ -4,8 +4,191 @@ from typing import Optional, List, Tuple, Dict
 from TrifleSklad.models import Role, Action
 from TrifleSklad.dao import RoleDAO, ActionDAO
 import TrifleSklad.routes as routes
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action as ActionEnum
 
 from TrifleSklad.administration.actions.backend import ActionsState
+
+
+class ViewRoleState(rx.State):
+    item: Role = Role(
+        title="",
+        description="",
+        actions=[]
+    )
+
+    app_state: Optional[AppState] = None
+    actions_state: Optional[ActionsState] = None
+
+    # Frontend vars
+    # ======================
+    @rx.var
+    def has_actions(self) -> bool:
+        return len(self.item.actions) > 0
+    # ======================
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    async def on_load(self, id: int):
+        self.app_state = await self.get_state(AppState)
+        self.actions_state = await self.get_state(ActionsState)
+        self.item = RoleDAO.get_by_id_with_relationships(id)
+        if self.item is None:
+            return [rx.redirect(routes.ADMIN_ROLES), rx.toast.error("Запис не було знайдено")]
+        self.actions_state.on_load(self.item.actions)
+    # ======================
+
+
+class AddRoleState(rx.State):
+    item: Role = Role(
+        title="",
+        description="",
+        actions=[]
+    )
+
+    app_state: Optional[AppState] = None
+    actions_state: Optional[ActionsState] = None
+
+    # Frontend vars
+    # ======================
+    @rx.var
+    def has_selected_actions(self) -> bool:
+        return len(self.item.actions) > 0
+    # ======================
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    async def on_load(self):
+        if self.app_state is None:
+            self.app_state = await self.get_state(AppState)
+        if self.actions_state is None:
+            self.actions_state = await self.get_state(ActionsState)
+        self.load_item()
+        self.actions_state.on_load(self.item.actions)
+
+    @rx.event
+    def load_item(self):
+        self.item = Role(
+            title="",
+            description="",
+            actions=[]
+        )
+
+    @rx.event
+    def change_title(self, title: str):
+        self.item.title = title
+
+    @rx.event
+    def change_description(self, description: str):
+        self.item.description = description
+
+    @rx.event
+    def change_actions(self):
+        self.item.actions = self.actions_state._get_selected_items()
+
+    @rx.event
+    def open_actions(self):
+        self.actions_state.on_load(self.item.actions)
+
+    @rx.event
+    def add_one(self):
+        if not self.app_state.has_permission(ActionEnum.ROLES_CREATE):
+            return rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
+        
+        if len(self.item.actions) == 0 or self.item.title == "":
+            return rx.toast.error("Заповніть всі обов'язкові поля!")
+        
+        flag, text, id = RoleDAO.add_one(self.item)
+        if flag:
+            return [rx.toast.success(text), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
+        return rx.toast.error(text)
+    # ======================
+
+
+class EditRoleState(rx.State):
+    item: Role = Role(
+        title="",
+        description="",
+        actions=[]
+    )
+
+    app_state: Optional[AppState] = None
+    actions_state: Optional[ActionsState] = None
+
+    # Frontend vars
+    # ======================
+    @rx.var
+    def has_selected_actions(self) -> bool:
+        return len(self.item.actions) > 0
+    # ======================
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    async def on_load(self, id: int):
+        if self.app_state is None:
+            self.app_state = await self.get_state(AppState)
+        if self.actions_state is None:
+            self.actions_state = await self.get_state(ActionsState)
+
+        self.item = RoleDAO.get_by_id_with_relationships(id)
+        if self.item is None:
+            return [rx.redirect(routes.ADMIN_ROLES), rx.toast.error("Запис не було знайдено")]
+        self.actions_state.on_load(self.item.actions)
+    
+    @rx.event
+    def change_title(self, title: str):
+        self.item.title = title
+
+    @rx.event
+    def change_description(self, description: str):
+        self.item.description = description
+
+    @rx.event
+    def change_actions(self):
+        print(self.actions_state._get_selected_items())
+        self.item.actions = self.actions_state._get_selected_items()
+
+    @rx.event
+    def open_actions(self):
+        self.actions_state.on_load(self.item.actions)
+
+    @rx.event
+    def edit_one(self):
+        if not self.app_state.has_permission(ActionEnum.ROLES_EDIT):
+            return rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
+        
+        if len(self.item.actions) == 0 or self.item.title == "":
+            return rx.toast.error("Заповніть всі обов'язкові поля!")
+        
+        print(self.item)
+
+        flag, text, id = RoleDAO.edit_one(self.item)
+        if flag:
+            return [rx.toast.success(text), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
+        return rx.toast.error(text)
+    # ======================
+
+
+class ListRoleState(rx.State):
+    items: List[Role] = []
+
+    app_state: Optional[AppState] = None
+
+    @rx.var
+    def has_items(self) -> bool:
+        return len(self.items) > 0
+
+    # Actions handlers
+    # ======================
+    @rx.event
+    async def on_load(self):
+        self.app_state = await self.get_state(AppState)
+        self.items = RoleDAO.get_all()
+    # ======================
+
 
 class RoleState(rx.State):
     class Pages:
@@ -15,15 +198,16 @@ class RoleState(rx.State):
         LIST = 'list'
 
     current_page: str = Pages.LIST
-
-    items: List[Role] = []
-    selected_item: int = -1
-
-    selected_actions: List[Action] = []
+    app_state: Optional[AppState] = None
 
     def _check_path(self):
-        print("RoleState._check_path")
-        print(f"Params page: {self.router.page.params.get("page", "")}")
+        if not self.app_state.has_permission(ActionEnum.ROLES_EDIT) \
+            or not self.app_state.has_permission(ActionEnum.ROLES_CREATE) \
+            or not self.app_state.has_permission(ActionEnum.ROLES_DELETE) \
+            or not self.app_state.has_permission(ActionEnum.ROLES_VIEW) \
+            or not self.app_state.has_permission(ActionEnum.ROLES_LIST):
+            return rx.redirect(routes.WELCOME)
+
         page = self.router.page.params.get("page", "")
         if page != "":
             id = -1
@@ -32,101 +216,46 @@ class RoleState(rx.State):
             
             # /roles/add
             if page == self.Pages.ADD:
-                id = Role()
+                yield AddRoleState.on_load()
+                
             # /roles/edit/[id]
             elif page == self.Pages.EDIT:
                 id = self.router.page.params.get("id", "")
                 if id != "":
-                    id = RoleDAO.get_by_id_with_relationships(id)
-                    if id is None:
-                        return [rx.redirect(routes.ADMIN_ROLES), rx.toast.error("Запись не была найдена")]
+                    yield EditRoleState.on_load(id)
                 else:
                     return rx.redirect(routes.ADMIN_ROLES)
             # /roles/view/[id]
             elif page == self.Pages.VIEW:
                 id = self.router.page.params.get("id", "")
                 if id != "":
-                    id = RoleDAO.get_by_id_with_relationships(id)
-                    if id is None:
-                        return [rx.redirect(routes.ADMIN_ROLES), rx.toast.error("Запись не была найдена")]
+                    yield ViewRoleState.on_load(id)
                 else:
                     return rx.redirect(routes.ADMIN_ROLES)
                 
-            self.items = []
-            self.items.append(id)
-            self.selected_item = 0
-            self.selected_actions = id.actions
             self.current_page = page
         else:
             # /roles
-            self.selected_item = -1
+            yield ListRoleState.on_load()
             self.current_page = self.Pages.LIST
-            self.items = RoleDAO.get_all()
-    
-    @rx.var
-    def has_items(self) -> bool:
-        if self.items is not None:
-            if len(self.items) > 0:
-                return True
-        return False
-
-    @rx.var
-    def get_items(self) -> List[Tuple[int, Role]]:
-        return [(index, item) for index, item in enumerate(self.items)]
-    
-    @rx.var
-    def has_selected_item(self) -> bool:
-        if self.selected_item != -1:
-            return True
-        return False
-    
-    @rx.var
-    def get_selected_item(self) -> Tuple[int, Role]:
-        if self.selected_item != -1:
-            return (self.selected_item, self.items[self.selected_item])
-        return(-1, Role())
-    
-    @rx.var
-    def has_selected_actions(self) -> bool:
-        if len(self.selected_actions) > 0:
-            return True
-        return False
     
     @rx.event
-    def on_load(self):
-        print("RoleState.on_load")
+    async def on_load(self):
+        self.app_state = await self.get_state(AppState)
         return self._check_path()
+    
+    @rx.event
+    def delete_one(self, id: int):
+        if id is not None:
+            if not self.app_state.has_permission(ActionEnum.ROLES_DELETE):
+                return rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
 
-    @rx.event
-    def set_selected_actions(self, actions: List[str]):
-        self.selected_actions = ActionDAO.get_by_list_id(actions)
-    
-    @rx.event
-    def add_one(self, form_data: dict):
-        form_data["actions"] = self.selected_actions
-        flag, text, id = RoleDAO.add_one(form_data)
-        if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
-        return rx.toast.error(text)
-    
-    @rx.event
-    def edit_one(self, form_data: dict):
-        form_data["id"] = self.items[self.selected_item].id
-        form_data["actions"] = [action.id for action in self.selected_actions]
-        flag, text, id = RoleDAO.edit_one(form_data)
-        if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
-        return rx.toast.error(text)
-    
-    @rx.event
-    def delete_one(self):
-        if self.selected_item != -1:
-            flag, text = RoleDAO.delete_one(self.items[self.selected_item].id)
+            flag, text = RoleDAO.delete_one(id)
             if flag:
                 return [rx.toast.success(text), rx.redirect(routes.ADMIN_ROLES)]
             else:
                 return [rx.toast.error(text)]
-        return rx.toast.error("Не выбрана запись для удаления")
+        return rx.toast.error("Не обрано запис для видалення")
     
 
 class RoleSelectorState(rx.State):
