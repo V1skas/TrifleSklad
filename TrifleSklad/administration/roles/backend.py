@@ -202,10 +202,10 @@ class RoleState(rx.State):
 
     def _check_path(self):
         if not self.app_state.has_permission(ActionEnum.ROLES_EDIT) \
-            or not self.app_state.has_permission(ActionEnum.ROLES_CREATE) \
-            or not self.app_state.has_permission(ActionEnum.ROLES_DELETE) \
-            or not self.app_state.has_permission(ActionEnum.ROLES_VIEW) \
-            or not self.app_state.has_permission(ActionEnum.ROLES_LIST):
+            and not self.app_state.has_permission(ActionEnum.ROLES_CREATE) \
+            and not self.app_state.has_permission(ActionEnum.ROLES_DELETE) \
+            and not self.app_state.has_permission(ActionEnum.ROLES_VIEW) \
+            and not self.app_state.has_permission(ActionEnum.ROLES_LIST):
             return rx.redirect(routes.WELCOME)
 
         page = self.router.page.params.get("page", "")
@@ -216,10 +216,14 @@ class RoleState(rx.State):
             
             # /roles/add
             if page == self.Pages.ADD:
+                if not self.app_state.has_permission(ActionEnum.ROLES_CREATE):
+                    return rx.redirect(routes.WELCOME)
                 yield AddRoleState.on_load()
                 
             # /roles/edit/[id]
             elif page == self.Pages.EDIT:
+                if not self.app_state.has_permission(ActionEnum.ROLES_EDIT):
+                    return rx.redirect(routes.WELCOME)
                 id = self.router.page.params.get("id", "")
                 if id != "":
                     yield EditRoleState.on_load(id)
@@ -227,6 +231,8 @@ class RoleState(rx.State):
                     return rx.redirect(routes.ADMIN_ROLES)
             # /roles/view/[id]
             elif page == self.Pages.VIEW:
+                if not self.app_state.has_permission(ActionEnum.ROLES_VIEW):
+                    return rx.redirect(routes.WELCOME)
                 id = self.router.page.params.get("id", "")
                 if id != "":
                     yield ViewRoleState.on_load(id)
@@ -236,6 +242,8 @@ class RoleState(rx.State):
             self.current_page = page
         else:
             # /roles
+            if not self.app_state.has_permission(ActionEnum.ROLES_LIST):
+                    return rx.redirect(routes.WELCOME)
             yield ListRoleState.on_load()
             self.current_page = self.Pages.LIST
     

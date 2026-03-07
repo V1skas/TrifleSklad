@@ -19,6 +19,12 @@ class Action(StrEnum):
     USERS_LIST = ('users:list', 'Список користувачів', 'Дозволяє переглядати список користувачів')
     USERS_VIEW = ('users:view', 'Перегляд користувачів', 'Дозволяє переглядати інформацію про користувачів')
 
+    CATEGORIES_CREATE = ('categories:create', 'Додавання категорій', 'Дозволяє додавати категорії')
+    CATEGORIES_DELETE = ('categories:delete', 'Видалення категорій', 'Дозволяє видаляти категорії')
+    CATEGORIES_EDIT = ('categories:edit', 'Редагування категорій', 'Дозволяє редагувати інформацію про категорії')
+    CATEGORIES_LIST = ('categories:list', 'Список категорій', 'Дозволяє переглядати список категорій')
+    CATEGORIES_VIEW = ('categories:view', 'Перегляд категорій', 'Дозволяє переглядати інформацію про категорії')
+
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
         obj._value_ = code

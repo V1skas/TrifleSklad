@@ -1,31 +1,20 @@
+from turtle import width
+
 import reflex as rx
 
+from typing import Tuple
+
 from TrifleSklad import routes
-from TrifleSklad.catalog.categories.backend import *
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action as ActionEnum
+from TrifleSklad.catalog.categories.backend import ViewCategoriesState, AddCategoriesState, EditCategoriesState, ListCategoriesState, CategoriesState
 
 from TrifleSklad.models import ProductCategory
 
-def item_preview(item: Tuple[int, ProductCategory]) -> rx.Component:
+def item_preview() -> rx.Component:
     return rx.vstack(
-        rx.heading(item[1].title, size="7", width="100%"),
-        rx.text(item[1].description, is_optional=True, width="100%"),
-        rx.spacer(),
-        rx.hstack(
-            rx.button(
-                "Редактировать",
-
-                on_click=rx.redirect(f"{routes.CATALOG_CATEGORIES_EDIT_ID}{item[1].id}")
-            ),
-            rx.spacer(),
-            rx.button(
-                "Удалить",
-                color_scheme="red",
-
-                on_click=CategoriesState.delete_one
-            ),
-
-            width="100%",
-        ),
+        rx.heading(ViewCategoriesState.item.title, size="7", width="100%"),
+        rx.text(ViewCategoriesState.item.description, is_optional=True, width="100%"),
 
         spacing="3",
 
@@ -35,17 +24,64 @@ def item_preview(item: Tuple[int, ProductCategory]) -> rx.Component:
 
 def item_preview_tab_content() -> rx.Component:
     return rx.tabs.content(
-        item_preview(CategoriesState.get_selected_item),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Повернутись",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_CATEGORIES)
+                    ),
+                    rx.heading("Категорії ТМЦ/Перегляд", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_DELETE),
+                            rx.button(
+                                "Видалити",
+                                color_scheme="red",
+                                variant="ghost",
+                                size="3",
+                                on_click=CategoriesState.delete_one(ViewCategoriesState.item.id)
+                            ),                            
+                        ),
+                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_EDIT),
+                            rx.button(
+                                "Редагувати",
+                                variant="ghost",
+                                size="3",
+                                on_click=rx.redirect(f"{routes.CATALOG_CATEGORIES_EDIT_ID}{ViewCategoriesState.item.id}")
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            item_preview(),
+
+            width="100%"
+        ),
 
         value=CategoriesState.Pages.VIEW
     )
 
-def table_row(item: Tuple[int, ProductCategory]) -> rx.Component:
+def table_row(item: ProductCategory) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
             rx.link(
-                item[1].title,
-                href=f"{routes.CATALOG_CATEGORIES_VIEW_ID}{item[1].id}"
+                item.title,
+                href=f"{routes.CATALOG_CATEGORIES_VIEW_ID}{item.id}"
             ),
 
             align="left"
@@ -56,13 +92,13 @@ def table() -> rx.Component:
     return rx.table.root(
         rx.table.header(
             rx.table.row(
-                rx.table.column_header_cell("Название", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Назва", color=rx.color("accent", 2)),
             ),
 
             background_color=rx.color("accent", 9)
         ),
         rx.table.body(
-            rx.foreach(CategoriesState.get_items, table_row),
+            rx.foreach(ListCategoriesState.items, table_row),
 
             height="100%",
             width="100%"
@@ -76,19 +112,37 @@ def table() -> rx.Component:
 def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
-            rx.hstack(
-                rx.heading("Категории ТМЦ", size="6"),
-                rx.spacer(),
-                rx.button(
-                    "Добавить",
-                    on_click=rx.redirect(routes.CATALOG_CATEGORIES_ADD)
+            rx.box(
+                rx.hstack(
+                    rx.heading("Категорії ТМЦ", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_CREATE),
+                            rx.button(
+                                "Додати",
+                                variant="ghost",
+                                size="3",
+                                on_click=rx.redirect(routes.CATALOG_CATEGORIES_ADD)
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
                 ),
 
-                width="100%"
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
             ),
-            rx.cond(CategoriesState.has_items,
+            rx.cond(ListCategoriesState.has_items,
                 table(),
-                rx.text("Записей нет.")
+                rx.text("Записів немає")
             ),
 
             width="100%",
@@ -100,48 +154,28 @@ def list_tab_content() -> rx.Component:
 
 def add_form() -> rx.Component:
     return rx.card(
-        rx.form(
-            rx.vstack(
-                rx.text("Название:"),
-                rx.input(id="title", required=True, size="3"),
-                rx.text("Описание:"),
-                rx.text_area(id="description", size="3"),
-                rx.hstack(
-                    rx.button("Отмена", type="reset", color_scheme="red", on_click=rx.redirect(routes.CATALOG_CATEGORIES)),
-                    rx.button("Сохранить", color_scheme="green", type="submit"),
+        rx.vstack(
+            rx.text("*Назва:"),
+            rx.input(id="title", required=True, size="3", value=AddCategoriesState.item.title, on_change=AddCategoriesState.on_change_title),
+            rx.text("Опис:"),
+            rx.text_area(id="description", size="3", value=AddCategoriesState.item.description, on_change=AddCategoriesState.on_change_description),
 
-                    justify="end"
-                ),
-
-                align="stretch"
-            ),
-
-            on_submit=CategoriesState.add_one,
+            align="stretch"
         ),
 
         height="100%",
         width="100%"
     )
 
-def edit_form(item: Tuple[int, ProductCategory]) -> rx.Component:
+def edit_form() -> rx.Component:
     return rx.card(
-        rx.form(
-            rx.vstack(
-                rx.text("Название:"),
-                rx.input(id="title", default_value=item[1].title, required=True, size="3"),
-                rx.text("Описание:"),
-                rx.text_area(id="description", default_value=item[1].description, size="3", is_optional=True),
-                rx.hstack(
-                    rx.button("Отмена", type="reset", color_scheme="red", on_click=rx.redirect(routes.CATALOG_CATEGORIES)),
-                    rx.button("Сохранить", color_scheme="green", type="submit"),
+        rx.vstack(
+            rx.text("*Назва:"),
+            rx.input(id="title", required=True, size="3", value=EditCategoriesState.item.title, on_change=EditCategoriesState.on_change_title),
+            rx.text("Опис:"),
+            rx.text_area(id="description", size="3", is_optional=True, value=EditCategoriesState.item.description, on_change=EditCategoriesState.on_change_description),
 
-                    justify="end"
-                ),
-
-                align="stretch"
-            ),
-
-            on_submit=CategoriesState.edit_one,
+            align="stretch"
         ),
 
         height="100%",
@@ -150,26 +184,104 @@ def edit_form(item: Tuple[int, ProductCategory]) -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Добавление категории", size="7", width="100%", margin_bottom="0.5em"),
-        add_form(),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_CATEGORIES)
+                    ),
+                    rx.heading("Категорії ТМЦ/Додавання", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_CREATE),
+                            rx.button(
+                                "Зберегти",
+                                variant="ghost",
+                                size="3",
+                                on_click=AddCategoriesState.add_one
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            add_form(),
+
+            width="100%"
+        ),
 
         value=CategoriesState.Pages.ADD
     )
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редактирование категории", size="7", width="100%", margin_bottom="0.5em"),
-        edit_form(CategoriesState.get_selected_item),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_CATEGORIES)
+                    ),
+                    rx.heading("Категорії ТМЦ/Редагування", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_EDIT),
+                            rx.button(
+                                "Зберегти",
+                                variant="ghost",
+                                size="3",
+                                on_click=EditCategoriesState.edit_one
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            edit_form(),
+
+            width="100%"
+        ),
 
         value=CategoriesState.Pages.EDIT
     )
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        list_tab_content(),
-        add_tab_content(),
-        edit_tab_content(),
-        item_preview_tab_content(),
+        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_LIST),
+            list_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_CREATE),
+            add_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_EDIT),
+            edit_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_VIEW),
+            item_preview_tab_content()),
 
         value=CategoriesState.current_page,
 

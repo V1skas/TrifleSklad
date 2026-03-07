@@ -321,7 +321,7 @@ class RoleDAO:
     def get_by_id_with_relationships(cls, id) -> Optional[Role]:
         statement = (
             select(Role)
-            .options(selectinload(Role.actions), selectinload(Role.users))
+            .options(selectinload(Role.actions))
             .where(Role.id == id)
         )
 
@@ -610,7 +610,7 @@ class ProductCategoryDAO:
             return category
 
     @classmethod
-    def get_by_id_with_relationships(cls, id: str) -> Optional[ProductCategory]:
+    def get_by_id_with_relationships(cls, id: int) -> Optional[ProductCategory]:
         statement = (
             select(ProductCategory)
             .options(joinedload(ProductCategory.products))
@@ -626,70 +626,62 @@ class ProductCategoryDAO:
             return category
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        category = ProductCategory(**form_data)
-
+    def add_one(cls, category: ProductCategory) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
-                    .where(ProductCategory.is_deleted == False)
+                    .where(not ProductCategory.is_deleted)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Категория с таким названием уже существует",
+                        "Помилка! Категорія з такою назвою вже існує!",
                         -1,
                     )
 
                 session.add(category)
                 session.commit()
                 session.refresh(category)
-                return True, "Категория успешно добавлена", category.id
+                return True, "Категорію успошно додано!", category.id
 
         except IntegrityError as e:
             print("[ProductCategoryDAO] IntegrityError: ", e)
-            return False, "Ошибка: Категория не может быть добавлена", -1
+            return False, "Системна помилка! Категорія не може бути додана!", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print(f"Ошибка: {str(e)}")
+            return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, category: ProductCategory) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                category = session.get(ProductCategory, form_data["id"])
-
-                if category is None:
-                    return False, "Ошибка: Категория не найдена", -1
-
-                for key, value in form_data.items():
-                    setattr(category, key, value)
-
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
                     .where(ProductCategory.id != category.id)
-                    .where(ProductCategory.is_deleted == False)
+                    .where(not ProductCategory.is_deleted)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Категория с таким названием уже существует",
+                        "Помилка! Категорія з такою назвою вже існує!",
                         category.id,
                     )
-
+                category = session.merge(category)
+                session.add(category)
                 session.commit()
                 session.refresh(category)
-                return True, "Категория успешно изменена", category.id
+                return True, "Категорію успішно змінено!", category.id
 
         except IntegrityError as e:
             print("[ProductCategoryDAO] IntegrityError: ", e)
-            return False, "Ошибка: Категория не может быть изменена", -1
+            return False, "Системна помилка! Категорія не може бути змінена!", -1
         except SQLAlchemyError as e:
             print("[ProductCategoryDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -698,18 +690,21 @@ class ProductCategoryDAO:
                 category = session.get(ProductCategory, id)
 
                 if category is None:
-                    return False, "Ошибка: Категория не найдена"
+                    return False, "Помилка! Категорію не знайдено!"
 
                 category.is_deleted = True
                 session.commit()
-                return True, "Категория успешно удалена"
+                return True, "Категорію успішно видалено!"
 
-        except IntegrityError:
-            return False, "Ошибка: Категория не может быть удалена"
+        except IntegrityError as e:
+            print(f"[ProductCategoryDAO] Error: {str(e)}")
+            return False, "Системна помилка! Категорія не може бути видалена!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print(f"[ProductCategoryDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print(f"[ProductCategoryDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
 
 
 class ProductCatalogDAO:
