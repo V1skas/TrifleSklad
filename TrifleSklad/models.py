@@ -38,8 +38,8 @@ class Role(rx.Model, table=True):
     description: Optional[str] = Field(nullable=True)
 
     # Relationships
-    actions: Optional[List['Action']] = Relationship(back_populates="roles", link_model=RolesActions)
-    users: Optional[List['User']] = Relationship(back_populates="roles", link_model=UsersRoles)
+    actions: Optional[List['Action']] = Relationship(link_model=RolesActions)
+    #users: Optional[List['User']] = Relationship(back_populates="roles", link_model=UsersRoles)
 
 
 class Action(rx.Model, table=True):
@@ -52,8 +52,8 @@ class Action(rx.Model, table=True):
     description: Optional[str] = Field(nullable=True)
 
     # Relationships
-    roles: Optional[List['Role']] = Relationship(back_populates="actions", link_model=RolesActions)
-    users: Optional[List['User']] = Relationship(back_populates="actions", link_model=UsersActions)
+    #roles: Optional[List['Role']] = Relationship(link_model=RolesActions)
+    #users: Optional[List['User']] = Relationship(back_populates="actions", link_model=UsersActions)
 
 
 class AuthToken(rx.Model, table=True):
@@ -79,9 +79,9 @@ class User(rx.Model, table=True):
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
-    actions: Optional[List[Action]] = Relationship(back_populates="users", link_model=UsersActions)
-    roles: Optional[List[Role]] = Relationship(back_populates="users", link_model=UsersRoles)
-    worker: Optional['Worker'] = Relationship(back_populates="user")
+    actions: Optional[List[Action]] = Relationship(link_model=UsersActions)
+    roles: Optional[List[Role]] = Relationship(link_model=UsersRoles)
+    worker: Optional['Worker'] = Relationship()
     auth_tokens: Optional[List[AuthToken]] = Relationship(back_populates="user")
 
 
@@ -97,7 +97,7 @@ class Worker(rx.Model, table=True):
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
-    user: Optional[User] = Relationship(back_populates="worker")
+    #user: Optional[User] = Relationship(back_populates="worker")
     storages: Optional[List['Storage']] = Relationship(back_populates="responsible")
     issues: Optional[List['Issue']] = Relationship(back_populates="recipient")
     sales: Optional[List['Sale']] = Relationship(back_populates="responsible")

@@ -132,9 +132,7 @@ class UserDAO:
             return fio
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, str]:
-        user = User(**form_data)
-
+    def add_one(cls, user: User) -> tuple[bool, str, str]:
         try:
             with rx.session() as session:
                 statement = select(User).where(User.login == user.login)
@@ -142,71 +140,44 @@ class UserDAO:
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Пользователь с таким логином уже существует",
+                        "Помилка! Користувач з таким логіном вже існує!",
                         -1,
                     )
 
+                user = session.merge(user)
                 session.add(user)
                 session.commit()
                 session.refresh(user)
-                return True, "Пользователь успешно добавлен", user.login
+                return True, "Користувачаа додано!", user.login
 
         except IntegrityError as e:
-            print("[UserDAO] IntegrityError: ", e)
-            return False, "Ошибка: Пользователь не может быть добавлен", -1
+            print("[UserDAO] IntegrityError:", e)
+            return False, "Системна помилка! Користувач не може бути доданий.", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print(f"[UserDAO] SQLAlchemyError:\n{str(e)}")
+            return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, str]:
+    def edit_one(cls, user: User) -> tuple[bool, str, str]:
         try:
             with rx.session() as session:
-                user = session.get(User, form_data["login"])
-
-                if user is None:
-                    return False, "Ошибка: Пользователь не найден", -1
-
-                for key, value in form_data.items():
-                    if key == "actions":
-                        # value — список id действий, получаем объекты из базы
-                        actions = session.exec(
-                            select(Action).where(Action.id.in_(value))
-                        ).all()
-                        setattr(user, key, actions)
-                    elif key == "roles":
-                        # value — список id ролей, получаем объекты из базы
-                        roles = session.exec(
-                            select(Role).where(Role.id.in_(value))
-                        ).all()
-                        setattr(user, key, roles)
-                    else:
-                        setattr(user, key, value)
-
-                statement = (
-                    select(User)
-                    .where(User.login == user.login)
-                    .where(User.login != user.login)
-                )
-                if session.exec(statement).one_or_none() is not None:
-                    return (
-                        False,
-                        "Ошибка: Пользователь с таким логином уже существует",
-                        user.login,
-                    )
-
+                if session.get(User, user.login) is None:
+                    return False, "Помилка! Користувача не знайдено.", -1
+                user = session.merge(user)
+                session.add(user)
                 session.commit()
                 session.refresh(user)
-                return True, "Пользователь успешно изменен", user.login
+                return True, "Користувача змінено", user.login
 
         except IntegrityError as e:
             print("[UserDAO] IntegrityError: ", e)
-            return False, "Ошибка: Пользователь не может быть изменен", -1
+            return False, "Помилка! Користувач не може бути змінений.", -1
         except SQLAlchemyError as e:
             print("[UserDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!", -1
         except Exception as e:
             print("[UserDAO] Exception: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: str) -> tuple[bool, str]:
@@ -215,18 +186,21 @@ class UserDAO:
                 user = session.get(User, id)
 
                 if user is None:
-                    return False, "Ошибка: Пользователь не найден"
+                    return False, "Помилка! Користувача не знайдено."
 
                 user.is_deleted = True
                 session.commit()
-                return True, "Пользователь успешно удален"
+                return True, "Користувача видалено!"
 
-        except IntegrityError:
-            return False, "Ошибка: Пользователь не может быть удален"
+        except IntegrityError as e:
+            print("[UserDAO] IntegrityError: ", e)
+            return False, "Помилка! Користувач не може бути видалений.", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[UserDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!", -1
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[UserDAO] Exception: ", e)
+            return False, "Системна помилка!", -1
 
 
 class AuthTokenDAO:
