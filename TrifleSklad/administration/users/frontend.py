@@ -297,7 +297,7 @@ def add_form() -> rx.Component:
                             width="100%",
                         ),
 
-                        height="50em",
+                        height="90vh",
                     ),
 
                     padding="0",
@@ -341,7 +341,7 @@ def add_form() -> rx.Component:
                             width="100%",
                         ),
 
-                        height="50em",
+                        height="90vh",
                     ),
 
                     padding="0",
@@ -419,7 +419,7 @@ def edit_form() -> rx.Component:
                             width="100%",
                         ),
 
-                        height="50em",
+                        height="90vh",
                     ),
 
                     padding="0",
@@ -462,7 +462,7 @@ def edit_form() -> rx.Component:
                             width="100%",
                         ),
 
-                        height="50em",
+                        height="90vh",
                     ),
 
                     padding="0",

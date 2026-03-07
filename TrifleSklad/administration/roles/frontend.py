@@ -229,7 +229,7 @@ def add_form() -> rx.Component:
                             width="100%",
                         ),
 
-                        height="50em",
+                        height="90vh",
                     ),
 
                     padding="0",
@@ -287,7 +287,7 @@ def edit_form() -> rx.Component:
                             width="100%",
                         ),
 
-                        height="50em",
+                        height="90vh",
                     ),
 
                     padding="0",
@@ -502,30 +502,27 @@ def selector_list() -> rx.Component:
 def selector(*child, **prop) -> rx.Component:
     return rx.vstack(
         rx.heading("Выбор ролей:", size="8", color=rx.color("accent", 2), background_color=rx.color("accent", 9), width="100%", padding="0.5em"),
-        rx.vstack(
-            rx.input(
-                rx.input.slot(rx.icon("search")),
+        rx.input(
+            rx.input.slot(rx.icon("search")),
 
-                placeholder="Поиск",
-                value=RoleSelectorState.filter,
+            placeholder="Поиск",
+            value=RoleSelectorState.filter,
 
-                width="100%",
-                size="3",
+            width="100%",
+            size="3",
 
-                on_change=RoleSelectorState.set_filter,
-            ),
-            rx.card(
-                selector_list(),
+            on_change=RoleSelectorState.set_filter,
+        ),
+        rx.card(
+            selector_list(),
 
-                width="100%",
-                height="100%",
-            ),
-            *child,
-
-            padding="1em",
             width="100%",
             height="100%",
         ),
+        *child,
+
+        padding="1em",
+        width="100%",
 
         **prop,
     )

@@ -96,30 +96,27 @@ def list() -> rx.Component:
 def index(*child, **prop) -> rx.Component:
     return rx.vstack(
         rx.heading("Обрати дію:", size="8", color=rx.color("accent", 2), background_color=rx.color("accent", 9), width="100%", padding="0.5em"),
-        rx.vstack(
-            rx.input(
-                rx.input.slot(rx.icon("search")),
+        rx.input(
+            rx.input.slot(rx.icon("search")),
 
-                placeholder="Пошук",
-                value=ActionsState.filter,
+            placeholder="Пошук",
+            value=ActionsState.filter,
 
-                width="100%",
-                size="3",
+            width="100%",
+            size="3",
 
-                on_change=ActionsState.set_filter,
-            ),
-            rx.card(
-                list(),
+            on_change=ActionsState.set_filter,
+        ),
+        rx.card(
+            list(),
 
-                width="100%",
-                height="100%",
-            ),
-            *child,
-
-            padding="1em",
             width="100%",
             height="100%",
         ),
+        *child,
+
+        padding="1em",
+        width="100%",
 
         **prop,
     )
