@@ -12,13 +12,11 @@ dependencies = [
     "aiomysql==0.2.0",
     "pymysql==1.1.1",
     "reflex==0.7.4",
-    "sqlmodel==0.0.24"
+    "sqlmodel==0.0.24",
 ]
 
 [dependency-groups]
 dev = [
-    "python-lsp-ruff>=2.3.0",
-    "python-lsp-server>=1.14.0",
     "ruff>=0.15.0",
 ]
 

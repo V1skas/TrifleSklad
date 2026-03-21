@@ -1,13 +1,9 @@
-from ast import Add
 from datetime import date
-from re import I
 from typing import List, Optional, Tuple
 
 import reflex as rx
-from annotated_types import T
 
 import TrifleSklad.routes as routes
-from TrifleSklad import movement
 from TrifleSklad.dao import IssueDAO, OwnerDAO, StorageDAO, WorkerDAO
 from TrifleSklad.declared import (
     MovementsStatus,
@@ -21,7 +17,6 @@ from TrifleSklad.models import (
     MovementProductsCatalog,
     Product,
     ProductCatalog,
-    Worker,
 )
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState

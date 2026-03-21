@@ -1,32 +1,16 @@
 import reflex as rx
 
 from TrifleSklad import routes
-from TrifleSklad.catalog.categories.backend import *
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action as ActionEnum
 
-from TrifleSklad.catalog.owners.backend import OwnerState
+from TrifleSklad.catalog.owners.backend import OwnerState, ViewOwnerstate, AddOwnerState, EditOwnerState, ListOwnerState
 from TrifleSklad.models import Owner
 
-def item_preview(item: Tuple[int, Owner]) -> rx.Component:
+def item_preview() -> rx.Component:
     return rx.vstack(
-        rx.heading(item[1].title, size="7", width="100%"),
-        rx.text(item[1].description, is_optional=True, width="100%"),
-        rx.spacer(),
-        rx.hstack(
-            rx.button(
-                "Редактировать",
-
-                on_click=rx.redirect(f"{routes.CATALOG_OWNERS_EDIT_ID}{item[1].id}")
-            ),
-            rx.spacer(),
-            rx.button(
-                "Удалить",
-                color_scheme="red",
-
-                on_click=OwnerState.delete_one
-            ),
-
-            width="100%",
-        ),
+        rx.heading(ViewOwnerstate.item.title, size="7", width="100%"),
+        rx.text(ViewOwnerstate.description, is_optional=True, width="100%"),
 
         spacing="3",
 
@@ -36,17 +20,64 @@ def item_preview(item: Tuple[int, Owner]) -> rx.Component:
 
 def item_preview_tab_content() -> rx.Component:
     return rx.tabs.content(
-        item_preview(OwnerState.get_selected_item),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Повернутись",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_OWNERS)
+                    ),
+                    rx.heading("Власники ТМЦ/Перегляд", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_DELETE),
+                            rx.button(
+                                "Видалити",
+                                color_scheme="red",
+                                variant="ghost",
+                                size="3",
+                                on_click=OwnerState.delete_one(ViewOwnerstate.item.id)
+                            ),                            
+                        ),
+                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_EDIT),
+                            rx.button(
+                                "Редагувати",
+                                variant="ghost",
+                                size="3",
+                                on_click=rx.redirect(f"{routes.CATALOG_OWNERS_EDIT_ID}{ViewOwnerstate.item.id}")
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            item_preview(),
+
+            width="100%"
+        ),
 
         value=OwnerState.Pages.VIEW
     )
 
-def table_row(item: Tuple[int, Owner]) -> rx.Component:
+def table_row(item: Owner) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
             rx.link(
-                item[1].title,
-                href=f"{routes.CATALOG_OWNERS_VIEW_ID}{item[1].id}"
+                item.title,
+                href=f"{routes.CATALOG_OWNERS_VIEW_ID}{item.id}"
             ),
 
             align="left"
@@ -57,13 +88,13 @@ def table() -> rx.Component:
     return rx.table.root(
         rx.table.header(
             rx.table.row(
-                rx.table.column_header_cell("Название", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Назва", color=rx.color("accent", 2)),
             ),
 
             background_color=rx.color("accent", 9)
         ),
         rx.table.body(
-            rx.foreach(OwnerState.get_items, table_row),
+            rx.foreach(ListOwnerState.items, table_row),
 
             height="100%",
             width="100%"
@@ -77,72 +108,70 @@ def table() -> rx.Component:
 def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
-            rx.hstack(
-                rx.heading("Владельцы ТМЦ", size="6"),
-                rx.spacer(),
-                rx.button(
-                    "Добавить",
-                    on_click=rx.redirect(routes.CATALOG_OWNERS_ADD)
+            rx.box(
+                rx.hstack(
+                    rx.heading("Власники ТМЦ", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_CREATE),
+                            rx.button(
+                                "Додати",
+                                variant="ghost",
+                                size="3",
+                                on_click=rx.redirect(routes.CATALOG_OWNERS_ADD)
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
                 ),
 
-                width="100%"
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
             ),
-            rx.cond(OwnerState.has_items,
+            rx.cond(ListOwnerState.has_items,
                 table(),
-                rx.text("Записей нет.")
+                rx.text("Записів немає")
             ),
 
             width="100%",
             height="100%",
         ),
 
-        value=CategoriesState.Pages.LIST,
+        value=OwnerState.Pages.LIST,
     )
 
 def add_form() -> rx.Component:
     return rx.card(
-        rx.form(
-            rx.vstack(
-                rx.text("Название:"),
-                rx.input(id="title", required=True, size="3"),
-                rx.text("Описание:"),
-                rx.text_area(id="description", size="3"),
-                rx.hstack(
-                    rx.button("Отмена", type="reset", color_scheme="red", on_click=rx.redirect(routes.CATALOG_OWNERS)),
-                    rx.button("Сохранить", color_scheme="green", type="submit"),
+        rx.vstack(
+            rx.text("*Назва:"),
+            rx.input(id="title", required=True, size="3", value=AddOwnerState.item.title, on_change=AddOwnerState.on_change_title),
+            rx.text("Опис:"),
+            rx.text_area(id="description", size="3", value=AddOwnerState.description, on_change=AddOwnerState.on_change_description),
 
-                    justify="end"
-                ),
-
-                align="stretch"
-            ),
-
-            on_submit=OwnerState.add_one,
+            align="stretch"
         ),
 
         height="100%",
         width="100%"
     )
 
-def edit_form(item: Tuple[int, Owner]) -> rx.Component:
+def edit_form() -> rx.Component:
     return rx.card(
-        rx.form(
-            rx.vstack(
-                rx.text("Название:"),
-                rx.input(id="title", default_value=item[1].title, required=True, size="3"),
-                rx.text("Описание:"),
-                rx.text_area(id="description", default_value=item[1].description, size="3", is_optional=True),
-                rx.hstack(
-                    rx.button("Отмена", type="reset", color_scheme="red", on_click=rx.redirect(f"{routes.CATALOG_OWNERS_VIEW_ID}{item[1].id}")),
-                    rx.button("Сохранить", color_scheme="green", type="submit"),
+        rx.vstack(
+            rx.text("*Назва:"),
+            rx.input(id="title", required=True, size="3", value=EditOwnerState.item.title, on_change=EditOwnerState.on_change_title),
+            rx.text("Опис:"),
+            rx.text_area(id="description", size="3", value=EditOwnerState.description, on_change=EditOwnerState.on_change_description),
 
-                    justify="end"
-                ),
-
-                align="stretch"
-            ),
-
-            on_submit=OwnerState.edit_one,
+            align="stretch"
         ),
 
         height="100%",
@@ -151,26 +180,104 @@ def edit_form(item: Tuple[int, Owner]) -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Добавление владельца", size="7", width="100%", margin_bottom="0.5em"),
-        add_form(),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_OWNERS)
+                    ),
+                    rx.heading("Власники ТМЦ/Додавання", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_CREATE),
+                            rx.button(
+                                "Зберегти",
+                                variant="ghost",
+                                size="3",
+                                on_click=AddOwnerState.add_one
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            add_form(),
+
+            width="100%"
+        ),
 
         value=OwnerState.Pages.ADD
     )
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редактирование владельца", size="7", width="100%", margin_bottom="0.5em"),
-        edit_form(OwnerState.get_selected_item),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_OWNERS)
+                    ),
+                    rx.heading("Власники ТМЦ/Редагування", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_EDIT),
+                            rx.button(
+                                "Зберегти",
+                                variant="ghost",
+                                size="3",
+                                on_click=EditOwnerState.edit_one
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            edit_form(),
+
+            width="100%"
+        ),
 
         value=OwnerState.Pages.EDIT
     )
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        list_tab_content(),
-        add_tab_content(),
-        edit_tab_content(),
-        item_preview_tab_content(),
+        rx.cond(AppState.has_permission(ActionEnum.OWNERS_LIST),
+            list_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.OWNERS_CREATE),
+            add_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.OWNERS_EDIT),
+            edit_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.OWNERS_VIEW),
+            item_preview_tab_content()),
 
         value=OwnerState.current_page,
 

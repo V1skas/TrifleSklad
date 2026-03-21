@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select
 
-from TrifleSklad.declared import MovementsStatus, MovementsType, get_status_by_text
+from TrifleSklad.declared import MovementsStatus, get_status_by_text
 from TrifleSklad.models import (
     Action,
     Admission,
@@ -1109,9 +1109,7 @@ class OwnerDAO:
             return session.exec(statement).all()
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        owner = Owner(**form_data)
-
+    def add_one(cls, owner: Owner) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -1123,33 +1121,26 @@ class OwnerDAO:
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Владелец с таким названием уже существует",
+                        "Помилка! Власник з такою назвою вже існує!",
                         -1,
                     )
 
                 session.add(owner)
                 session.commit()
                 session.refresh(owner)
-                return True, "Владелец успешно добавлен", owner.id
+                return True, "Власника успішно додано!", owner.id
 
         except IntegrityError as e:
             print("[OwnerDAO] IntegrityError: ", e)
-            return False, "Ошибка: Владелец не может быть добавлен", -1
+            return False, "Помилка! Власника не може бути додано!", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print("[OwnerDAO] IntegrityError: ", e)
+            return False, "Помилка!", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, owner: Owner) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                owner = session.get(Owner, form_data["id"])
-
-                if owner is None:
-                    return False, "Ошибка: Владелец не найден", -1
-
-                for key, value in form_data.items():
-                    setattr(owner, key, value)
-
                 statement = (
                     select(Owner)
                     .where(Owner.title == owner.title)
@@ -1159,20 +1150,22 @@ class OwnerDAO:
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Владелец с таким названием уже существует",
+                        "Помилка! Власник з такою назвою вже існує!",
                         owner.id,
                     )
 
+                owner = session.merge(owner)
+                session.add(owner)
                 session.commit()
                 session.refresh(owner)
-                return True, "Владелец успешно изменен", owner.id
+                return True, "Інформацію про власника успішно змінено!", owner.id
 
         except IntegrityError as e:
             print("[OwnerDAO] IntegrityError: ", e)
-            return False, "Ошибка: Владелец не может быть изменен", -1
+            return False, "Помилка! Інформація про власника не може бути змінена!", -1
         except SQLAlchemyError as e:
             print("[OwnerDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -1181,18 +1174,21 @@ class OwnerDAO:
                 owner = session.get(Owner, id)
 
                 if owner is None:
-                    return False, "Ошибка: Владелец не найден"
+                    return False, "Помилка! Власника не знайдено!"
 
                 owner.is_deleted = True
                 session.commit()
-                return True, "Владелец успешно удален"
+                return True, "Інформація про власника видалена!"
 
-        except IntegrityError:
-            return False, "Ошибка: Владелец не может быть удален"
+        except IntegrityError as e:
+            print("[OwnerDAO] IntegrityError: ", e)
+            return False, "Помилка! Інформація про власника не може бути видалена!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[OwnerDAO] SQLAlchemyError: ", e)
+            return False, "Помилка!"
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[OwnerDAO] SQLAlchemyError: ", e)
+            return False, "Помилка!"
 
 
 class SupplierDAO:
