@@ -125,7 +125,6 @@ class ListCategoriesState(rx.State):
     @rx.event
     def on_load(self):
         self.items = ProductCategoryDAO.get_all()
-        print(self.items)
     # ===============
 
 

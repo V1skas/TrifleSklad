@@ -1752,9 +1752,7 @@ class PaymentTypeDAO:
             return payment_type
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        payment_type = PaymentType(**form_data)
-
+    def add_one(cls, payment_type: PaymentType) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -1766,33 +1764,26 @@ class PaymentTypeDAO:
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Тип оплаты с таким названием уже существует",
+                        "Помилка! Тип оплати з такою назвою вже існує!",
                         -1,
                     )
 
                 session.add(payment_type)
                 session.commit()
                 session.refresh(payment_type)
-                return True, "Тип оплаты успешно добавлен", payment_type.id
+                return True, "Тип оплати додано!", payment_type.id
 
         except IntegrityError as e:
             print("[PaymentTypeDAO] IntegrityError: ", e)
-            return False, "Ошибка: Тип оплаты не может быть добавлен", -1
+            return False, "Системна помилка! Тип оплати не може бути доданий!", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
+            return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, payment_type: PaymentType) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                payment_type = session.get(PaymentType, form_data["id"])
-
-                if payment_type is None:
-                    return False, "Ошибка: Тип оплаты не найден", -1
-
-                for key, value in form_data.items():
-                    setattr(payment_type, key, value)
-
                 statement = (
                     select(PaymentType)
                     .where(PaymentType.title == payment_type.title)
@@ -1802,20 +1793,22 @@ class PaymentTypeDAO:
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Тип оплаты с таким названием уже существует",
+                        "Помилка! Тип оплати з такою назвою вже існує!",
                         payment_type.id,
                     )
 
+                payment_type = session.merge(payment_type)
+                session.add(payment_type)
                 session.commit()
                 session.refresh(payment_type)
-                return True, "Тип оплаты успешно изменен", payment_type.id
+                return True, "Тип оплати змінено!", payment_type.id
 
         except IntegrityError as e:
             print("[PaymentTypeDAO] IntegrityError: ", e)
-            return False, "Ошибка: Тип оплаты не может быть изменен", -1
+            return False, "Системна помилка! Тип оплати не може бути змінений!", -1
         except SQLAlchemyError as e:
-            print("[PaymentTypeDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -1824,18 +1817,21 @@ class PaymentTypeDAO:
                 payment_type = session.get(PaymentType, id)
 
                 if payment_type is None:
-                    return False, "Ошибка: Тип оплаты не найден"
+                    return False, "Помилка! Тип оплати не знайдено!"
 
                 payment_type.is_deleted = True
                 session.commit()
-                return True, "Тип оплаты успешно удален"
+                return True, "Тип оплати видалено!"
 
-        except IntegrityError:
-            return False, "Ошибка: Тип оплаты не может быть удален"
+        except IntegrityError as e:
+            print("[PaymentTypeDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Тип оплати не може бути видалений!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
+            return False, "Системна помилка!", -1
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
+            return False, "Системна помилка!", -1
 
 
 class AdmissionDAO:

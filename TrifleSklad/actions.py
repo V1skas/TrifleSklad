@@ -32,6 +32,12 @@ class Action(StrEnum):
     OWNERS_LIST = ("owners:list", "Список власників", "Дозволяє переглядати список власників")
     OWNERS_VIEW = ("owners:view", "Перегляд власників", "Дозволяє переглядати інформацію про власників")
 
+    PAYMENT_TYPE_CREATE = ("payment_types:create", "Додавання типів оплати", "Дозволяє додавати типи оплати")
+    PAYMENT_TYPE_DELETE = ("payment_types:delete", "Видалення типів оплати", "Дозволяє видаляти типи оплати")
+    PAYMENT_TYPE_EDIT = ("payment_types:edit", "Редагування типів оплати", "Дозволяє редагувати інформацію про типи оплати")
+    PAYMENT_TYPE_LIST = ("payment_types:list", "Список типів оплати", "Дозволяє переглядати список типів оплати")
+    PAYMENT_TYPE_VIEW = ("payment_types:view", "Перегляд типів оплати", "Дозволяє переглядати інформацію про типи оплати")
+
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
         obj._value_ = code
