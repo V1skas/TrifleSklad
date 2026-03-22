@@ -44,6 +44,12 @@ class Action(StrEnum):
     STORAGE_LIST = ("storage:list", "Список складів", "Дозволяє переглядати список складів")
     STORAGE_VIEW = ("storage:view", "Перегляд складів", "Дозволяє переглядати інформацію про склади")
 
+    SUPPLIERS_CREATE = ("suppliers:create", "Додавання постачальників", "Дозволяє додавати постачальників")
+    SUPPLIERS_DELETE = ("suppliers:delete", "Видалення постачальників", "Дозволяє видаляти постачальників")
+    SUPPLIERS_EDIT = ("suppliers:edit", "Редагування постачальників", "Дозволяє редагувати інформацію про постачальників")
+    SUPPLIERS_LIST = ("suppliers:list", "Список постачальників", "Дозволяє переглядати список постачальників")
+    SUPPLIERS_VIEW = ("suppliers:view", "Перегляд постачальників", "Дозволяє переглядати інформацію про постачальників")
+
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
         obj._value_ = code

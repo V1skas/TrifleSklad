@@ -1193,7 +1193,7 @@ class SupplierDAO:
             return session.exec(statement).all()
 
     @classmethod
-    def get_by_id(cls, id: str) -> Optional[Supplier]:
+    def get_by_id(cls, id: int) -> Optional[Supplier]:
         statement = (
             select(Supplier)
             .where(Supplier.id == id)
@@ -1222,70 +1222,69 @@ class SupplierDAO:
             return session.exec(statement).all()
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        supplier = Supplier(**form_data)
-
+    def add_one(cls, supplier: Supplier) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
                     select(Supplier)
                     .where(Supplier.title == supplier.title)
-                    .where(Supplier.is_deleted == False)
+                    .where(not Supplier.is_deleted)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Поставщик с таким названием уже существует",
+                        "Помилка! Постачальник з такою назвою вже існує!",
                         -1,
                     )
 
                 session.add(supplier)
                 session.commit()
                 session.refresh(supplier)
-                return True, "Поставщик успешно добавлен", supplier.id
+                return True, "Постачальника додано!", supplier.id
 
         except IntegrityError as e:
             print("[SupplierDAO] IntegrityError: ", e)
-            return False, "Ошибка: Поставщик не может быть добавлен", -1
+            return False, "Помилка! Інформація про постачальника не може бути додана!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print("[SupplierDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
+        except Exception as e:
+            print("[SupplierDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, supplier: Supplier) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                supplier = session.get(Supplier, form_data["id"])
-
-                if supplier is None:
-                    return False, "Ошибка: Поставщик не найден", -1
-
-                for key, value in form_data.items():
-                    setattr(supplier, key, value)
-
                 statement = (
                     select(Supplier)
                     .where(Supplier.title == supplier.title)
                     .where(Supplier.id != supplier.id)
-                    .where(Supplier.is_deleted == False)
+                    .where(not Supplier.is_deleted)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Поставщик с таким названием уже существует",
+                        "Помилка! Постачальник з такою назвою вже існує!",
                         supplier.id,
                     )
 
+                supplier = session.merge(supplier)
+                session.add(supplier)
                 session.commit()
                 session.refresh(supplier)
-                return True, "Поставщик успешно изменен", supplier.id
+                return True, "Інформація про постачальника змінена!", supplier.id
 
         except IntegrityError as e:
             print("[SupplierDAO] IntegrityError: ", e)
-            return False, "Ошибка: Поставщик не может быть изменен", -1
+            return False, "Помилка! Інформація про постачальника не може бути змінена!"
         except SQLAlchemyError as e:
             print("[SupplierDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!"
+        except Exception as e:
+            print("[SupplierDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -1294,18 +1293,21 @@ class SupplierDAO:
                 supplier = session.get(Supplier, id)
 
                 if supplier is None:
-                    return False, "Ошибка: Поставщик не найден"
+                    return False, "Помилка! Постачальника не знайдено!"
 
                 supplier.is_deleted = True
                 session.commit()
-                return True, "Поставщик успешно удален"
+                return True, "Інформація про постачальника видалена!"
 
-        except IntegrityError:
-            return False, "Ошибка: Поставщик не может быть удален"
+        except IntegrityError as e:
+            print("[SupplierDAO] IntegrityError: ", e)
+            return False, "Помилка! Інформація про постачальника не може бути видалена!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[SupplierDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[SupplierDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
 
 
 class ProductDAO:
