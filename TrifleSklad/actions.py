@@ -38,6 +38,12 @@ class Action(StrEnum):
     PAYMENT_TYPE_LIST = ("payment_types:list", "Список типів оплати", "Дозволяє переглядати список типів оплати")
     PAYMENT_TYPE_VIEW = ("payment_types:view", "Перегляд типів оплати", "Дозволяє переглядати інформацію про типи оплати")
 
+    STORAGE_CREATE = ("storage:create", "Додавання складів", "Дозволяє додавати склади")
+    STORAGE_DELETE = ("storage:delete", "Видалення складів", "Дозволяє видаляти склади")
+    STORAGE_EDIT = ("storage:edit", "Редагування складів", "Дозволяє редагувати інформацію про склади")
+    STORAGE_LIST = ("storage:list", "Список складів", "Дозволяє переглядати список складів")
+    STORAGE_VIEW = ("storage:view", "Перегляд складів", "Дозволяє переглядати інформацію про склади")
+
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
         obj._value_ = code

@@ -1,31 +1,20 @@
 import reflex as rx
 
 from TrifleSklad import routes
-from TrifleSklad.catalog.storages.backend import *
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action as ActionEnum
 
-def item_preview(item: Tuple[int, Storage]) -> rx.Component:
+from TrifleSklad.models import Storage
+
+from TrifleSklad.catalog.storages.backend import ViewStorageState, AddStorageState, EditStorageState, ListStorageState, StorageState
+
+def item_preview() -> rx.Component:
     return rx.vstack(
-        rx.heading(item[1].title, size="7", width="100%"),
-        rx.text(StorageState.get_titles_type_storages_dict[item[1].type], width="100%"),
-        rx.text(item[1].description, is_optional=True, width="100%"),
-        rx.text(item[1].address, width="100%"),
-        rx.text(item[1].responsible.fio, width="100%"),
-        rx.spacer(),
-        rx.hstack(
-            rx.button(
-                "Редактировать",
-
-                on_click=rx.redirect(f"{routes.CATALOG_STORAGES_EDIT_ID}{item[1].id}")
-            ),
-            rx.spacer(),
-            rx.button(
-                "Удалить",
-
-                color_scheme="red",
-                on_click=StorageState.delete_one
-            ),
-            width="100%",
-        ),
+        rx.heading(ViewStorageState.title, size="7", width="100%"),
+        rx.text(ViewStorageState.storage_type, width="100%"),
+        rx.text(ViewStorageState.description, is_optional=True, width="100%"),
+        rx.text(ViewStorageState.address, width="100%"),
+        rx.text(ViewStorageState.responsible, width="100%"),
 
         spasing="3",
         height="100%",
@@ -34,40 +23,87 @@ def item_preview(item: Tuple[int, Storage]) -> rx.Component:
 
 def item_preview_tab_content() -> rx.Component:
     return rx.tabs.content(
-        item_preview(StorageState.get_selected_item),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Повернутись",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_STORAGES)
+                    ),
+                    rx.heading("Типи оплат/Перегляд", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_DELETE),
+                            rx.button(
+                                "Видалити",
+                                color_scheme="red",
+                                variant="ghost",
+                                size="3",
+                                on_click=StorageState.delete_one(ViewStorageState.item.id)
+                            ),                            
+                        ),
+                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_EDIT),
+                            rx.button(
+                                "Редагувати",
+                                variant="ghost",
+                                size="3",
+                                on_click=rx.redirect(f"{routes.CATALOG_STORAGES_EDIT_ID}{ViewStorageState.item.id}")
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            item_preview(),
+
+            width="100%"
+        ),
         value=StorageState.Pages.VIEW
     )
 
-def table_row(item: Tuple[int, Storage]) -> rx.Component:
+def table_row(item: Storage) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
             rx.link(
-                item[1].title,
-                href=f"{routes.CATALOG_STORAGES_VIEW_ID}{item[1].id}"
+                item.title,
+                href=f"{routes.CATALOG_STORAGES_VIEW_ID}{item.id}"
             ),
 
             align="left"
         ),
-        rx.table.cell(StorageState.get_titles_type_storages_dict[item[1].type]),
-        rx.table.cell(item[1].address),
-        rx.table.cell(item[1].responsible.fio),
+        rx.table.cell(StorageState.get_titles_type_storages_dict_as_dict[item.type]),
+        rx.table.cell(item.address),
+        rx.table.cell(item.responsible.fio),
     )
 
 def table() -> rx.Component:
     return rx.table.root(
         rx.table.header(
             rx.table.row(
-                rx.table.column_header_cell("Название", align="left", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Назва", align="left", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Тип", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Адрес", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Ответственный", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Адреса", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Відповідальний", color=rx.color("accent", 2)),
             ),
 
             background_color=rx.color("accent", 9),
         ),
         rx.table.body(
             rx.foreach(
-                StorageState.get_items,
+                ListStorageState.items,
                 table_row
             )
         ),
@@ -79,25 +115,41 @@ def table() -> rx.Component:
 def table_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
-            rx.hstack(
-                rx.heading("Хранилища", size="6"),
-                rx.spacer(),
-                rx.button(
-                    "Добавить",
+            rx.box(
+                rx.hstack(
+                    rx.heading("Сховища", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_CREATE),
+                            rx.button(
+                                "Додати",
+                                variant="ghost",
+                                size="3",
+                                on_click=rx.redirect(routes.CATALOG_STORAGES_ADD)
+                            ),                          
+                        ),
 
-                    on_click=rx.redirect(routes.CATALOG_STORAGES_ADD)
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
                 ),
 
-                width="100%"
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
             ),
-            rx.cond(
-                StorageState.has_items,
+            rx.cond(ListStorageState.has_items,
                 table(),
-                rx.text("Записей нет.")
+                rx.text("Записів немає")
             ),
 
-            spacing="3",
-            width="100%"
+            width="100%",
+            height="100%",
         ),
 
         value=StorageState.Pages.LIST
@@ -105,68 +157,73 @@ def table_tab_content() -> rx.Component:
 
 def add_form() -> rx.Component:
     return rx.card(
-        rx.form(
-            rx.vstack(
-                rx.text("Название", size="4", width="100%"),
-                rx.input(
-                    name="title",
-                    required=True,
-                    width="100%"
-                ),
-                rx.text("Тип", size="4", width="100%"),
-                rx.select(
-                    StorageState.get_titles_type_storages_list,
-
-                    name="type",
-                    placeholder="Выберите из списка",
-                    required=True,
-                    width="100%"
-                ),
-                rx.text("Описание", size="4", width="100%"),
-                rx.text_area(
-                    name="description",
-                    is_optional=True,
-                    width="100%"
-                ),
-                rx.text("Адрес", size="4", width="100%"),
-                rx.input(
-                    name="address",
-                    required=True,
-                    width="100%"
-                ),
-                rx.text("Ответственный", size="4", width="100%"),
-                rx.select(
-                    [worker.fio for worker in WorkerDAO.get_all()],
-
-                    name="id_responsible",
-                    required=True,
-                    placeholder="Выберите ответственного",
-                    size="3",
-                    width="100%"
-                ),
-
-                rx.hstack(
-                    rx.button(
-                        "Отмена",
-                        color_scheme="red",
-                        on_click=rx.redirect(routes.CATALOG_STORAGES)
-                    ),
-                    rx.button(
-                        "Добавить",
-                        color_scheme="green",
-                        type="submit"
-                    ),
-
-                    justify="end",
-
-                    width="100%"
-                ),
-
-                spacing="3",
+        rx.vstack(
+            rx.text("*Назва", size="4", width="100%"),
+            rx.input(
+                name="title",
+                required=True,
+                value=AddStorageState.title,
+                on_change=AddStorageState.on_change_title,
                 width="100%"
             ),
+            rx.text("*Тип", size="4", width="100%"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%"
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        StorageState.get_titles_type_storages_dict,
+                        lambda st_type: rx.select.item(st_type[1], value=st_type[0])
+                    ),
+                    width="100%",
+                ),
 
-            on_submit=StorageState.add_one,
+                name="type",
+                required=True,
+
+                value=AddStorageState.storage_type_id,
+                on_change=AddStorageState.on_change_type,
+            ),
+            rx.text("Опис", size="4", width="100%"),
+            rx.text_area(
+                name="description",
+                is_optional=True,
+                value=AddStorageState.description,
+                on_change=AddStorageState.on_change_description,
+                width="100%"
+            ),
+            rx.text("Адреса", size="4", width="100%"),
+            rx.input(
+                name="address",
+                required=True,
+                value=AddStorageState.address,
+                on_change=AddStorageState.on_change_address,
+                width="100%"
+            ),
+            rx.text("*Відповідальний", size="4", width="100%"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%"
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        AddStorageState.list_workers,
+                        lambda worker: rx.select.item(worker[1], value=worker[0])
+                    ),
+                    width="100%",
+                ),
+
+                name="id_worker",
+                required=True,
+
+                value=AddStorageState.id_responsible,
+                on_change=AddStorageState.on_change_responsible,
+            ),
+
+            spacing="3",
             width="100%"
         ),
         
@@ -174,103 +231,182 @@ def add_form() -> rx.Component:
         height="100%",
     )
 
-def edit_form(item: Tuple[int, Storage]) -> rx.Component:
+def edit_form() -> rx.Component:
     return rx.card(
-        rx.form(
-            rx.vstack(
-                rx.text("Название", size="4", width="100%"),
-                rx.input(
-                    name="title",
-                    required=True,
-                    default_value=item[1].title,
-                    width="100%"
-                ),
-                rx.text("Тип", size="4", width="100%"),
-                rx.select(
-                    StorageState.get_titles_type_storages_list,
-
-                    name="type",
-                    placeholder="Выберите из списка",
-                    default_value=StorageState.get_titles_type_storages_dict[item[1].type],
-                    required=True,
-
-                    width="100%"
-                ),
-                rx.text("Описание", size="4", width="100%"),
-                rx.text_area(
-                    name="description",
-                    is_optional=True,
-                    default_value=item[1].description,
-                    width="100%"
-                ),
-                rx.text("Адрес", size="4", width="100%"),
-                rx.input(
-                    name="address",
-                    required=True,
-                    default_value=item[1].address,
-                    width="100%"
-                ),
-                rx.text("Ответственный", size="4", width="100%"),
-                rx.select(
-                    [worker.fio for worker in WorkerDAO.get_all()],
-                    
-                    name="id_responsible",
-                    required=True,
-                    placeholder="Выберите ответственного",
-                    default_value=item[1].responsible.fio,
-                    size="3",
-                    width="100%"
-                ),
-
-                rx.hstack(
-                    rx.button(
-                        "Отмена",
-                        color_scheme="red",
-                        on_click=rx.redirect(routes.CATALOG_STORAGES)
-                    ),
-                    rx.button(
-                        "Сохранить",
-                        color_scheme="green",
-                        type="submit"
-                    ),
-
-                    justify="end",
-
-                    width="100%"
-                ),
-
-                spacing="3",
+        rx.vstack(
+            rx.text("*Назва", size="4", width="100%"),
+            rx.input(
+                name="title",
+                required=True,
+                value=EditStorageState.title,
+                on_change=EditStorageState.on_change_title,
                 width="100%"
             ),
+            rx.text("*Тип", size="4", width="100%"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%"
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        StorageState.get_titles_type_storages_dict,
+                        lambda st_type: rx.select.item(st_type[1], value=st_type[0])
+                    ),
+                    width="100%",
+                ),
 
-            on_submit=StorageState.edit_one,
+                name="type",
+                required=True,
+
+                value=EditStorageState.storage_type_id,
+                on_change=EditStorageState.on_change_type,
+            ),
+            rx.text("Опис", size="4", width="100%"),
+            rx.text_area(
+                name="description",
+                is_optional=True,
+                value=EditStorageState.description,
+                on_change=EditStorageState.on_change_description,
+                width="100%"
+            ),
+            rx.text("Адреса", size="4", width="100%"),
+            rx.input(
+                name="address",
+                required=True,
+                value=EditStorageState.address,
+                on_change=EditStorageState.on_change_address,
+                width="100%"
+            ),
+            rx.text("*Відповідальний", size="4", width="100%"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%"
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        EditStorageState.list_workers,
+                        lambda worker: rx.select.item(worker[1], value=worker[0])
+                    ),
+                    width="100%",
+                ),
+
+                name="id_worker",
+                required=True,
+
+                value=EditStorageState.id_responsible,
+                on_change=EditStorageState.on_change_responsible,
+            ),
+
+            spacing="3",
             width="100%"
         ),
-
+        
         width="100%",
         height="100%",
     )
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Добавление хранилища", size="7", width="100%", margin_bottom="0.5em"),
-        add_form(),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_STORAGES)
+                    ),
+                    rx.heading("Сховища/Додавання", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_CREATE),
+                            rx.button(
+                                "Зберегти",
+                                variant="ghost",
+                                size="3",
+                                on_click=AddStorageState.add_one
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            add_form(),
+
+            width="100%"
+        ),
+
         value=StorageState.Pages.ADD
     )
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редактирование хранилища", size="7", width="100%", margin_bottom="0.5em"),
-        edit_form(StorageState.get_selected_item),
+        rx.vstack(
+            rx.box(
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="ghost",
+                        size="3",
+                        on_click=rx.redirect(routes.CATALOG_STORAGES)
+                    ),
+                    rx.heading("Сховища/Редагування", size="7", color=rx.color("accent", 9)),
+                    rx.hstack(
+                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_EDIT),
+                            rx.button(
+                                "Зберегти",
+                                variant="ghost",
+                                size="3",
+                                on_click=EditStorageState.edit_one
+                            ),                          
+                        ),
+
+                        spacing="6",
+                    ),
+
+                    align="center",
+                    justify="between",
+                    padding="0.5em",
+                    width="100%"
+                ),
+
+                width="100%",
+
+                style={
+                    "border_bottom": f"1px solid {rx.color('accent', 9)}",
+                }
+            ),
+            edit_form(),
+
+            width="100%"
+        ),
+
         value=StorageState.Pages.EDIT
     )
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        table_tab_content(),
-        item_preview_tab_content(),
-        add_tab_content(),
-        edit_tab_content(),
+        rx.cond(AppState.has_permission(ActionEnum.STORAGE_LIST),
+            table_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.STORAGE_CREATE),
+            add_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.STORAGE_EDIT),
+            edit_tab_content()),
+        rx.cond(AppState.has_permission(ActionEnum.STORAGE_VIEW),
+            item_preview_tab_content()),
 
         value=StorageState.current_page,
 

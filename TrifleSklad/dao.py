@@ -915,7 +915,7 @@ class StorageDAO:
             return list(storages)
 
     @classmethod
-    def get_by_id(cls, id: str) -> Optional[Storage]:
+    def get_by_id(cls, id: int) -> Optional[Storage]:
         statement = (
             select(Storage).where(Storage.id == id).where(Storage.is_deleted == False)
         )
@@ -928,7 +928,7 @@ class StorageDAO:
             return storage
 
     @classmethod
-    def get_by_id_with_relationships(cls, id: str) -> Optional[Storage]:
+    def get_by_id_with_relationships(cls, id: int) -> Optional[Storage]:
         statement = (
             select(Storage)
             .options(joinedload(Storage.responsible))
@@ -983,66 +983,59 @@ class StorageDAO:
             return list(storages)
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        storage = Storage(**form_data)
-
+    def add_one(cls, storage: Storage) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
-                    .where(Storage.is_deleted == False)
+                    .where(not Storage.is_deleted)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Склад с таким названием уже существует", -1
+                    return False, "Помилка! Місце зберігання з такою назвою вже існує!", -1
 
                 session.add(storage)
                 session.commit()
                 session.refresh(storage)
-                return True, "Склад успешно добавлен", storage.id
+                return True, "Склад успішно додано!", storage.id
 
         except IntegrityError as e:
             print("[StorageDAO] IntegrityError: ", e)
-            return False, "Ошибка: Склад не может быть добавлен", -1
+            return False, "Системна помилка! Склад не може бути доданий!", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print("[StorageDAO] Error: ", e)
+            return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, storage: Storage) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                storage = session.get(Storage, form_data["id"])
-
-                if storage is None:
-                    return False, "Ошибка: Склад не найден", -1
-
-                for key, value in form_data.items():
-                    setattr(storage, key, value)
-
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
                     .where(Storage.id != storage.id)
-                    .where(Storage.is_deleted == False)
+                    .where(not Storage.is_deleted)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Склад с таким названием уже существует",
+                        "Помилка! Склад з такою назвою вже існує!",
                         storage.id,
                     )
 
+                storage = session.merge(storage)
+                session.add(storage)
                 session.commit()
                 session.refresh(storage)
-                return True, "Склад успешно изменен", storage.id
+                return True, "Склад успішно змінено!", storage.id
 
         except IntegrityError as e:
             print("[StorageDAO] IntegrityError: ", e)
-            return False, "Ошибка: Склад не может быть изменен", -1
+            return False, "Системна помилка! Склад не може бути змінено!", -1
         except SQLAlchemyError as e:
-            print("[StorageDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            print("[StorageDAO] Error: ", e)
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -1051,18 +1044,18 @@ class StorageDAO:
                 storage = session.get(Storage, id)
 
                 if storage is None:
-                    return False, "Ошибка: Склад не найден"
+                    return False, "Помилка! Склад не знайдено!"
 
                 storage.is_deleted = True
                 session.commit()
-                return True, "Склад успешно удален"
+                return True, "Склад видалено!"
 
-        except IntegrityError:
-            return False, "Ошибка: Склад не может быть удален"
-        except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+        except IntegrityError as e:
+            print("[StorageDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Склад не може бути видалено!", -1
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[StorageDAO] Error: ", e)
+            return False, "Системна помилка!", -1
 
 
 class OwnerDAO:
