@@ -31,7 +31,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Власники ТМЦ/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -40,7 +40,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=OwnerState.delete_one(ViewOwnerstate.item.id)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -112,7 +112,7 @@ def list_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Власники ТМЦ", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -191,7 +191,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Власники ТМЦ/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -236,7 +236,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Власники ТМЦ/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.OWNERS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -270,13 +270,13 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.OWNERS_LIST),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST),
             list_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.OWNERS_CREATE),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_CREATE),
             add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.OWNERS_EDIT),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_EDIT),
             edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.OWNERS_VIEW),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_VIEW),
             item_preview_tab_content()),
 
         value=OwnerState.current_page,

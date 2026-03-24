@@ -108,7 +108,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Користувачі/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.USERS_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -117,7 +117,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=UserState.delete_one(ViewUserState.item.login)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.USERS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -198,7 +198,7 @@ def list_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Користувачі", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.USERS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -491,7 +491,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Користувачі/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.USERS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -534,7 +534,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Користувачі/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.USERS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -566,10 +566,10 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.USERS_LIST), list_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.USERS_LIST), add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.USERS_LIST), edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.USERS_LIST), item_preview_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_LIST), list_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_LIST), add_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_LIST), edit_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.USERS_LIST), item_preview_tab_content()),
 
         value=UserState.current_page,
  

@@ -34,7 +34,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Типи оплат/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -43,7 +43,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=StorageState.delete_one(ViewStorageState.item.id)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -119,7 +119,7 @@ def table_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Сховища", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -320,7 +320,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Сховища/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -365,7 +365,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Сховища/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.STORAGE_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -399,13 +399,13 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.STORAGE_LIST),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST),
             table_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.STORAGE_CREATE),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_CREATE),
             add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.STORAGE_EDIT),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_EDIT),
             edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.STORAGE_VIEW),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_VIEW),
             item_preview_tab_content()),
 
         value=StorageState.current_page,

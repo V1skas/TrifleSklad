@@ -3,6 +3,8 @@ import reflex as rx
 from components.elements import sidebar, sidebar_link, workspace
 
 from TrifleSklad import routes
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.administration.backend import AdministrationState
 
 import TrifleSklad.administration.users as users
@@ -48,9 +50,18 @@ def users_tab():
 def index():
     return rx.hstack(
         sidebar(
-            sidebar_link("Співробітники", routes.ADMIN_WORKERS),
-            sidebar_link("Ролі", routes.ADMIN_ROLES),
-            sidebar_link("Користувачі", routes.ADMIN_USERS),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.WORKERS_LIST),
+                sidebar_link("Співробітники", routes.ADMIN_WORKERS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.ROLES_LIST),
+                sidebar_link("Ролі", routes.ADMIN_ROLES),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.USERS_LIST),
+                sidebar_link("Користувачі", routes.ADMIN_USERS),
+            ),
         ),
         workspace(
             workers_tab(),

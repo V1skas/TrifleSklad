@@ -63,7 +63,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Каталог ТМЦ/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -72,7 +72,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=ProductsState.delete_one(ViewProductsState.item.id)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -164,7 +164,7 @@ def table_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Каталог ТМЦ", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -272,7 +272,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Каталог ТМЦ/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -375,7 +375,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Каталог ТМЦ/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -408,13 +408,13 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_LIST),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST),
             table_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_CREATE),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_CREATE),
             add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_EDIT),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_EDIT),
             edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.PRODUCTS_VIEW),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.PRODUCTS_VIEW),
             item_preview_tab_content()),
 
         value=ProductsState.current_page,

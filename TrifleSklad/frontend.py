@@ -1,6 +1,8 @@
 import reflex as rx
 
+from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.state import AppState
+
 from components import decor
 from TrifleSklad import authorithation, administration, routes, catalog, movement
 
@@ -46,9 +48,15 @@ def navbar() -> rx.Component:
                 href=routes.WELCOME,
             ),
             rx.hstack(
-                navbar_link("Адміністрування", routes.ADMIN),
-                navbar_link("Каталог", routes.CATALOG),
-                navbar_link("Рух ТМЦ", routes.MOVEMENT),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.WORKERS_LIST) | AppState.get_user_actions.contains(ActionEnum.ROLES_LIST) | AppState.get_user_actions.contains(ActionEnum.USERS_LIST),
+                    navbar_link("Адміністрування", routes.ADMIN),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST) | AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST) | AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST) | AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST) | AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST) | AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST),
+                    navbar_link("Каталог", routes.CATALOG),                
+                ),
+                #navbar_link("Рух ТМЦ", routes.MOVEMENT),
 
                 align_items="center",
                 height="100%",

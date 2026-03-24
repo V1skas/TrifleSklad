@@ -1,10 +1,14 @@
 import reflex as rx
 
+from typing import List
+
 from TrifleSklad.catalog.categories.backend import CategoriesState
 from TrifleSklad.catalog.products.backend import ProductsState
 from components.elements import sidebar, sidebar_link, workspace
 
 from TrifleSklad import routes
+from TrifleSklad.state import AppState
+from TrifleSklad.actions import Action as ActionEnum
 
 from TrifleSklad.catalog.backend import CatalogState
 import TrifleSklad.catalog.categories as categories
@@ -89,12 +93,30 @@ def payment_types_tab() -> rx.Component:
 def index():
     return rx.hstack(
         sidebar(
-            sidebar_link("Категории ТМЦ", routes.CATALOG_CATEGORIES),
-            sidebar_link("Каталог ТМЦ", routes.CATALOG_PRODUCTS),
-            sidebar_link("Владельцы ТМЦ", routes.CATALOG_OWNERS),
-            sidebar_link("Хранилища", routes.CATALOG_STORAGES),
-            sidebar_link("Поставщики", routes.CATALOG_SUPPLIERS),
-            sidebar_link("Типы оплаты", routes.CATALOG_PAYMENT_TYPES),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST),
+                sidebar_link("Категорії ТМЦ", routes.CATALOG_CATEGORIES),
+                ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST),
+                sidebar_link("Каталог ТМЦ", routes.CATALOG_PRODUCTS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST),
+                sidebar_link("Власники ТМЦ", routes.CATALOG_OWNERS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST),
+                sidebar_link("Сховища", routes.CATALOG_STORAGES),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST),
+                sidebar_link("Постачальники", routes.CATALOG_SUPPLIERS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST),
+                sidebar_link("Типи оплат", routes.CATALOG_PAYMENT_TYPES),
+            ),
         ),
         workspace(
             categories_tab(),

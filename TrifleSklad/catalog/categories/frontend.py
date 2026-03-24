@@ -35,7 +35,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Категорії ТМЦ/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -44,7 +44,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=CategoriesState.delete_one(ViewCategoriesState.item.id)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -116,7 +116,7 @@ def list_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Категорії ТМЦ", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -195,7 +195,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Категорії ТМЦ/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -240,7 +240,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Категорії ТМЦ/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -274,13 +274,13 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_LIST),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST),
             list_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_CREATE),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_CREATE),
             add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_EDIT),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_EDIT),
             edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.CATEGORIES_VIEW),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.CATEGORIES_VIEW),
             item_preview_tab_content()),
 
         value=CategoriesState.current_page,

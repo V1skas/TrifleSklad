@@ -17,7 +17,7 @@ def item_preview() -> rx.Component:
                 ),
                 rx.heading("Співробітники/Перегляд", size="7", color=rx.color("accent", 9)),
                 rx.hstack(
-                    rx.cond(AppState.has_permission(Action.WORKERS_DELETE),
+                    rx.cond(AppState.get_user_actions.contains(Action.WORKERS_DELETE),
                         rx.button(
                             "Видалити",
                             color_scheme="red",
@@ -26,7 +26,7 @@ def item_preview() -> rx.Component:
                             on_click=WorkersState.delete_one(ViewWorkerState.item.id)
                         ),                            
                     ),
-                    rx.cond(AppState.has_permission(Action.WORKERS_EDIT),
+                    rx.cond(AppState.get_user_actions.contains(Action.WORKERS_EDIT),
                         rx.button(
                             "Редагувати",
                             variant="ghost",
@@ -122,7 +122,7 @@ def list_tab_content() -> rx.Component:
             rx.box(
                 rx.hstack(
                     rx.heading("Співробітники", size="7", color=rx.color("accent", 9)),
-                    rx.cond(AppState.has_permission(Action.WORKERS_CREATE),
+                    rx.cond(AppState.get_user_actions.contains(Action.WORKERS_CREATE),
                         rx.button(
                                 "Створити",
                                 variant="ghost",
@@ -327,10 +327,10 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(Action.WORKERS_LIST), list_tab_content()),
-        rx.cond(AppState.has_permission(Action.WORKERS_CREATE), add_tab_content()),
-        rx.cond(AppState.has_permission(Action.WORKERS_EDIT), edit_tab_content()),
-        rx.cond(AppState.has_permission(Action.WORKERS_LIST), item_preview_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(Action.WORKERS_LIST), list_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(Action.WORKERS_CREATE), add_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(Action.WORKERS_EDIT), edit_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(Action.WORKERS_LIST), item_preview_tab_content()),
 
         value=WorkersState.current_page,
 

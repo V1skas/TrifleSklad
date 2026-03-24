@@ -53,24 +53,13 @@ class ViewWorkerState(rx.State):
 
 class AddWorkerState(rx.State):
     item: Worker = Worker(
-        id=-1,
-        fio="",
-        phone_number=None,
-        email=None,
-        position=None
     )
 
     # Actions handlers
     # ======================
     @rx.event
     def reset_item(self):
-        self.item = Worker(
-            id=-1,
-            fio="",
-            phone_number=None,
-            email=None,
-            position=None
-        )
+        self.item = Worker()
 
     @rx.event
     def change_fio(self, value: str):
@@ -108,13 +97,7 @@ class AddWorkerState(rx.State):
 
 
 class EditWorkerState(rx.State):
-    item: Worker = Worker(
-        id=-1,
-        fio="",
-        phone_number=None,
-        email=None,
-        position=None
-    )
+    item: Worker = Worker()
 
     # Actions handlers
     # ======================

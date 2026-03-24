@@ -55,7 +55,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Ролі/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.ROLES_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -64,7 +64,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=RoleState.delete_one(ViewRoleState.item.id)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.ROLES_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -133,7 +133,7 @@ def list_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Ролі", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.ROLES_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -316,7 +316,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Ролі/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.ROLES_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -361,7 +361,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Ролі/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.ROLES_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -395,13 +395,13 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.ROLES_LIST),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_LIST),
             list_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.ROLES_CREATE),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_CREATE),
             add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.ROLES_EDIT),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_EDIT),
             edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.ROLES_VIEW),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ROLES_VIEW),
             item_preview_tab_content()),
 
         value=RoleState.current_page,

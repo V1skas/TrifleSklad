@@ -15,6 +15,10 @@ class AppState(rx.State):
     def check_params(self):
         print(self.router.page.path)
         print(self.router.page.params)
+        
+    @rx.var
+    def get_user_actions(self) -> List[str]:
+        return self.user_actions
 
     @rx.var
     def is_authenticated(self) -> bool:
@@ -46,3 +50,6 @@ class AppState(rx.State):
         if not self.user:
             return False
         return action.value in self.user_actions
+    
+    def has_section_access(self, section: str) -> bool:
+        return any(action.startswith(f"{section}:") for action in self.user_actions)

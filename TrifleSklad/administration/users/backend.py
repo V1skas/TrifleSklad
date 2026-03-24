@@ -85,7 +85,7 @@ class AddUserState(rx.State):
 
     @rx.var
     def id_worker(self) -> str:
-        return str(self.item.id_worker)
+        return str(self.item.id_worker) if self.item.id_worker is not None else ""
 
     # =============
 
@@ -110,15 +110,15 @@ class AddUserState(rx.State):
 
     @rx.event
     def on_change_login(self, login: str):
-        self.item.login = login
+        self.item.login = login if login != "" else None
 
     @rx.event
     def on_change_worker(self, worker: str):
-        self.item.id_worker = int(worker)
+        self.item.id_worker = int(worker) if int(worker) > 0 else None
 
     @rx.event
     def on_change_password(self, password: str):
-        self.item.password_hash = password
+        self.item.password_hash = password if password != "" else None
 
     @rx.event
     def on_change_roles(self):
@@ -142,9 +142,9 @@ class AddUserState(rx.State):
             return rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
 
         if (
-            self.item.login is None or len(self.item.login) < 1
-            or self.item.password_hash is None or len(self.item.password_hash) < 1
-            or self.item.id_worker is None or self.item.id_worker < 0
+            self.item.login is None
+            or self.item.password_hash is None
+            or self.item.id_worker is None
         ):
             return rx.toast.error("Заповнить всі обов'язкові поля!")
 
@@ -216,11 +216,11 @@ class EditUserState(rx.State):
 
     @rx.event
     def on_change_worker(self, worker: str):
-        self.item.id_worker = int(worker)
+        self.item.id_worker = int(worker) if int(worker) > 0 else None
 
     @rx.event
     def on_change_password(self, password: str):
-        self.password = password
+        self.password = password if password != "" else None
 
     @rx.event
     def on_change_roles(self):
@@ -243,7 +243,7 @@ class EditUserState(rx.State):
         if not self.app_state.has_permission(ActionEnum.USERS_EDIT):
             return rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
 
-        if self.item.id_worker == -1:
+        if self.item.id_worker is None:
             return rx.toast.error("Заповнить всі обов'язкові поля!")
 
         if len(self.item.roles) == 0 and len(self.item.actions == 0):

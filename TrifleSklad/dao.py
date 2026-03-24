@@ -569,7 +569,7 @@ class ProductCategoryDAO:
         statement = (
             select(ProductCategory)
             .options(selectinload(ProductCategory.products))
-            .where(not ProductCategory.is_deleted)
+            .where(ProductCategory.is_deleted == False)
         )
 
         with rx.session() as session:
@@ -584,7 +584,7 @@ class ProductCategoryDAO:
         statement = (
             select(ProductCategory)
             .where(ProductCategory.id == id)
-            .where(not ProductCategory.is_deleted)
+            .where(ProductCategory.is_deleted == False)
         )
 
         with rx.session() as session:
@@ -599,7 +599,7 @@ class ProductCategoryDAO:
         statement = (
             select(ProductCategory)
             .where(ProductCategory.title == title)
-            .where(not ProductCategory.is_deleted)
+            .where(ProductCategory.is_deleted == False)
         )
 
         with rx.session() as session:
@@ -615,7 +615,7 @@ class ProductCategoryDAO:
             select(ProductCategory)
             .options(joinedload(ProductCategory.products))
             .where(ProductCategory.id == id)
-            .where(not ProductCategory.is_deleted)
+            .where(ProductCategory.is_deleted == False)
         )
 
         with rx.session() as session:
@@ -632,7 +632,7 @@ class ProductCategoryDAO:
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
-                    .where(not ProductCategory.is_deleted)
+                    .where(ProductCategory.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
@@ -662,7 +662,7 @@ class ProductCategoryDAO:
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
                     .where(ProductCategory.id != category.id)
-                    .where(not ProductCategory.is_deleted)
+                    .where(ProductCategory.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
@@ -990,7 +990,7 @@ class StorageDAO:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
-                    .where(not Storage.is_deleted)
+                    .where(Storage.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
@@ -1016,7 +1016,7 @@ class StorageDAO:
                     select(Storage)
                     .where(Storage.title == storage.title)
                     .where(Storage.id != storage.id)
-                    .where(not Storage.is_deleted)
+                    .where(Storage.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
@@ -1262,7 +1262,7 @@ class SupplierDAO:
                     select(Supplier)
                     .where(Supplier.title == supplier.title)
                     .where(Supplier.id != supplier.id)
-                    .where(not Supplier.is_deleted)
+                    .where(Supplier.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (

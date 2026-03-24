@@ -35,7 +35,7 @@ def item_preview_tab_content() -> rx.Component:
                     ),
                     rx.heading("Постачальники/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_DELETE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_DELETE),
                             rx.button(
                                 "Видалити",
                                 color_scheme="red",
@@ -44,7 +44,7 @@ def item_preview_tab_content() -> rx.Component:
                                 on_click=SupplierState.delete_one(ViewSupplierState.item.id)
                             ),                            
                         ),
-                        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_EDIT),
                             rx.button(
                                 "Редагувати",
                                 variant="ghost",
@@ -140,7 +140,7 @@ def list_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.heading("Постачальники", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_CREATE),
                             rx.button(
                                 "Додати",
                                 variant="ghost",
@@ -319,7 +319,7 @@ def add_tab_content() -> rx.Component:
                     ),
                     rx.heading("Постачальники/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_CREATE),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_CREATE),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -364,7 +364,7 @@ def edit_tab_content() -> rx.Component:
                     ),
                     rx.heading("Постачальники/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
-                        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_EDIT),
+                        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_EDIT),
                             rx.button(
                                 "Зберегти",
                                 variant="ghost",
@@ -398,13 +398,13 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_LIST),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST),
             list_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_CREATE),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_CREATE),
             add_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_EDIT),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_EDIT),
             edit_tab_content()),
-        rx.cond(AppState.has_permission(ActionEnum.SUPPLIERS_VIEW),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_VIEW),
             item_preview_tab_content()),
 
         value=SupplierState.current_page,
