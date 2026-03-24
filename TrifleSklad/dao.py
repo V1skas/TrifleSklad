@@ -569,7 +569,7 @@ class ProductCategoryDAO:
         statement = (
             select(ProductCategory)
             .options(selectinload(ProductCategory.products))
-            .where(ProductCategory.is_deleted == False)
+            .where(not ProductCategory.is_deleted)
         )
 
         with rx.session() as session:
@@ -580,11 +580,11 @@ class ProductCategoryDAO:
             return list(categories)
 
     @classmethod
-    def get_by_id(cls, id: str) -> Optional[ProductCategory]:
+    def get_by_id(cls, id: int) -> Optional[ProductCategory]:
         statement = (
             select(ProductCategory)
             .where(ProductCategory.id == id)
-            .where(ProductCategory.is_deleted == False)
+            .where(not ProductCategory.is_deleted)
         )
 
         with rx.session() as session:
@@ -599,7 +599,7 @@ class ProductCategoryDAO:
         statement = (
             select(ProductCategory)
             .where(ProductCategory.title == title)
-            .where(ProductCategory.is_deleted == False)
+            .where(not ProductCategory.is_deleted)
         )
 
         with rx.session() as session:
@@ -615,7 +615,7 @@ class ProductCategoryDAO:
             select(ProductCategory)
             .options(joinedload(ProductCategory.products))
             .where(ProductCategory.id == id)
-            .where(ProductCategory.is_deleted == False)
+            .where(not ProductCategory.is_deleted)
         )
 
         with rx.session() as session:
@@ -759,7 +759,7 @@ class ProductCatalogDAO:
             return list(products)
 
     @classmethod
-    def get_by_id(cls, id: str) -> Optional[ProductCatalog]:
+    def get_by_id(cls, id: int) -> Optional[ProductCatalog]:
         statement = (
             select(ProductCatalog)
             .where(ProductCatalog.id == id)
@@ -774,7 +774,7 @@ class ProductCatalogDAO:
             return product
 
     @classmethod
-    def get_by_id_with_relationships(cls, id: str) -> Optional[ProductCatalog]:
+    def get_by_id_with_relationships(cls, id: int) -> Optional[ProductCatalog]:
         statement = (
             select(ProductCatalog)
             .options(joinedload(ProductCatalog.category))
@@ -805,9 +805,7 @@ class ProductCatalogDAO:
             return product
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        product = ProductCatalog(**form_data)
-
+    def add_one(cls, product: ProductCatalog) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -817,31 +815,27 @@ class ProductCatalogDAO:
                 )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Товар с таким названием уже существует", -1
+                    return False, "Помилка! Товар з такою назвою вже існує!", -1
 
                 session.add(product)
                 session.commit()
                 session.refresh(product)
-                return True, "Товар успешно добавлен", product.id
+                return True, "Товар додано!", product.id
 
         except IntegrityError as e:
-            print("[ProductCatalogDAO] IntegrityError: ", e)
-            return False, "Ошибка: Товар не может быть добавлен", -1
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка! Товар не може бути доданий!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
+        except Exception as e:
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, product: ProductCatalog) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                product = session.get(ProductCatalog, form_data["id"])
-
-                if product is None:
-                    return False, "Ошибка: Товар не найден", -1
-
-                for key, value in form_data.items():
-                    setattr(product, key, value)
-
                 statement = (
                     select(ProductCatalog)
                     .where(ProductCatalog.title == product.title)
@@ -851,20 +845,24 @@ class ProductCatalogDAO:
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Товар с таким названием уже существует",
+                        "Помилка! Товар з такою назвою вже існує!",
                         product.id,
                     )
 
+                session.add(product)
                 session.commit()
                 session.refresh(product)
-                return True, "Товар успешно изменен", product.id
+                return True, "Товар успішно змінено!", product.id
 
         except IntegrityError as e:
-            print("[ProductCatalogDAO] IntegrityError: ", e)
-            return False, "Ошибка: Товар не может быть изменен", -1
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка! Товар не може бути змінений!"
         except SQLAlchemyError as e:
-            print("[ProductCatalogDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
+        except Exception as e:
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -873,18 +871,21 @@ class ProductCatalogDAO:
                 product = session.get(ProductCatalog, id)
 
                 if product is None:
-                    return False, "Ошибка: Товар не найден"
+                    return False, "Помилка! Товар не знайдено"
 
                 product.is_deleted = True
                 session.commit()
-                return True, "Товар успешно удален"
+                return True, "Товар видалено!"
 
-        except IntegrityError:
-            return False, "Ошибка: Товар не может быть удален"
+        except IntegrityError as e:
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка! Товар не може бути видалений!"
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print(f"[ProductCatalogDAO] Error: {str(e)}")
+            return False, "Системна помилка!"
 
 
 class StorageDAO:

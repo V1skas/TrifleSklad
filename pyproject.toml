@@ -17,7 +17,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.0",
+    "python-lsp-server[all]>=1.14.0",
 ]
 
 [tool.ruff]
@@ -50,3 +50,14 @@ exclude = [
     "site-packages",
     "venv",
 ]
+
+[tool.pylsp.plugins.pyright]
+enabled = true
+
+[tool.pylsp.plugins.jedi_completion]
+enabled = false  # Выключаем стандартный Jedi, если хотим всё от Pyright
+
+[tool.pylsp.plugins.rope_autoimport]
+enabled = true   # Бонус: автоимпорт недостающих библиотек
+
+
