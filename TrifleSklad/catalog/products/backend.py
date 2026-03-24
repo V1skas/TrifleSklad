@@ -329,7 +329,7 @@ class ProductsState(rx.State):
             # /products/view/[id]
             elif page == self.Pages.VIEW:
                 if not self.app_state.has_permission(ActionEnum.PRODUCTS_VIEW):
-                    rx.redirect(routes.WELCOME)
+                    return rx.redirect(routes.WELCOME)
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield ViewProductsState.on_load(int(id))
@@ -340,7 +340,7 @@ class ProductsState(rx.State):
         else:
             # /products
             if not self.app_state.has_permission(ActionEnum.PRODUCTS_LIST):
-                rx.redirect(routes.WELCOME)
+                return rx.redirect(routes.WELCOME)
             yield ListProductsState.on_load()
             self.current_page = self.Pages.LIST
 

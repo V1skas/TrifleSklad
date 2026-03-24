@@ -201,13 +201,6 @@ class RoleState(rx.State):
     app_state: Optional[AppState] = None
 
     def _check_path(self):
-        if not self.app_state.has_permission(ActionEnum.ROLES_EDIT) \
-            and not self.app_state.has_permission(ActionEnum.ROLES_CREATE) \
-            and not self.app_state.has_permission(ActionEnum.ROLES_DELETE) \
-            and not self.app_state.has_permission(ActionEnum.ROLES_VIEW) \
-            and not self.app_state.has_permission(ActionEnum.ROLES_LIST):
-            return rx.redirect(routes.WELCOME)
-
         page = self.router.page.params.get("page", "")
         if page != "":
             id = -1

@@ -27,12 +27,17 @@ class AdministrationState(AppState):
         if tab != "":
             if tab not in [self.Tabs.ROLES, self.Tabs.USERS, self.Tabs.WORKERS]:
                 return rx.redirect(routes.WELCOME)
-            
+
             self.current_tab = tab
             return None
-        
+
     @rx.event
     def on_load(self):
+        if (not self.has_section_access("users")
+            and not self.has_section_access("workers")
+            and not self.has_section_access("roles")):
+            return rx.redirect(routes.WELCOME)
+        self.current_tab = ""
         result = self._check_path()
         if result is not None:
             return result

@@ -1,4 +1,3 @@
-from pydantic import Tag
 import reflex as rx
 
 from TrifleSklad import routes
@@ -44,6 +43,14 @@ class CatalogState(AppState):
 
     @rx.event
     def on_load(self):
+        if (not self.has_section_access("categories") 
+            and not self.has_section_access("products")
+            and not self.has_section_access("suppliers")
+            and not self.has_section_access("owners")
+            and not self.has_section_access("storage")
+            and not self.has_section_access("payment_types")):
+            return rx.redirect(routes.WELCOME)
+        self.current_tab = ""
         result = self._check_path()
         if result is not None:
             return result
