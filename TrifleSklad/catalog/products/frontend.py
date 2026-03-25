@@ -188,9 +188,34 @@ def table_tab_content() -> rx.Component:
                     "border_bottom": f"1px solid {rx.color('accent', 9)}",
                 }
             ),
+            rx.hstack(
+                rx.input(
+                    value=ListProductsState.get_search_str,
+                    on_change=ListProductsState.on_change_search_str
+                ),
+                rx.button("Пошук", on_click=ListProductsState.on_click_search),
+
+                width="100%"
+            ),
             rx.cond(ListProductsState.has_items,
                 table(),
                 rx.text("Записів немає")
+            ),
+            rx.hstack(
+                rx.button("Назад", on_click=ListProductsState.current_page_decrement),
+                rx.input(
+                    value=ListProductsState.get_current_page,
+                    on_change=ListProductsState.on_change_current_page,
+                    type="number",
+                    min="1",
+                    max=ListProductsState.get_all_pages),
+                rx.text("/"),
+                rx.text(ListProductsState.get_all_pages),
+                rx.button("Вперед", on_click=ListProductsState.current_page_increment),
+
+                justify="center",
+
+                width="100%"
             ),
 
             width="100%",

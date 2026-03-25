@@ -1,9 +1,11 @@
 from typing import List, Optional
 
 import reflex as rx
+import math
+
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import select
+from sqlmodel import select, func
 
 from TrifleSklad.declared import MovementsStatus, get_status_by_text
 from TrifleSklad.models import (
@@ -757,6 +759,45 @@ class ProductCatalogDAO:
             if len(products) > 0:
                 session.expunge_all()
             return list(products)
+        
+    @classmethod
+    def get_count_with_search(cls, search_str: Optional[str] = None) -> int:
+        if search_str is not None and search_str.strip():
+            condition = ProductCatalog.title.ilike(f"%{search_str.strip()}%")
+        else:
+            condition = True
+
+        statement = select(func.count(ProductCatalog.id)).where(condition).where(ProductCatalog.is_deleted == False)
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+        
+    @classmethod
+    def get_all_with_relationships_by_page(cls, page: int = 1, count_items: int = 0, limit: int = 20, search_str: Optional[str] = None) -> tuple[int, List[ProductCatalog]]:
+        if search_str is not None and search_str.strip():
+            condition = ProductCatalog.title.ilike(f"%{search_str.strip()}%")
+        else:
+            condition = True
+
+        total_pages = math.ceil(count_items / limit)
+        if total_pages == 0:
+            total_pages = 1
+
+        skip = (page - 1) * limit
+        
+        statement = (
+                select(ProductCatalog)
+                .options(selectinload(ProductCatalog.category))
+                .where(ProductCatalog.is_deleted == False)
+                .where(condition)
+                .offset(skip)
+                .limit(limit)
+            )
+
+        with rx.session() as session:
+            items = session.exec(statement).all()
+            session.expunge_all()
+            return total_pages, items
 
     @classmethod
     def get_by_id(cls, id: int) -> Optional[ProductCatalog]:

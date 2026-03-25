@@ -1,3 +1,5 @@
+from token import OP
+
 import reflex as rx
 
 from typing import List, Tuple, Optional
@@ -291,6 +293,36 @@ class EditProductsState(rx.State):
 
 class ListProductsState(rx.State):
     items: List[ProductCatalog] = []
+    
+    _current_page: int = 1
+    _all_pages: int = 1
+    _limit_items: int = 20
+    search_str: Optional[str] = None
+
+    def _load_items(self):
+        self._all_pages, self.items = ProductCatalogDAO.get_all_with_relationships_by_page(page=self._current_page,
+                                                                                           count_items=ProductCatalogDAO.get_count_with_search(),
+                                                                                           limit=self._limit_items,
+                                                                                           search_str=self.search_str)
+
+    # Vars
+    # ====
+    @rx.var
+    def get_current_page(self) -> str:
+        return str(self._current_page)
+    
+    @rx.var
+    def get_all_pages(self) -> str:
+        return str(self._all_pages)
+    
+    @rx.var
+    def get_items(self) -> List[ProductCatalog]:
+        return self.items
+    
+    @rx.var
+    def get_search_str(self) -> str:
+        return self.search_str if self.search_str is not None else ""
+    # ====
 
     # Frontend vars
     # =============
@@ -303,7 +335,38 @@ class ListProductsState(rx.State):
     # ===============
     @rx.event
     def on_load(self):
-        self.items = ProductCatalogDAO.get_all_with_relationships()
+        self._current_page = 1
+        self._load_items()
+
+    @rx.event
+    def current_page_increment(self):
+        if self._current_page+1 <= self._all_pages:
+            self._current_page += 1
+            self._load_items()
+
+    @rx.event
+    def current_page_decrement(self):
+        if self._current_page > 1:
+            self._current_page -= 1
+            self._load_items()
+
+    @rx.event
+    def on_change_current_page(self, value: str):
+        if value != "" and int(value) > 0 and int(value) <= self._all_pages:
+            self._current_page = int(value)
+            self._load_items()
+    
+    @rx.event
+    def on_change_search_str(self, value: str):
+        if value != "":
+            self.search_str = value
+        else:
+            self.search_str = None
+
+    @rx.event
+    def on_click_search(self):
+        self._current_page = 1
+        self._load_items()
     # ===============
 
 class ProductsState(rx.State):
