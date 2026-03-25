@@ -73,13 +73,17 @@ class AddProductsState(rx.State):
     item: Optional[ProductCatalog] = None
     app_state: Optional[AppState] = None
     list_categories: List[Tuple[str, str]] = []
+    all_units_cache: list[str] = []
 
     def _reload_item(self):
         self.item = ProductCatalog()
 
     def _load_categories(self):
         self.list_categories = [(str(item.id), item.title) for item in ProductCategoryDAO.get_all()]
-
+    
+    def _load_all_units_cache(self):
+        self.all_units_cache = ProductCatalogDAO.get_list_units()
+        
     # Vars
     # ====
     @rx.var
@@ -100,7 +104,7 @@ class AddProductsState(rx.State):
         
     @rx.var
     def unit(self) -> str:
-        return str(self.item.unit) if self.item is not None and self.item.unit is not None else "None"
+        return str(self.item.unit) if self.item is not None and self.item.unit is not None else ""
         
     @rx.var
     def divisible(self) -> bool:
@@ -125,6 +129,7 @@ class AddProductsState(rx.State):
     async def on_load(self):
         self._reload_item()
         self._load_categories()
+        self._load_all_units_cache()
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 
@@ -143,6 +148,7 @@ class AddProductsState(rx.State):
     @rx.event
     def on_change_unit(self, value: str):
         self.item.unit = value if value != "" else None
+        #self.filter_suggestions(value)
 
     @rx.event
     def on_change_divisible(self, value: bool):
@@ -175,12 +181,16 @@ class EditProductsState(rx.State):
     item: Optional[ProductCatalog] = None
     app_state: Optional[AppState] = None
     list_categoties: List[Tuple[str, str]] = []
-
+    all_units_cache: list[str] = []
+    
     def _load_item(self, id: int):
         self.item = ProductCatalogDAO.get_by_id_with_relationships(id)
 
     def _load_categories(self):
         self.list_categoties = [(str(item.id), item.title) for item in ProductCategoryDAO.get_all()]
+        
+    def _load_all_units_cache(self):
+        self.all_units_cache = ProductCatalogDAO.get_list_units()
 
     # Vars
     # ====
@@ -202,7 +212,7 @@ class EditProductsState(rx.State):
         
     @rx.var
     def unit(self) -> str:
-        return str(self.item.unit) if self.item is not None and self.item.unit is not None else "None"
+        return str(self.item.unit) if self.item is not None and self.item.unit is not None else ""
         
     @rx.var
     def divisible(self) -> bool:
@@ -232,6 +242,7 @@ class EditProductsState(rx.State):
                 rx.toast.warning("Запис не знайдено!")
             ]
         self._load_categories()
+        self._load_all_units_cache()
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 

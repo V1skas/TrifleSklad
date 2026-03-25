@@ -1,5 +1,3 @@
-from tkinter import N
-
 import reflex as rx
 
 from typing import List, Tuple, Optional
@@ -8,7 +6,7 @@ import TrifleSklad.routes as routes
 from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
 
-from TrifleSklad.models import ProductCategory
+from TrifleSklad.models import ProductCategory, ProductCatalog
 from TrifleSklad.dao import ProductCatalogDAO, ProductCategoryDAO
 
 
@@ -190,6 +188,11 @@ class CategoriesState(rx.State):
         if id > -1:
             if not self.app_state.has_permission(ActionEnum.CATEGORIES_DELETE):
                 return rx.toast.error("Ви не маєте дозволу на цю дію!")
+                
+            products_in_category: List[ProductCatalog] = ProductCatalogDAO.get_by_category(id)
+            
+            if len(products_in_category) > 0:
+                return rx.toast.error("Неможливо видалити категорію, у яку входить ТМЦ з каталогу!")
 
             flag, text = ProductCategoryDAO.delete_one(id)
             if flag:

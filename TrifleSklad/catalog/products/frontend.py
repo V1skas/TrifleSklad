@@ -233,7 +233,15 @@ def add_form() -> rx.Component:
                 width="100%"
             ),
             rx.text("Одиниця виміру", size="3", width="100%"),
-            rx.input(id="unit", required=True, size="3", width="100%", value=AddProductsState.unit, on_change=AddProductsState.on_change_unit),
+            rx.input(id="unit", required=True, size="3", width="100%", list="units-datalist", value=AddProductsState.unit, on_change=AddProductsState.on_change_unit
+            ),
+            rx.el.datalist(
+                rx.foreach(
+                    AddProductsState.all_units_cache,
+                    lambda unit: rx.el.option(value=unit)
+                ),
+                id="units-datalist"
+            ),
             rx.text("Місткість", size="3", width="100%"),
             rx.input(id="capacity", required=True, size="3", width="100%", value=AddProductsState.capacity, on_change=AddProductsState.on_change_capacity),
             rx.checkbox(
@@ -336,7 +344,14 @@ def edit_form() -> rx.Component:
                 width="100%"
             ),
             rx.text("Одиниця виміру", size="3", width="100%"),
-            rx.input(id="unit", required=True, size="3", width="100%", value=EditProductsState.unit, on_change=EditProductsState.on_change_unit),
+            rx.input(id="unit", required=True, size="3", width="100%", list="units-datalist", value=EditProductsState.unit, on_change=EditProductsState.on_change_unit),
+            rx.el.datalist(
+                rx.foreach(
+                    EditProductsState.all_units_cache,
+                    lambda unit: rx.el.option(value=unit)
+                ),
+                id="units-datalist"
+            ),
             rx.text("Місткість", size="3", width="100%"),
             rx.input(id="capacity", required=True, size="3", width="100%", value=EditProductsState.capacity, on_change=EditProductsState.on_change_capacity),
             rx.checkbox(

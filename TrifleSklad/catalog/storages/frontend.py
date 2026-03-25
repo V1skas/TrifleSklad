@@ -32,7 +32,7 @@ def item_preview_tab_content() -> rx.Component:
                         size="3",
                         on_click=rx.redirect(routes.CATALOG_STORAGES)
                     ),
-                    rx.heading("Типи оплат/Перегляд", size="7", color=rx.color("accent", 9)),
+                    rx.heading("Об'єкти підприємства/Перегляд", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
                         rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_DELETE),
                             rx.button(
@@ -117,7 +117,7 @@ def table_tab_content() -> rx.Component:
         rx.vstack(
             rx.box(
                 rx.hstack(
-                    rx.heading("Сховища", size="7", color=rx.color("accent", 9)),
+                    rx.heading("Об'єкти підприємства", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
                         rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_CREATE),
                             rx.button(
@@ -318,7 +318,7 @@ def add_tab_content() -> rx.Component:
                         size="3",
                         on_click=rx.redirect(routes.CATALOG_STORAGES)
                     ),
-                    rx.heading("Сховища/Додавання", size="7", color=rx.color("accent", 9)),
+                    rx.heading("Об'єкти підприємства/Додавання", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
                         rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_CREATE),
                             rx.button(
@@ -363,7 +363,7 @@ def edit_tab_content() -> rx.Component:
                         size="3",
                         on_click=rx.redirect(routes.CATALOG_STORAGES)
                     ),
-                    rx.heading("Сховища/Редагування", size="7", color=rx.color("accent", 9)),
+                    rx.heading("Об'єкти підприємства/Редагування", size="7", color=rx.color("accent", 9)),
                     rx.hstack(
                         rx.cond(AppState.get_user_actions.contains(ActionEnum.STORAGE_EDIT),
                             rx.button(

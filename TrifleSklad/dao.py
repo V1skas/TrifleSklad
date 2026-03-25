@@ -804,6 +804,31 @@ class ProductCatalogDAO:
                 session.expunge(product)
             return product
 
+
+    @classmethod
+    def get_by_category(cls, id_category) -> List[ProductCatalog]:
+        statement = (
+            select(ProductCatalog).where(ProductCatalog.id_category == id_category)
+            .where(ProductCatalog.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            products = session.exec(statement).all()
+
+            for product in products:
+                session.expunge(product)
+        return products
+
+    @classmethod
+    def get_list_units(cls) -> list[str]:
+        statement = select(ProductCatalog.unit).distinct()
+        
+        with rx.session() as session:
+            units_from_db = session.exec(statement).all()
+            uniq_units = sorted([u.strip() for u in units_from_db if u])
+            
+        return uniq_units
+        
     @classmethod
     def add_one(cls, product: ProductCatalog) -> tuple[bool, str, int]:
         try:

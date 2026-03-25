@@ -107,7 +107,7 @@ def index():
             ),
             rx.cond(
                 AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST),
-                sidebar_link("Сховища", routes.CATALOG_STORAGES),
+                sidebar_link("Об'єкти підприємства", routes.CATALOG_STORAGES),
             ),
             rx.cond(
                 AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST),
