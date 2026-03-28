@@ -25,8 +25,11 @@ def item_preview() -> rx.Component:
                 rx.text("Подільний: Так", width="50%"),
                 rx.text("Подільний: Ні", width="50%")
             ),
-
-            rx.text(f"Місткість: {rx.cond(ViewProductsState.divisible, ViewProductsState.capacity, "-")}", width="50%"),
+            
+            rx.cond(ViewProductsState.divisible,
+                rx.text(f"Місткість: {ViewProductsState.capacity}", width="50%"),
+                rx.text("Місткість: -", width="50%")
+            ),
             width="100%"
         ),
         rx.hstack(

@@ -1,5 +1,3 @@
-from turtle import width
-
 import reflex as rx
 
 from typing import Tuple
