@@ -15,9 +15,9 @@ dist/
 /node_modules
 
 # Alembic
-alembic.ini
-versions/
-alembic/
+# alembic.ini
+# versions/
+# aembic/
 
 # Логи
 *.log
