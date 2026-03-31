@@ -36,9 +36,7 @@ class AppState(rx.State):
             
             self.user = token.user
 
-            self.user_actions = UserDAO.get_user_actions_by_id(self.user.login)
-
-        if self.fio is None: 
+            self.user_actions = UserDAO.get_user_actions_by_id(self.user.login) 
             self.fio = UserDAO.get_user_fio_by_login(self.user.login)
 
     @rx.event
