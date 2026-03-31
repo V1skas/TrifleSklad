@@ -5,8 +5,6 @@ INIT_FLAG="/TrifleSklad/data/.initialized"
 UPDATE_MARKER="/TrifleSklad/.update_marker"
 
 if [ ! -f "$INIT_FLAG" ]; then
-    uv run reflex db init
-    uv run makemigrations
     uv run reflex db migrate
     uv run deploy.py
     uv run reflex export --frontend-only --no-zip
@@ -18,7 +16,6 @@ if [ ! -f "$INIT_FLAG" ]; then
 
 else
     if [ -f "$UPDATE_MARKER" ]; then
-        uv run reflex db makemigrations
         uv run reflex db migrate
         uv run update.py
         uv run reflex export --frontend-only --no-zip

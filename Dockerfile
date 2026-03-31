@@ -13,9 +13,9 @@ RUN pip install uv
 RUN uv sync
 
 # Копируем весь оставшийся код проекта
-COPY rxconfig.py update.py .update_marker deploy.py entrypoint.sh ./
+COPY alembic.ini rxconfig.py update.py .update_marker deploy.py entrypoint.sh ./
 COPY TrifleSklad/ ./TrifleSklad/
-# COPY alembic ./alembic/
+COPY alembic ./alembic/
 COPY assets/ ./assets/
 COPY components/ ./components/
 # COPY scripts/ ./scripts/
