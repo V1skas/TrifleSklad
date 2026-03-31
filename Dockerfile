@@ -18,7 +18,7 @@ COPY TrifleSklad/ ./TrifleSklad/
 # COPY alembic ./alembic/
 COPY assets/ ./assets/
 COPY components/ ./components/
-COPY scripts/ ./scripts/
+# COPY scripts/ ./scripts/
 COPY utils/ ./utils/
 
 # RUN uv run reflex export --frontend-only --no-zip
