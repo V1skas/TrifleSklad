@@ -26,6 +26,10 @@ dist/
 *.sqlite
 *.csv
 
+# Claude Code
+CLAUDE.md
+.claude/
+
 # Разное
 .idea/
 *.swp

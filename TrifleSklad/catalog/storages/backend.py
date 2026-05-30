@@ -110,7 +110,11 @@ class AddStorageState(rx.State):
 
     @rx.event
     def on_change_type(self, st_type: str):
-        self.item.type = int(st_type) if int(st_type) > 0 and int(st_type) < len(declared.storage_type_list)+1 else None
+        if st_type.isdigit():
+            t = int(st_type)
+            self.item.type = t if 0 < t < len(declared.storage_type_list) + 1 else None
+        else:
+            self.item.type = None
 
     @rx.event
     def on_change_title(self, title: str):
@@ -126,7 +130,8 @@ class AddStorageState(rx.State):
 
     @rx.event
     def on_change_responsible(self, id_responsible: str):
-        self.item.id_responsible = int(id_responsible)
+        if id_responsible.isdigit():
+            self.item.id_responsible = int(id_responsible)
 
     @rx.event
     def add_one(self):
@@ -152,7 +157,7 @@ class EditStorageState(rx.State):
     list_workers: List[Tuple[str, str]] = []
 
     def _load_item(self, id: int):
-        self.item = StorageDAO.get_by_id(id)
+        self.item = StorageDAO.get_by_id_with_relationships(id)
 
     def _load_workers(self):
         self.list_workers = [(str(item.id), item.fio) for item in WorkerDAO.get_all()]
@@ -196,7 +201,7 @@ class EditStorageState(rx.State):
         if self.item is None:
             return [
                 rx.redirect(routes.CATALOG_STORAGES),
-                rx.touas.error("Запис не знайдено!")
+                rx.toast.error("Запис не знайдено!")
             ]
         self._load_workers()
         if self.app_state is None:
@@ -204,7 +209,11 @@ class EditStorageState(rx.State):
 
     @rx.event
     def on_change_type(self, st_type: str):
-        self.item.type = int(st_type) if int(st_type) > 0 and int(st_type) < len(declared.storage_type_list)+1 else None
+        if st_type.isdigit():
+            t = int(st_type)
+            self.item.type = t if 0 < t < len(declared.storage_type_list) + 1 else None
+        else:
+            self.item.type = None
 
     @rx.event
     def on_change_title(self, title: str):
@@ -220,17 +229,18 @@ class EditStorageState(rx.State):
 
     @rx.event
     def on_change_responsible(self, id_responsible: str):
-        self.item.id_responsible = int(id_responsible)
+        if id_responsible.isdigit():
+            self.item.id_responsible = int(id_responsible)
 
     @rx.event
     def edit_one(self):
         if not self.app_state.has_permission(ActionEnum.STORAGE_EDIT):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        
+
         if self.item.type is None or self.item.title is None:
             return rx.toast.error("Обов'язкові поля повинні бути заповнені!")
-        
-        if self.item.id_responsible in [int(item[0]) for item in self.list_workers]:
+
+        if self.item.id_responsible not in [int(item[0]) for item in self.list_workers]:
             return rx.toast.error("Відповідальний вказаний некоректно!")
         
         flag, text, id = StorageDAO.edit_one(self.item)
@@ -285,39 +295,46 @@ class StorageState(rx.State):
         if page != '':
             id = -1
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.CATALOG_STORAGES)
+                yield rx.redirect(routes.CATALOG_STORAGES)
+                return
 
             # /storages/add
             if page == self.Pages.ADD:
                 if not self.app_state.has_permission(ActionEnum.STORAGE_CREATE):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddStorageState.on_load()
             # /storages/edit/[id]
             elif page == self.Pages.EDIT:
                 if not self.app_state.has_permission(ActionEnum.STORAGE_EDIT):
-                    rx.redirect(routes.CATALOG_STORAGES)
+                    yield rx.redirect(routes.WELCOME)
+                    return
 
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield EditStorageState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_STORAGES)
+                    yield rx.redirect(routes.CATALOG_STORAGES)
+                    return
             # /storages/view/[id]
             elif page == self.Pages.VIEW:
                 if not self.app_state.has_permission(ActionEnum.STORAGE_VIEW):
-                    rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
 
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield ViewStorageState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_STORAGES)
+                    yield rx.redirect(routes.CATALOG_STORAGES)
+                    return
 
             self.current_page = page
         else:
             # /storages
-            if self.app_state.has_permission(ActionEnum.STORAGE_LIST):
-                rx.redirect(routes.WELCOME)
+            if not self.app_state.has_permission(ActionEnum.STORAGE_LIST):
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListStorageState.on_load()
             self.current_page = self.Pages.LIST
 
@@ -330,9 +347,11 @@ class StorageState(rx.State):
     @rx.event
     def delete_one(self, id: int):
         if id > -1:
+            if not self.app_state.has_permission(ActionEnum.STORAGE_DELETE):
+                return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             flag, text = StorageDAO.delete_one(id)
             if flag:
                 return [rx.toast.success(text), rx.redirect(routes.CATALOG_STORAGES)]
             else:
                 return [rx.toast.error(text)]
-        return rx.toast.error("Не выбрана запись для удаления")
+        return rx.toast.error("Не обрано запис для видалення!")

@@ -1,6 +1,5 @@
 from typing import Optional, Dict, List
 
-from httpx import Auth
 import reflex as rx
 import hashlib
 from sqlalchemy.exc import SQLAlchemyError

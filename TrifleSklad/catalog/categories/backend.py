@@ -53,7 +53,7 @@ class AddCategoriesState(rx.State):
     @rx.event
     def add_one(self):
         if not self.app_state.has_permission(ActionEnum.CATEGORIES_CREATE):
-            return rx.toast.error("У Вас немає дозвулу на виконання цієї дії!")
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
 
         if self.item.title is None or self.item.title == "":
             return rx.toast.error("Не заповнені обов'язкові поля!")
@@ -141,39 +141,46 @@ class CategoriesState(rx.State):
         if page != '':
             id = -1
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.CATALOG_CATEGORIES)
+                yield rx.redirect(routes.CATALOG_CATEGORIES)
+                return
 
             # /categories/add
             if page == self.Pages.ADD:
                 if not self.app_state.has_permission(ActionEnum.CATEGORIES_CREATE):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddCategoriesState.on_load()
             # /categories/edit/[id]
             elif page == self.Pages.EDIT:
                 if not self.app_state.has_permission(ActionEnum.CATEGORIES_EDIT):
-                    return rx.redirect(routes.WELCOME)
-                
+                    yield rx.redirect(routes.WELCOME)
+                    return
+
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield EditCategoriesState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_CATEGORIES)
+                    yield rx.redirect(routes.CATALOG_CATEGORIES)
+                    return
             # /categories/view/[id]
             elif page == self.Pages.VIEW:
                 if not self.app_state.has_permission(ActionEnum.CATEGORIES_VIEW):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
 
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield ViewCategoriesState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_CATEGORIES)
+                    yield rx.redirect(routes.CATALOG_CATEGORIES)
+                    return
 
             self.current_page = page
         else:
             # /categories
             if not self.app_state.has_permission(ActionEnum.CATEGORIES_LIST):
-                return rx.redirect(routes.WELCOME)
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListCategoriesState.on_load()
             self.current_page = self.Pages.LIST
 

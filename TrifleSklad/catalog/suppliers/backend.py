@@ -284,37 +284,44 @@ class SupplierState(rx.State):
         if page != '':
             id = -1
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.CATALOG_SUPPLIERS)
+                yield rx.redirect(routes.CATALOG_SUPPLIERS)
+                return
 
             # /suppliers/add
             if page == self.Pages.ADD:
                 if not self.app_state.has_permission(ActionEnum.SUPPLIERS_CREATE):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddSupplierState.on_load()
             # /suppliers/edit/[id]
             elif page == self.Pages.EDIT:
                 if not self.app_state.has_permission(ActionEnum.SUPPLIERS_EDIT):
-                    rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield EditSupplierState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_SUPPLIERS)
+                    yield rx.redirect(routes.CATALOG_SUPPLIERS)
+                    return
             # /suppliers/view/[id]
             elif page == self.Pages.VIEW:
                 if not self.app_state.has_permission(ActionEnum.SUPPLIERS_VIEW):
-                    rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield ViewSupplierState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_SUPPLIERS)
+                    yield rx.redirect(routes.CATALOG_SUPPLIERS)
+                    return
 
             self.current_page = page
         else:
             # /suppliers
             if not self.app_state.has_permission(ActionEnum.SUPPLIERS_LIST):
-                rx.redirect(routes.WELCOME)
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListSupplierState.on_load()
             self.current_page = self.Pages.LIST
 
@@ -327,6 +334,8 @@ class SupplierState(rx.State):
     @rx.event
     def delete_one(self, id):
         if id != -1:
+            if not self.app_state.has_permission(ActionEnum.SUPPLIERS_DELETE):
+                return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             flag, text = SupplierDAO.delete_one(id)
             if flag:
                 return [rx.toast.success(text), rx.redirect(routes.CATALOG_SUPPLIERS)]

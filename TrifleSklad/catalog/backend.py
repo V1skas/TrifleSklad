@@ -12,7 +12,7 @@ from TrifleSklad.catalog.payment_types.backend import PaymentTypeState
 
 class CatalogState(AppState):
     class Tabs:
-        CATERORIES = "categories"
+        CATEGORIES = "categories"
         PRODUCTS = "products"
         OWNERS = "owners"
         STORAGES = "storages"
@@ -20,7 +20,7 @@ class CatalogState(AppState):
         PAYMENT_TYPES = "payment_types"
 
     __tabs_events = {
-        Tabs.CATERORIES: CategoriesState.on_load,
+        Tabs.CATEGORIES: CategoriesState.on_load,
         Tabs.PRODUCTS: ProductsState.on_load,
         Tabs.OWNERS: OwnerState.on_load,
         Tabs.STORAGES: StorageState.on_load,
@@ -34,7 +34,7 @@ class CatalogState(AppState):
         tab = self.router.page.params.get("tab", "")
 
         if tab != "":
-            if tab not in [self.Tabs.CATERORIES, self.Tabs.PRODUCTS, self.Tabs.PAYMENT_TYPES,
+            if tab not in [self.Tabs.CATEGORIES, self.Tabs.PRODUCTS, self.Tabs.PAYMENT_TYPES,
                            self.Tabs.OWNERS, self.Tabs.STORAGES, self.Tabs.SUPPLIERS]:
                 return rx.redirect(routes.WELCOME)
 

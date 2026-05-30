@@ -27,7 +27,7 @@ def categories_tab() -> rx.Component:
             height="100%",
         ),
 
-        value=CatalogState.Tabs.CATERORIES,
+        value=CatalogState.Tabs.CATEGORIES,
     )
 
 def products_tab() -> rx.Component:

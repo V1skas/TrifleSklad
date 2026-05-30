@@ -9,7 +9,7 @@ from TrifleSklad.dao import OwnerDAO
 from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
 
-class ViewOwnerstate(rx.State):
+class ViewOwnerState(rx.State):
     item: Optional[Owner] = None
     app_state: Optional[AppState] = None
 
@@ -152,39 +152,46 @@ class OwnerState(rx.State):
         page = self.router.page.params.get('page', '')
         if page != '':
             id = -1
-            
+
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.CATALOG_OWNERS)
+                yield rx.redirect(routes.CATALOG_OWNERS)
+                return
 
             # /owners/add
             if page == self.Pages.ADD:
                 if not self.app_state.has_permission(ActionEnum.OWNERS_CREATE):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddOwnerState.on_load()
             # /owners/edit/[id]
             elif page == self.Pages.EDIT:
                 if not self.app_state.has_permission(ActionEnum.OWNERS_EDIT):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield EditOwnerState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_OWNERS)
+                    yield rx.redirect(routes.CATALOG_OWNERS)
+                    return
             # /owners/view/[id]
             elif page == self.Pages.VIEW:
-                id = self.router.page.params.get('id', '')
                 if not self.app_state.has_permission(ActionEnum.OWNERS_VIEW):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
+                id = self.router.page.params.get('id', '')
                 if id != '':
-                    yield ViewOwnerstate.on_load(id)
+                    yield ViewOwnerState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_OWNERS)
+                    yield rx.redirect(routes.CATALOG_OWNERS)
+                    return
 
             self.current_page = page
         else:
             # /owners
             if not self.app_state.has_permission(ActionEnum.OWNERS_LIST):
-                return rx.redirect(routes.WELCOME)
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListOwnerState.on_load()
             self.current_page = self.Pages.LIST
 
@@ -198,7 +205,7 @@ class OwnerState(rx.State):
     def delete_one(self, id: int):
         if id > -1:
             if not self.app_state.has_permission(ActionEnum.OWNERS_DELETE):
-                return rx.toast.error("У Вас немає дозвулу на виконання цієї дії!")
+                return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
 
             flag, text = OwnerDAO.delete_one(id)
             if flag:

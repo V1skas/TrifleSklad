@@ -354,7 +354,7 @@ def edit_form() -> rx.Component:
                 ),
                 rx.select.content(
                     rx.foreach(
-                        EditProductsState.list_categoties,
+                        EditProductsState.list_categories,
                         lambda category: rx.select.item(
                             rx.text(category[1]),
                             value=category[0],

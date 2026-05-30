@@ -1,10 +1,6 @@
-from token import OP
-
 import reflex as rx
 
 from typing import List, Tuple, Optional
-
-from reflex import route
 
 import TrifleSklad.routes as routes
 from TrifleSklad.state import AppState
@@ -145,7 +141,7 @@ class AddProductsState(rx.State):
 
     @rx.event
     def on_change_category(self, value: str):
-        self.item.id_category = int(value) if int(value) > 0 else None
+        self.item.id_category = int(value) if value.isdigit() and int(value) > 0 else None
 
     @rx.event
     def on_change_unit(self, value: str):
@@ -158,7 +154,7 @@ class AddProductsState(rx.State):
 
     @rx.event
     def on_change_capacity(self, value: str):
-        self.item.capacity = int(value) if int(value) > 0 else 0
+        self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
 
     @rx.event
     def on_change_uniq(self, value: bool):
@@ -182,14 +178,14 @@ class AddProductsState(rx.State):
 class EditProductsState(rx.State):
     item: Optional[ProductCatalog] = None
     app_state: Optional[AppState] = None
-    list_categoties: List[Tuple[str, str]] = []
+    list_categories: List[Tuple[str, str]] = []
     all_units_cache: list[str] = []
     
     def _load_item(self, id: int):
         self.item = ProductCatalogDAO.get_by_id_with_relationships(id)
 
     def _load_categories(self):
-        self.list_categoties = [(str(item.id), item.title) for item in ProductCategoryDAO.get_all()]
+        self.list_categories = [(str(item.id), item.title) for item in ProductCategoryDAO.get_all()]
         
     def _load_all_units_cache(self):
         self.all_units_cache = ProductCatalogDAO.get_list_units()
@@ -258,7 +254,7 @@ class EditProductsState(rx.State):
 
     @rx.event
     def on_change_category(self, value: str):
-        self.item.id_category = int(value) if int(value) > 0 else None
+        self.item.id_category = int(value) if value.isdigit() and int(value) > 0 else None
 
     @rx.event
     def on_change_unit(self, value: str):
@@ -270,7 +266,7 @@ class EditProductsState(rx.State):
 
     @rx.event
     def on_change_capacity(self, value: str):
-        self.item.capacity = int(value) if int(value) > 0 else 0
+        self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
 
     @rx.event
     def on_change_uniq(self, value: bool):
@@ -384,37 +380,44 @@ class ProductsState(rx.State):
         if page != '':
             id = -1
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.CATALOG_PRODUCTS)
+                yield rx.redirect(routes.CATALOG_PRODUCTS)
+                return
 
             # /products/add
             if page == self.Pages.ADD:
                 if not self.app_state.has_permission(ActionEnum.PRODUCTS_CREATE):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddProductsState.on_load()
             # /products/edit/[id]
             elif page == self.Pages.EDIT:
                 if not self.app_state.has_permission(ActionEnum.PRODUCTS_EDIT):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield EditProductsState.on_load(int(id))
                 else:
-                    return rx.redirect(routes.CATALOG_PRODUCTS)
+                    yield rx.redirect(routes.CATALOG_PRODUCTS)
+                    return
             # /products/view/[id]
             elif page == self.Pages.VIEW:
                 if not self.app_state.has_permission(ActionEnum.PRODUCTS_VIEW):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield ViewProductsState.on_load(int(id))
                 else:
-                    return rx.redirect(routes.CATALOG_PRODUCTS)
+                    yield rx.redirect(routes.CATALOG_PRODUCTS)
+                    return
 
             self.current_page = page
         else:
             # /products
             if not self.app_state.has_permission(ActionEnum.PRODUCTS_LIST):
-                return rx.redirect(routes.WELCOME)
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListProductsState.on_load()
             self.current_page = self.Pages.LIST
 
@@ -427,6 +430,8 @@ class ProductsState(rx.State):
     @rx.event
     def delete_one(self, id: int):
         if id > 0:
+            if not self.app_state.has_permission(ActionEnum.PRODUCTS_DELETE):
+                return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             flag, text = ProductCatalogDAO.delete_one(id)
             if flag:
                 return [rx.toast.success(text), rx.redirect(routes.CATALOG_PRODUCTS)]

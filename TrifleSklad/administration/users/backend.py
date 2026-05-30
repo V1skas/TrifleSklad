@@ -154,7 +154,7 @@ class AddUserState(rx.State):
             )
 
         if check_pass(self.item.password_hash):
-            return rx.roast.error("Пароль містить недопустимі символи!")
+            return rx.toast.error("Пароль містить недопустимі символи!")
 
         self.item.salt = gen_salt()
         self.item.password_hash = gen_hash(self.item.password_hash, self.item.salt)
@@ -220,7 +220,7 @@ class EditUserState(rx.State):
 
     @rx.event
     def on_change_password(self, password: str):
-        self.password = password if password != "" else None
+        self.password = password
 
     @rx.event
     def on_change_roles(self):
@@ -246,17 +246,17 @@ class EditUserState(rx.State):
         if self.item.id_worker is None:
             return rx.toast.error("Заповнить всі обов'язкові поля!")
 
-        if len(self.item.roles) == 0 and len(self.item.actions == 0):
+        if len(self.item.roles) == 0 and len(self.item.actions) == 0:
             return rx.toast.error(
                 "Користувач має мати доступ хоча б до однієї дії або мати роль!"
             )
 
         if self.password != "":
             if check_pass(self.password):
-                return rx.roast.error("Пароль містить недопустимі символи!")
+                return rx.toast.error("Пароль містить недопустимі символи!")
 
             self.item.salt = gen_salt()
-            self.item.password_hash = gen_hash(self.item.password_has, self.item.salt)
+            self.item.password_hash = gen_hash(self.password, self.item.salt)
 
         flag, text, id = UserDAO.edit_one(self.item)
         if flag:
@@ -306,13 +306,15 @@ class UserState(rx.State):
             or self.app_state.has_permission(ActionEnum.USERS_VIEW)
             or self.app_state.has_permission(ActionEnum.USERS_LIST)
         ):
-            return rx.redirect(routes.WELCOME)
+            yield rx.redirect(routes.WELCOME)
+            return
 
         page = self.router.page.params.get("page", "")
         if page != "":
             id = -1
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.ADMIN_USERS)
+                yield rx.redirect(routes.ADMIN_USERS)
+                return
 
             # /users/add
             if page == self.Pages.ADD:
@@ -320,17 +322,19 @@ class UserState(rx.State):
             # /users/edit/[id]
             elif page == self.Pages.EDIT:
                 id = self.router.page.params.get("id", "")
-                if id != "" or UserDAO.get_user_by_id(id) is not None:
+                if id != "" and UserDAO.get_user_by_id(id) is not None:
                     yield EditUserState.on_load(id)
                 else:
-                    return rx.redirect(routes.ADMIN_USERS)
+                    yield rx.redirect(routes.ADMIN_USERS)
+                    return
             # /users/view/[id]
             elif page == self.Pages.VIEW:
                 id = self.router.page.params.get("id", "")
-                if id != "" or UserDAO.get_user_by_id(id) is not None:
+                if id != "" and UserDAO.get_user_by_id(id) is not None:
                     yield ViewUserState.on_load(id)
                 else:
-                    return rx.redirect(routes.ADMIN_USERS)
+                    yield rx.redirect(routes.ADMIN_USERS)
+                    return
 
             self.current_page = page
         else:

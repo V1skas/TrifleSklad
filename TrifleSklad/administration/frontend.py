@@ -21,7 +21,7 @@ def workers_tab():
         ),
 
         value=AdministrationState.Tabs.WORKERS,
-    ),
+    )
 
 def roles_tab():
     return rx.tabs.content(
@@ -33,7 +33,7 @@ def roles_tab():
         ),
 
         value=AdministrationState.Tabs.ROLES,
-    ),
+    )
 
 def users_tab():
     return rx.tabs.content(
@@ -45,7 +45,7 @@ def users_tab():
         ),
 
         value=AdministrationState.Tabs.USERS,
-    ),
+    )
 
 def index():
     return rx.hstack(

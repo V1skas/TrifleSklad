@@ -163,13 +163,20 @@ class UserDAO:
     def edit_one(cls, user: User) -> tuple[bool, str, str]:
         try:
             with rx.session() as session:
-                if session.get(User, user.login) is None:
+                db_user = session.get(User, user.login)
+                if db_user is None:
                     return False, "Помилка! Користувача не знайдено.", -1
-                user = session.merge(user)
-                session.add(user)
+
+                db_user.id_worker = user.id_worker
+                db_user.salt = user.salt
+                db_user.password_hash = user.password_hash
+                db_user.is_deleted = user.is_deleted
+
+                db_user.roles = [session.merge(r) for r in (user.roles or [])]
+                db_user.actions = [session.merge(a) for a in (user.actions or [])]
+
                 session.commit()
-                session.refresh(user)
-                return True, "Користувача змінено", user.login
+                return True, "Користувача змінено", db_user.login
 
         except IntegrityError as e:
             print("[UserDAO] IntegrityError: ", e)
@@ -442,7 +449,7 @@ class ActionDAO:
 class WorkerDAO:
     @classmethod
     def get_all(cls) -> List[Worker]:
-        statement = select(Worker)
+        statement = select(Worker).where(Worker.is_deleted == False)
 
         with rx.session() as session:
             workers = session.exec(statement).all()
@@ -453,7 +460,7 @@ class WorkerDAO:
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[Worker]:
-        statement = select(Worker).where(Worker.id == id)
+        statement = select(Worker).where(Worker.id == id).where(Worker.is_deleted == False)
 
         with rx.session() as session:
             worker = session.exec(statement).one_or_none()
@@ -464,7 +471,7 @@ class WorkerDAO:
 
     @classmethod
     def get_by_fio(cls, fio: str) -> Optional[Worker]:
-        statement = select(Worker).where(Worker.fio == fio)
+        statement = select(Worker).where(Worker.fio == fio).where(Worker.is_deleted == False)
 
         with rx.session() as session:
             worker = session.exec(statement).one_or_none()
@@ -479,21 +486,26 @@ class WorkerDAO:
 
         try:
             with rx.session() as session:
-                statement = select(Worker).where(Worker.fio == worker.fio)
+                statement = (
+                    select(Worker)
+                    .where(Worker.fio == worker.fio)
+                    .where(Worker.is_deleted == False)
+                )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Ошибка: Работник с таким ФИО уже существует", -1
+                    return False, "Помилка! Співробітник з таким ПІБ вже існує!", -1
 
                 session.add(worker)
                 session.commit()
                 session.refresh(worker)
-                return True, "Работник успешно добавлен", worker.id
+                return True, "Співробітника додано!", worker.id
 
         except IntegrityError as e:
             print("[WorkerDAO] IntegrityError: ", e)
-            return False, "Ошибка: Работник не может быть добавлен", -1
+            return False, "Системна помилка! Співробітник не може бути доданий.", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print("[WorkerDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
@@ -502,7 +514,7 @@ class WorkerDAO:
                 worker = session.get(Worker, form_data["id"])
 
                 if worker is None:
-                    return False, "Ошибка: Работник не найден", -1
+                    return False, "Помилка! Співробітника не знайдено.", -1
 
                 for key, value in form_data.items():
                     setattr(worker, key, value)
@@ -511,27 +523,28 @@ class WorkerDAO:
                     select(Worker)
                     .where(Worker.fio == worker.fio)
                     .where(Worker.id != worker.id)
+                    .where(Worker.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Ошибка: Работник с таким ФИО уже существует",
+                        "Помилка! Співробітник з таким ПІБ вже існує!",
                         worker.id,
                     )
 
                 session.commit()
                 session.refresh(worker)
-                return True, "Работник успешно изменен", worker.id
+                return True, "Інформацію про співробітника змінено!", worker.id
 
         except IntegrityError as e:
             print("[WorkerDAO] IntegrityError: ", e)
-            return False, "Ошибка: Работник не может быть изменен", -1
+            return False, "Системна помилка! Співробітник не може бути змінений.", -1
         except SQLAlchemyError as e:
             print("[WorkerDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!", -1
         except Exception as e:
             print("[WorkerDAO] Exception: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: str) -> tuple[bool, str]:
@@ -540,18 +553,21 @@ class WorkerDAO:
                 worker = session.get(Worker, id)
 
                 if worker is None:
-                    return False, "Ошибка: Работник не найден"
+                    return False, "Помилка! Співробітника не знайдено."
 
                 worker.is_deleted = True
                 session.commit()
-                return True, "Работник успешно удален"
+                return True, "Співробітника видалено!"
 
-        except IntegrityError:
-            return False, "Ошибка: Работник не может быть удален"
+        except IntegrityError as e:
+            print("[WorkerDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Співробітник не може бути видалений."
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[WorkerDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[WorkerDAO] Exception: ", e)
+            return False, "Системна помилка!"
 
 
 class ProductCategoryDAO:
@@ -647,7 +663,7 @@ class ProductCategoryDAO:
                 session.add(category)
                 session.commit()
                 session.refresh(category)
-                return True, "Категорію успошно додано!", category.id
+                return True, "Категорію успішно додано!", category.id
 
         except IntegrityError as e:
             print("[ProductCategoryDAO] IntegrityError: ", e)
@@ -890,13 +906,13 @@ class ProductCatalogDAO:
 
         except IntegrityError as e:
             print(f"[ProductCatalogDAO] Error: {str(e)}")
-            return False, "Системна помилка! Товар не може бути доданий!"
+            return False, "Системна помилка! Товар не може бути доданий!", -1
         except SQLAlchemyError as e:
             print(f"[ProductCatalogDAO] Error: {str(e)}")
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
         except Exception as e:
             print(f"[ProductCatalogDAO] Error: {str(e)}")
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
 
     @classmethod
     def edit_one(cls, product: ProductCatalog) -> tuple[bool, str, int]:
@@ -915,6 +931,7 @@ class ProductCatalogDAO:
                         product.id,
                     )
 
+                product = session.merge(product)
                 session.add(product)
                 session.commit()
                 session.refresh(product)
@@ -922,13 +939,13 @@ class ProductCatalogDAO:
 
         except IntegrityError as e:
             print(f"[ProductCatalogDAO] Error: {str(e)}")
-            return False, "Системна помилка! Товар не може бути змінений!"
+            return False, "Системна помилка! Товар не може бути змінений!", -1
         except SQLAlchemyError as e:
             print(f"[ProductCatalogDAO] Error: {str(e)}")
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
         except Exception as e:
             print(f"[ProductCatalogDAO] Error: {str(e)}")
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -1119,10 +1136,10 @@ class StorageDAO:
 
         except IntegrityError as e:
             print("[StorageDAO] IntegrityError: ", e)
-            return False, "Системна помилка! Склад не може бути видалено!", -1
+            return False, "Системна помилка! Склад не може бути видалено!"
         except Exception as e:
             print("[StorageDAO] Error: ", e)
-            return False, "Системна помилка!", -1
+            return False, "Системна помилка!"
 
 
 class OwnerDAO:
@@ -1295,7 +1312,7 @@ class SupplierDAO:
                 statement = (
                     select(Supplier)
                     .where(Supplier.title == supplier.title)
-                    .where(not Supplier.is_deleted)
+                    .where(Supplier.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
@@ -1312,13 +1329,13 @@ class SupplierDAO:
 
         except IntegrityError as e:
             print("[SupplierDAO] IntegrityError: ", e)
-            return False, "Помилка! Інформація про постачальника не може бути додана!"
+            return False, "Помилка! Інформація про постачальника не може бути додана!", -1
         except SQLAlchemyError as e:
             print("[SupplierDAO] SQLAlchemyError: ", e)
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
         except Exception as e:
             print("[SupplierDAO] SQLAlchemyError: ", e)
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
 
     @classmethod
     def edit_one(cls, supplier: Supplier) -> tuple[bool, str, int]:
@@ -1345,13 +1362,13 @@ class SupplierDAO:
 
         except IntegrityError as e:
             print("[SupplierDAO] IntegrityError: ", e)
-            return False, "Помилка! Інформація про постачальника не може бути змінена!"
+            return False, "Помилка! Інформація про постачальника не може бути змінена!", -1
         except SQLAlchemyError as e:
             print("[SupplierDAO] SQLAlchemyError: ", e)
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
         except Exception as e:
             print("[SupplierDAO] SQLAlchemyError: ", e)
-            return False, "Системна помилка!"
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -1804,7 +1821,11 @@ class PaymentTypeDAO:
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[PaymentType]:
-        statement = select(PaymentType).where(PaymentType.id == id)
+        statement = (
+            select(PaymentType)
+            .where(PaymentType.id == id)
+            .where(PaymentType.is_deleted == False)
+        )
 
         with rx.session() as session:
             payment_type = session.exec(statement).one_or_none()

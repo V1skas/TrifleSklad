@@ -131,7 +131,7 @@ class EditPaymentTypeState(rx.State):
     @rx.event
     def edit_one(self):
         if not self.app_state.has_permission(ActionEnum.PAYMENT_TYPE_EDIT):
-            return rx.touas.error("У Вас немає дозволу на виконання цієї дії!")
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         
         if self.item.title is None:
             return rx.toast.error("Усі обов'язкові поля мають бути заповнені!")
@@ -177,39 +177,46 @@ class PaymentTypeState(rx.State):
             id = -1
 
             if page not in [self.Pages.ADD, self.Pages.EDIT, self.Pages.VIEW]:
-                return rx.redirect(routes.CATALOG_PAYMENT_TYPES)
+                yield rx.redirect(routes.CATALOG_PAYMENT_TYPES)
+                return
 
             # /payment_types/add
             if page == self.Pages.ADD:
                 if not self.app_state.has_permission(ActionEnum.PAYMENT_TYPE_CREATE):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddPaymentTypeState.on_load()
             # /payment_types/edit/[id]
             elif page == self.Pages.EDIT:
                 if not self.app_state.has_permission(ActionEnum.PAYMENT_TYPE_EDIT):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
 
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield EditPaymentTypeState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_PAYMENT_TYPES)
+                    yield rx.redirect(routes.CATALOG_PAYMENT_TYPES)
+                    return
             # /payment_types/view/[id]
             elif page == self.Pages.VIEW:
                 if not self.app_state.has_permission(ActionEnum.PAYMENT_TYPE_VIEW):
-                    return rx.redirect(routes.WELCOME)
+                    yield rx.redirect(routes.WELCOME)
+                    return
 
                 id = self.router.page.params.get('id', '')
                 if id != '':
                     yield ViewPaymentTypeState.on_load(id)
                 else:
-                    return rx.redirect(routes.CATALOG_PAYMENT_TYPES)
+                    yield rx.redirect(routes.CATALOG_PAYMENT_TYPES)
+                    return
 
             self.current_page = page
         else:
             # /payment_types
             if not self.app_state.has_permission(ActionEnum.PAYMENT_TYPE_LIST):
-                return rx.redirect(routes.WELCOME)
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListPaymentTypeState.on_load()
             self.current_page = self.Pages.LIST
 

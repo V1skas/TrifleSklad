@@ -4,13 +4,13 @@ from TrifleSklad import routes
 from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
 
-from TrifleSklad.catalog.owners.backend import OwnerState, ViewOwnerstate, AddOwnerState, EditOwnerState, ListOwnerState
+from TrifleSklad.catalog.owners.backend import OwnerState, ViewOwnerState, AddOwnerState, EditOwnerState, ListOwnerState
 from TrifleSklad.models import Owner
 
 def item_preview() -> rx.Component:
     return rx.vstack(
-        rx.heading(ViewOwnerstate.item.title, size="7", width="100%"),
-        rx.text(ViewOwnerstate.description, is_optional=True, width="100%"),
+        rx.heading(ViewOwnerState.item.title, size="7", width="100%"),
+        rx.text(ViewOwnerState.description, is_optional=True, width="100%"),
 
         spacing="3",
 
@@ -37,7 +37,7 @@ def item_preview_tab_content() -> rx.Component:
                                 color_scheme="red",
                                 variant="ghost",
                                 size="3",
-                                on_click=OwnerState.delete_one(ViewOwnerstate.item.id)
+                                on_click=OwnerState.delete_one(ViewOwnerState.item.id)
                             ),                            
                         ),
                         rx.cond(AppState.get_user_actions.contains(ActionEnum.OWNERS_EDIT),
@@ -45,7 +45,7 @@ def item_preview_tab_content() -> rx.Component:
                                 "Редагувати",
                                 variant="ghost",
                                 size="3",
-                                on_click=rx.redirect(f"{routes.CATALOG_OWNERS_EDIT_ID}{ViewOwnerstate.item.id}")
+                                on_click=rx.redirect(f"{routes.CATALOG_OWNERS_EDIT_ID}{ViewOwnerState.item.id}")
                             ),                          
                         ),
 
