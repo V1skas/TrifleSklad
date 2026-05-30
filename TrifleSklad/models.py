@@ -161,7 +161,7 @@ class Supplier(rx.Model, table=True):
     email: str = Field(default="", nullable=False)
     contact_person: str = Field(default="", nullable=False)
     contact_phone: str = Field(default="", nullable=False)
-    okpo: str = Field(default="", nullable=False)
+    edrpou: str = Field(default="", nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
@@ -270,6 +270,17 @@ class PaymentType(rx.Model, table=True):
     # Relationships
 
 
+class NDSRate(rx.Model, table=True):
+    __tablename__ = "nds_rates"
+
+    # Table columns
+    id: int = Field(primary_key=True)
+    title: str = Field(nullable=False, unique=True)
+    rate: float = Field(default=0.0, nullable=False)
+    description: Optional[str] = Field(nullable=True)
+    is_deleted: bool = Field(default=False, nullable=False)
+
+
 class Admission(rx.Model, table=True):
     __tablename__ = "admissions"
 
@@ -278,12 +289,15 @@ class Admission(rx.Model, table=True):
     id_payment_type: int = Field(nullable=False, foreign_key="payment_types.id")
     id_supplier: int = Field(foreign_key="suppliers.id", nullable=False)
     flag_nds: bool = Field(default=False, nullable=False)
+    id_nds_rate: Optional[int] = Field(default=None, foreign_key="nds_rates.id", nullable=True)
     dollar_rate: float = Field(default=0.0, nullable=False)
+    invoice_number: Optional[str] = Field(default=None, nullable=True)
 
     # Relationship
     supplier: Optional[Supplier] = Relationship(back_populates="admissions")
     movement: Optional[Movement] = Relationship()
     payment_type: Optional[PaymentType] = Relationship()
+    nds_rate: Optional[NDSRate] = Relationship()
 
 
 class Issue(rx.Model, table=True):

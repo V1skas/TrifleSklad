@@ -44,8 +44,8 @@ class ViewSupplierState(rx.State):
         return self.item.contact_phone if self.item is not None and self.item.contact_phone is not None else ""
     
     @rx.var 
-    def okpo(self) -> str:
-        return self.item.okpo if self.item is not None and self.item.okpo is not None else ""
+    def edrpou(self) -> str:
+        return self.item.edrpou if self.item is not None and self.item.edrpou is not None else ""
     # ====
 
     # Action handlers
@@ -97,8 +97,8 @@ class AddSupplierState(rx.State):
         return self.item.contact_phone if self.item is not None and self.item.contact_phone is not None else ""
     
     @rx.var 
-    def okpo(self) -> str:
-        return self.item.okpo if self.item is not None and self.item.okpo is not None else ""
+    def edrpou(self) -> str:
+        return self.item.edrpou if self.item is not None and self.item.edrpou is not None else ""
     # ====
 
     # Action handlers
@@ -139,8 +139,8 @@ class AddSupplierState(rx.State):
         self.item.contact_phone = contact_phone if contact_phone != "" else None
 
     @rx.event
-    def on_change_okpo(self, okpo: str):
-        self.item.okpo = okpo if okpo != "" else None
+    def on_change_edrpou(self, edrpou: str):
+        self.item.edrpou = edrpou if edrpou != "" else None
 
     @rx.event
     def add_one(self):
@@ -191,8 +191,8 @@ class EditSupplierState(rx.State):
         return self.item.contact_phone if self.item is not None and self.item.contact_phone is not None else ""
     
     @rx.var 
-    def okpo(self) -> str:
-        return self.item.okpo if self.item is not None and self.item.okpo is not None else ""
+    def edrpou(self) -> str:
+        return self.item.edrpou if self.item is not None and self.item.edrpou is not None else ""
     # ====
 
     # Action handlers
@@ -233,8 +233,8 @@ class EditSupplierState(rx.State):
         self.item.contact_phone = contact_phone if contact_phone != "" else None
 
     @rx.event
-    def on_change_okpo(self, okpo: str):
-        self.item.okpo = okpo if okpo != "" else None
+    def on_change_edrpou(self, edrpou: str):
+        self.item.edrpou = edrpou if edrpou != "" else None
 
     @rx.event
     def edit_one(self):

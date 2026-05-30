@@ -6,6 +6,7 @@ import reflex as rx
 import TrifleSklad.routes as routes
 from TrifleSklad.dao import (
     AdmissionDAO,
+    NDSRateDAO,
     OwnerDAO,
     PaymentTypeDAO,
     ProductCatalogDAO,
@@ -264,7 +265,9 @@ class AddAdmissionState(rx.State):
         id_payment_type="-1",
         id_supplier=-1,
         flag_nds=False,
+        id_nds_rate=None,
         dollar_rate=0.0,
+        invoice_number=None,
         movement=Movement(
             id_destination_storage=-1,
             id_destination_owner=-1,
@@ -290,6 +293,8 @@ class AddAdmissionState(rx.State):
     list_storages: List[Tuple[str, str]]
     list_owners: List[Tuple[str, str]]
     list_payment_types: List[Tuple[str, str]]
+    list_nds_rates: List[Tuple[str, str]]
+    nds_rates_cache: List[Tuple[int, float]]
     # ======================
 
     # Interface logic variables
@@ -334,13 +339,39 @@ class AddAdmissionState(rx.State):
         self.list_payment_types = [
             (item.title, str(item.id)) for item in PaymentTypeDAO.get_all()
         ]
-    
+
+    def __load_nds_rates(self):
+        rates = NDSRateDAO.get_all()
+        self.list_nds_rates = [(item.title, str(item.id)) for item in rates]
+        self.nds_rates_cache = [(item.id, item.rate) for item in rates]
+
+    def _get_nds_rate_value(self) -> float:
+        if self.item.id_nds_rate is None:
+            return 0.0
+        for rid, rate in self.nds_rates_cache:
+            if rid == self.item.id_nds_rate:
+                return rate
+        return 0.0
+
+    def _recompute_total(self):
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = self._get_nds_rate_value() / 100.0
+        if rate <= 0:
+            self.item.movement.total_cost = round(line_total, 2)
+            return
+        if self.item.flag_nds:
+            self.item.movement.total_cost = round(line_total, 2)
+        else:
+            self.item.movement.total_cost = round(line_total * (1 + rate), 2)
+
     async def _on_load(self):
         self.item = Admission(
             id_payment_type="-1",
             id_supplier=-1,
             flag_nds=False,
+            id_nds_rate=None,
             dollar_rate=0.0,
+            invoice_number=None,
             movement=Movement(
                 id_destination_storage=-1,
                 id_destination_owner=-1,
@@ -362,6 +393,7 @@ class AddAdmissionState(rx.State):
         self.__load_storages()
         self.__load_owners()
         self.__load_payment_types()
+        self.__load_nds_rates()
 
         self.addedit_product_catalog_form_state = await self.get_state(
             MovementProductCatalogAddEditFormState
@@ -371,7 +403,7 @@ class AddAdmissionState(rx.State):
         )        
         
     async def on_load(self):
-        self._on_load()
+        await self._on_load()
 
     # ======================
 
@@ -404,6 +436,47 @@ class AddAdmissionState(rx.State):
     @rx.var
     def dollar_rate(self) -> str:
         return str(self.item.dollar_rate)
+
+    @rx.var
+    def id_nds_rate(self) -> str:
+        return str(self.item.id_nds_rate) if self.item.id_nds_rate is not None else ""
+
+    @rx.var
+    def invoice_number(self) -> str:
+        return self.item.invoice_number if self.item.invoice_number is not None else ""
+
+    @rx.var
+    def nds_rate_percent(self) -> str:
+        return str(self._get_nds_rate_value())
+
+    @rx.var
+    def subtotal_display(self) -> str:
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = self._get_nds_rate_value() / 100.0
+        if rate <= 0:
+            return f"{round(line_total, 2)}"
+        if self.item.flag_nds:
+            return f"{round(line_total / (1 + rate), 2)}"
+        return f"{round(line_total, 2)}"
+
+    @rx.var
+    def nds_amount_display(self) -> str:
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = self._get_nds_rate_value() / 100.0
+        if rate <= 0:
+            return "0.0"
+        if self.item.flag_nds:
+            subtotal = line_total / (1 + rate)
+            return f"{round(line_total - subtotal, 2)}"
+        return f"{round(line_total * rate, 2)}"
+
+    @rx.var
+    def total_display(self) -> str:
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = self._get_nds_rate_value() / 100.0
+        if rate <= 0 or self.item.flag_nds:
+            return f"{round(line_total, 2)}"
+        return f"{round(line_total * (1 + rate), 2)}"
 
     # ======================
 
@@ -446,10 +519,29 @@ class AddAdmissionState(rx.State):
     @rx.event
     def on_change_flag_nds(self, value: bool):
         self.item.flag_nds = value
+        self._recompute_total()
+
+    @rx.event
+    def on_change_id_nds_rate(self, value: str):
+        if value == "" or value == "None":
+            self.item.id_nds_rate = None
+        else:
+            try:
+                self.item.id_nds_rate = int(value)
+            except ValueError:
+                self.item.id_nds_rate = None
+        self._recompute_total()
+
+    @rx.event
+    def on_change_invoice_number(self, value: str):
+        self.item.invoice_number = value if value != "" else None
 
     @rx.event
     def on_change_dollar_rate(self, value: str):
-        self.item.dollar_rate = float(value)
+        try:
+            self.item.dollar_rate = float(value)
+        except ValueError:
+            self.item.dollar_rate = 0.0
 
     @rx.event
     def on_change_date(self, value: str):
@@ -507,7 +599,7 @@ class AddAdmissionState(rx.State):
     def add_product_catalog_dialog_open(self):
         if self.addedit_product_catalog_form_state is None:
             return rx.toast.error(
-                "Состояние формы добавления/редактирования товарной позиции не инициализировано"
+                "Стан форми додавання/редагування товарної позиції не ініціалізовано"
             )
         self.is_product_dialog_view_mode = False
         self.current_product_catalog_index = -1
@@ -552,9 +644,7 @@ class AddAdmissionState(rx.State):
         else:
             self.item.movement.products_catalog.append(item)
 
-        self.item.movement.total_cost = 0.0
-        for pc in self.item.movement.products_catalog:
-            self.item.movement.total_cost += pc.count * pc.price
+        self._recompute_total()
         self.is_open_product_catalog_dialog = False
 
     @rx.event
@@ -584,7 +674,7 @@ class EditAdmissionState(AddAdmissionState):
     # Backend only
     # ======================
     async def on_load(self, id: int):
-        super()._on_load()
+        await super()._on_load()
         self.item = AdmissionDAO.get_by_id_with_all_relationship(id)
 
     # ======================
@@ -615,7 +705,9 @@ class ViewAdmissionState(rx.State):
         id_payment_type="-1",
         id_supplier=-1,
         flag_nds=False,
+        id_nds_rate=None,
         dollar_rate=0.0,
+        invoice_number=None,
         movement=Movement(
             id_destination_storage=-1,
             id_destination_owner=-1,
@@ -672,6 +764,45 @@ class ViewAdmissionState(rx.State):
             else MovementProductsCatalog()
         )
 
+    @rx.var
+    def nds_rate_title(self) -> str:
+        if self.item.nds_rate is not None:
+            return f"{self.item.nds_rate.title} ({self.item.nds_rate.rate}%)"
+        return "—"
+
+    @rx.var
+    def invoice_number(self) -> str:
+        return self.item.invoice_number if self.item.invoice_number is not None else ""
+
+    @rx.var
+    def subtotal_display(self) -> str:
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
+        if rate <= 0:
+            return f"{round(line_total, 2)}"
+        if self.item.flag_nds:
+            return f"{round(line_total / (1 + rate), 2)}"
+        return f"{round(line_total, 2)}"
+
+    @rx.var
+    def nds_amount_display(self) -> str:
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
+        if rate <= 0:
+            return "0.0"
+        if self.item.flag_nds:
+            subtotal = line_total / (1 + rate)
+            return f"{round(line_total - subtotal, 2)}"
+        return f"{round(line_total * rate, 2)}"
+
+    @rx.var
+    def total_display(self) -> str:
+        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
+        rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
+        if rate <= 0 or self.item.flag_nds:
+            return f"{round(line_total, 2)}"
+        return f"{round(line_total * (1 + rate), 2)}"
+
     # ======================
 
     # Action handlers
@@ -721,7 +852,7 @@ class AdmissionState(rx.State):
             if page == self.Pages.ADD:
                 if self.add_addmission_form_state is None:
                     return rx.toast.error(
-                        "Состояние формы добавления поступления не инициализировано"
+                        "Стан форми додавання постачання не ініціалізовано"
                     )
                 await self.add_addmission_form_state.on_load()
                 self.current_page = self.Pages.ADD
@@ -732,7 +863,7 @@ class AdmissionState(rx.State):
                 if id != "":
                     if self.edit_admission_form_state is None:
                         return rx.toast.error(
-                            "Состояние формы редактирования поступления не инициализировано"
+                            "Стан форми редагування постачання не ініціалізовано"
                         )
                     await self.edit_admission_form_state.on_load(int(id))
                     self.current_page = self.Pages.EDIT
@@ -745,7 +876,7 @@ class AdmissionState(rx.State):
                 if id != "":
                     if self.view_admission_state is None:
                         return rx.toast.error(
-                            "Состояние просмотра поступления не инициализировано"
+                            "Стан перегляду постачання не ініціалізовано"
                         )
                     await self.view_admission_state.on_load(id)
                     self.current_page = self.Pages.VIEW
@@ -756,7 +887,7 @@ class AdmissionState(rx.State):
             # /admissions
             if self.list_admission_state is None:
                 return rx.toast.error(
-                    "Состояние списка поступлений не инициализировано"
+                    "Стан списку постачань не ініціалізовано"
                 )
             self.list_admission_state.refresh_list()
             self.current_page = self.Pages.LIST
@@ -778,4 +909,4 @@ class AdmissionState(rx.State):
                 return [rx.toast.success(text), rx.redirect(routes.MOVEMENT_ADMISSIONS)]
             else:
                 return [rx.toast.error(text)]
-        return rx.toast.error("Не выбрана запись для удаления")
+        return rx.toast.error("Не обрано запис для видалення!")

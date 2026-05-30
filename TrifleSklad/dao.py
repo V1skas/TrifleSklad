@@ -16,6 +16,7 @@ from TrifleSklad.models import (
     Movement,
     MovementProducts,
     MovementProductsCatalog,
+    NDSRate,
     Owner,
     PaymentType,
     Product,
@@ -1917,6 +1918,116 @@ class PaymentTypeDAO:
             return False, "Системна помилка!", -1
 
 
+class NDSRateDAO:
+    @classmethod
+    def get_all(cls) -> List[NDSRate]:
+        statement = select(NDSRate).where(NDSRate.is_deleted == False)
+
+        with rx.session() as session:
+            rates = session.exec(statement).all()
+
+            if len(rates) > 0:
+                session.expunge_all()
+            return list(rates)
+
+    @classmethod
+    def get_by_id(cls, id: int) -> Optional[NDSRate]:
+        statement = (
+            select(NDSRate)
+            .where(NDSRate.id == id)
+            .where(NDSRate.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            rate = session.exec(statement).one_or_none()
+
+            if rate:
+                session.expunge(rate)
+            return rate
+
+    @classmethod
+    def add_one(cls, nds_rate: NDSRate) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                statement = (
+                    select(NDSRate)
+                    .where(NDSRate.title == nds_rate.title)
+                    .where(NDSRate.is_deleted == False)
+                )
+
+                if session.exec(statement).one_or_none() is not None:
+                    return (
+                        False,
+                        "Помилка! Ставка ПДВ з такою назвою вже існує!",
+                        -1,
+                    )
+
+                session.add(nds_rate)
+                session.commit()
+                session.refresh(nds_rate)
+                return True, "Ставку ПДВ додано!", nds_rate.id
+
+        except IntegrityError as e:
+            print("[NDSRateDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Ставка ПДВ не може бути додана!", -1
+        except SQLAlchemyError as e:
+            print(f"[NDSRateDAO] SQLAlchemyError: {str(e)}")
+            return False, "Системна помилка!", -1
+
+    @classmethod
+    def edit_one(cls, nds_rate: NDSRate) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                statement = (
+                    select(NDSRate)
+                    .where(NDSRate.title == nds_rate.title)
+                    .where(NDSRate.id != nds_rate.id)
+                    .where(NDSRate.is_deleted == False)
+                )
+                if session.exec(statement).one_or_none() is not None:
+                    return (
+                        False,
+                        "Помилка! Ставка ПДВ з такою назвою вже існує!",
+                        nds_rate.id,
+                    )
+
+                nds_rate = session.merge(nds_rate)
+                session.add(nds_rate)
+                session.commit()
+                session.refresh(nds_rate)
+                return True, "Ставку ПДВ змінено!", nds_rate.id
+
+        except IntegrityError as e:
+            print("[NDSRateDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Ставка ПДВ не може бути змінена!", -1
+        except SQLAlchemyError as e:
+            print(f"[NDSRateDAO] SQLAlchemyError: {str(e)}")
+            return False, "Системна помилка!", -1
+
+    @classmethod
+    def delete_one(cls, id: int) -> tuple[bool, str]:
+        try:
+            with rx.session() as session:
+                nds_rate = session.get(NDSRate, id)
+
+                if nds_rate is None:
+                    return False, "Помилка! Ставку ПДВ не знайдено!"
+
+                nds_rate.is_deleted = True
+                session.commit()
+                return True, "Ставку ПДВ видалено!"
+
+        except IntegrityError as e:
+            print("[NDSRateDAO] IntegrityError: ", e)
+            return False, "Системна помилка! Ставка ПДВ не може бути видалена!"
+        except SQLAlchemyError as e:
+            print(f"[NDSRateDAO] SQLAlchemyError: {str(e)}")
+            return False, "Системна помилка!"
+        except Exception as e:
+            print(f"[NDSRateDAO] Exception: {str(e)}")
+            return False, "Системна помилка!"
+
+
 class AdmissionDAO:
     @classmethod
     def get_all(cls) -> List[Admission]:
@@ -1930,6 +2041,7 @@ class AdmissionDAO:
         statement = select(Admission).options(
             joinedload(Admission.supplier),
             joinedload(Admission.payment_type),
+            joinedload(Admission.nds_rate),
             joinedload(Admission.movement).options(
                 selectinload(Movement.products_catalog).options(
                     joinedload(MovementProductsCatalog.product),
@@ -1956,6 +2068,7 @@ class AdmissionDAO:
         statement = select(Admission).options(
             joinedload(Admission.supplier),
             joinedload(Admission.payment_type),
+            joinedload(Admission.nds_rate),
             joinedload(Admission.movement).options(
                 joinedload(Movement.destination_storage),
                 joinedload(Movement.destination_owner),
@@ -1987,6 +2100,7 @@ class AdmissionDAO:
             .options(
                 joinedload(Admission.supplier),
                 joinedload(Admission.payment_type),
+                joinedload(Admission.nds_rate),
                 joinedload(Admission.movement).options(
                     selectinload(Movement.products_catalog).options(
                         joinedload(MovementProductsCatalog.product),
@@ -2044,13 +2158,14 @@ class AdmissionDAO:
                 session.expire_on_commit = False
                 session.add(movement)
                 session.commit()
-                return True, "Поставка успешно добавлена", movement.id
+                return True, "Постачання успішно додано!", movement.id
 
         except IntegrityError as e:
             print("[AdmissionDAO] IntegrityError: ", e)
-            return False, "Ошибка: Поставка не может быть добавлена", -1
+            return False, "Помилка! Постачання не може бути додано.", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print("[AdmissionDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!", -1
 
     @classmethod
     def edit_one(cls, admission: Admission) -> tuple[bool, str, int]:
@@ -2058,14 +2173,14 @@ class AdmissionDAO:
             with rx.session() as session:
                 session.merge(admission)
                 session.commit()
-                return True, "Движение товара успешно изменено", admission.id
+                return True, "Постачання успішно змінено!", admission.id
 
         except IntegrityError as e:
             print("[AdmissionDAO] IntegrityError: ", e)
-            return False, "Ошибка: Единица товара не может быть изменена", -1
+            return False, "Помилка! Постачання не може бути змінено.", -1
         except SQLAlchemyError as e:
             print("[AdmissionDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, "Системна помилка!", -1
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
@@ -2112,12 +2227,12 @@ class AdmissionDAO:
                 ).all()
 
                 if admission is None:
-                    return False, "Ошибка: Поставка не найдена"
+                    return False, "Помилка! Постачання не знайдено."
 
                 if len(other_movements_with_current_products) > 0:
                     return (
                         False,
-                        "Ошибка: Поставка не может быть удалена, так как товары уже используются в других движениях",
+                        "Помилка! Постачання не може бути видалено, оскільки товари вже використовуються в інших рухах.",
                     )
 
                 for item in products_in_movement:
@@ -2130,14 +2245,17 @@ class AdmissionDAO:
                 for item in products:
                     session.delete(item)
                 session.commit()
-                return True, "Поставка успешно удалена"
+                return True, "Постачання успішно видалено!"
 
         except IntegrityError as e:
-            return False, f"Ошибка: Поставка не может быть удалена: {e}"
+            print("[AdmissionDAO] IntegrityError: ", e)
+            return False, "Помилка! Постачання не може бути видалено."
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[AdmissionDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
         except Exception as e:
-            return False, f"Ошибка: {str(e)}"
+            print("[AdmissionDAO] Exception: ", e)
+            return False, "Системна помилка!"
 
 
 class IssueDAO:

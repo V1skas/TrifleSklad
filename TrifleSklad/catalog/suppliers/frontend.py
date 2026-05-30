@@ -10,7 +10,7 @@ from TrifleSklad.models import Supplier
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewSupplierState.title, size="7", width="100%"),
-        rx.text(ViewSupplierState.okpo, width="100%"),
+        rx.text(ViewSupplierState.edrpou, width="100%"),
         rx.text(ViewSupplierState.description, is_optional=True, width="100%"),
         rx.text(ViewSupplierState.address, is_optional=True, width="100%"),
         rx.text(ViewSupplierState.email, is_optional=True, width="100%"),
@@ -79,7 +79,7 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: Supplier) -> rx.Component:
     return rx.table.row(
         rx.table.cell(
-            item.okpo,
+            item.edrpou,
             align="left"
         ),
         rx.table.row_header_cell(
@@ -189,9 +189,9 @@ def add_form() -> rx.Component:
             ),
             rx.text("ЄДРПОУ:", size="3", width="100%"),
             rx.input(
-                name="okpo",
-                value=AddSupplierState.okpo,
-                on_change=AddSupplierState.on_change_okpo,
+                name="edrpou",
+                value=AddSupplierState.edrpou,
+                on_change=AddSupplierState.on_change_edrpou,
                 required=True,
                 width="100%"
             ),
@@ -254,9 +254,9 @@ def edit_form() -> rx.Component:
             ),
             rx.text("ЄДРПОУ:", size="3", width="100%"),
             rx.input(
-                name="okpo",
-                value=EditSupplierState.okpo,
-                on_change=EditSupplierState.on_change_okpo,
+                name="edrpou",
+                value=EditSupplierState.edrpou,
+                on_change=EditSupplierState.on_change_edrpou,
                 required=True,
                 width="100%"
             ),

@@ -59,6 +59,11 @@ CATALOG_PAYMENT_TYPES_VIEW_ID = "/catalog/payment_types/view/"
 CATALOG_PAYMENT_TYPES_EDIT_ID = "/catalog/payment_types/edit/"
 CATALOG_PAYMENT_TYPES_ADD = "/catalog/payment_types/add/"
 
+CATALOG_NDS_RATES = "/catalog/nds_rates/"
+CATALOG_NDS_RATES_VIEW_ID = "/catalog/nds_rates/view/"
+CATALOG_NDS_RATES_EDIT_ID = "/catalog/nds_rates/edit/"
+CATALOG_NDS_RATES_ADD = "/catalog/nds_rates/add/"
+
 MOVEMENT_TAB = "/movement/[tab]/"
 MOVEMENT_TAB_PAGE = "/movement/[tab]/[page]/"
 MOVEMENT_TAB_PAGE_ID = "/movement/[tab]/[page]/[id]/"

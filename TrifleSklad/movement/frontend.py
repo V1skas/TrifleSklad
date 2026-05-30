@@ -40,11 +40,11 @@ def issues_tab() -> rx.Component:
 def index():
     return rx.hstack(
         sidebar(
-            sidebar_link("Поставки", routes.MOVEMENT_ADMISSIONS),
-            sidebar_link("Списания", routes.MOVEMENT_WRITE_OFFS),
-            sidebar_link("Перемещения", routes.MOVEMENT_MOVEMENTS),
-            sidebar_link("Выдачи", routes.MOVEMENT_ISSUES),
-            sidebar_link("Продажи", routes.CATALOG_CATEGORIES),
+            sidebar_link("Постачання", routes.MOVEMENT_ADMISSIONS),
+            sidebar_link("Списання", routes.MOVEMENT_WRITE_OFFS),
+            sidebar_link("Переміщення", routes.MOVEMENT_MOVEMENTS),
+            sidebar_link("Видачі", routes.MOVEMENT_ISSUES),
+            sidebar_link("Продажі", routes.CATALOG_CATEGORIES),
         ),
         workspace(
             admissions_tab(),

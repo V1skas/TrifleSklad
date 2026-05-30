@@ -13,10 +13,10 @@ from TrifleSklad.declared import MovementsStatus
 
 def movement_product_catalog_add_edit_form() -> rx.Component:
     return rx.vstack(
-        rx.text("Наименование из каталога:", width="100%"),
+        rx.text("Найменування з каталогу:", width="100%"),
         rx.select.root(
             rx.select.trigger(
-                placeholder="Выберите из списка",
+                placeholder="Оберіть зі списку",
                 width="100%",
             ),
             rx.select.content(
@@ -37,7 +37,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
             width="100%"
         ),
         rx.hstack(
-            rx.text("Количество:"),
+            rx.text("Кількість:"),
             rx.input(
                 name="count",
                 type="number",
@@ -66,7 +66,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
             width="100%"
         ),
         rx.hstack(
-            rx.text("Стоимость за единицу:"),
+            rx.text("Вартість за одиницю:"),
             rx.input(
                 name="price",
                 type="number",
@@ -98,7 +98,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
         rx.cond(MovementProductCatalogAddEditFormState.product_is_uniq,
             rx.accordion.root(
                 rx.accordion.item(
-                    header=rx.text("Серийные номера"),
+                    header=rx.text("Серійні номери"),
                     content=rx.scroll_area(
                         rx.vstack(
                             rx.foreach(
@@ -137,7 +137,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
 
 def movement_product_catalog_detailed_view_form() -> rx.Component:
     return rx.vstack(
-        rx.text("Товары из каталога:", width="100%"),
+        rx.text("Товари з каталогу:", width="100%"),
         rx.text(
             MovementProductCatalogDetailedViewState.item.product.title,
             weight="bold",
@@ -145,7 +145,7 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
             width="100%"
         ),
         rx.hstack(
-            rx.text("Количество:"),
+            rx.text("Кількість:"),
             rx.text(
                 MovementProductCatalogDetailedViewState.item.count,
                 weight="bold",
@@ -154,7 +154,7 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
             )
         ),
         rx.hstack(
-            rx.text("Стоимость за единицу:"),
+            rx.text("Вартість за одиницю:"),
             rx.text(
                 MovementProductCatalogDetailedViewState.item.price,
                 weight="bold",
@@ -165,7 +165,7 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
         rx.cond(MovementProductCatalogDetailedViewState.item.product.uniq,
             rx.accordion.root(
                 rx.accordion.item(
-                    header=rx.text("Серийные номера"),
+                    header=rx.text("Серійні номери"),
                     content=rx.scroll_area(
                         rx.vstack(
                             rx.foreach(
@@ -201,7 +201,7 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
 def add_admission_products_catalog_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Информация о товаре"),
+            rx.dialog.title("Інформація про товар"),
             rx.tabs.root(
                 rx.tabs.content(
                     movement_product_catalog_add_edit_form(),
@@ -223,19 +223,19 @@ def add_admission_products_catalog_dialog() -> rx.Component:
             ),
             rx.cond(AddAdmissionState.is_product_dialog_view_mode,
                     rx.hstack(
-                        rx.button("Удалить", variant="outline", color_scheme="red",
+                        rx.button("Видалити", variant="outline", color_scheme="red",
                                   on_click=AddAdmissionState.on_close_product_catalog_dialog),
                         rx.spacer(),
-                        rx.button("Редактировать", type="button", on_click=AddAdmissionState.edit_product_catalog_dialog),
+                        rx.button("Редагувати", type="button", on_click=AddAdmissionState.edit_product_catalog_dialog),
 
                         padding_top="1em",
 
                         width="100%",
                     ),
                     rx.hstack(
-                        rx.button("Отменить", variant="outline", on_click=AddAdmissionState.on_close_product_catalog_dialog),
+                        rx.button("Скасувати", variant="outline", on_click=AddAdmissionState.on_close_product_catalog_dialog),
                         rx.spacer(),
-                        rx.button("Сохранить", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=AddAdmissionState.on_save_product_catalog_dialog),
+                        rx.button("Зберегти", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=AddAdmissionState.on_save_product_catalog_dialog),
 
                         padding_top="1em",
 
@@ -262,8 +262,8 @@ def product_catalog_table():
         rx.table.header(
             rx.table.row(
                 rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Количество", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Стоимость", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
             ),
 
             background_color=rx.color("accent", 9)
@@ -289,8 +289,8 @@ def add_admission_products_catalog_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Количество", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Стоимость", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -323,8 +323,8 @@ def view_admission_products_catalog_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Количество", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Стоимость", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -353,28 +353,28 @@ def view_admission_products_catalog_table() -> rx.Component:
 
 def item_preview() -> rx.Component:
     return rx.vstack(
-        rx.heading(f"Поставка №{ViewAdmissionState.item.id}", size="7", width="100%"),
+        rx.heading(f"Постачання №{ViewAdmissionState.item.id}", size="7", width="100%"),
         rx.hstack(
             rx.text("Дата:"),
             rx.text(ViewAdmissionState.item.movement.date)
         ),
         rx.hstack(
-            rx.text("Поставщик:"),
+            rx.text("Постачальник:"),
             rx.text(ViewAdmissionState.item.supplier.title)
         ),
         rx.hstack(
-            rx.text("Получатель:"),
+            rx.text("Одержувач:"),
             rx.text(ViewAdmissionState.item.movement.destination_owner.title)
         ),
         rx.hstack(
             rx.text("Склад:"),
             rx.text(ViewAdmissionState.item.movement.destination_storage.title)
         ),
-        rx.text("Товары из каталога:", width="100%"),
+        rx.text("Товари з каталогу:", width="100%"),
         view_admission_products_catalog_table(),
         rx.dialog.root(
             rx.dialog.content(
-                rx.dialog.title("Информация о товаре"),
+                rx.dialog.title("Інформація про товар"),
                 movement_product_catalog_detailed_view_form(),
 
                 width="30em"
@@ -384,19 +384,35 @@ def item_preview() -> rx.Component:
             on_open_change=ViewAdmissionState.close_dialog
         ),
         rx.hstack(
-            rx.text("Итоговая стоимость:"),
-            rx.text(f"{ViewAdmissionState.item.movement.total_cost}")
+            rx.text("Сума без ПДВ:"),
+            rx.text(ViewAdmissionState.subtotal_display)
         ),
         rx.hstack(
-            rx.text("НДС:"),
-            rx.text(rx.cond(ViewAdmissionState.item.flag_nds, "Есть", "Нет"))
+            rx.text("Ставка ПДВ:"),
+            rx.text(ViewAdmissionState.nds_rate_title)
         ),
         rx.hstack(
-            rx.text("Способ оплаты:"),
+            rx.text("Сума ПДВ:"),
+            rx.text(ViewAdmissionState.nds_amount_display)
+        ),
+        rx.hstack(
+            rx.text("Разом з ПДВ:"),
+            rx.text(ViewAdmissionState.total_display)
+        ),
+        rx.hstack(
+            rx.text("ПДВ включений у ціну:"),
+            rx.text(rx.cond(ViewAdmissionState.item.flag_nds, "Так", "Ні"))
+        ),
+        rx.hstack(
+            rx.text("Спосіб оплати:"),
             rx.text(ViewAdmissionState.item.payment_type.title)
         ),
         rx.hstack(
-            rx.text("Курс доллара:"),
+            rx.text("Номер накладної оплати:"),
+            rx.text(ViewAdmissionState.invoice_number)
+        ),
+        rx.hstack(
+            rx.text("Курс долара:"),
             rx.text(ViewAdmissionState.item.dollar_rate)
         ),
         rx.hstack(
@@ -404,19 +420,19 @@ def item_preview() -> rx.Component:
             rx.text(ViewAdmissionState.item_status)
         ),
         rx.hstack(
-            rx.text("Комментарий:"),
+            rx.text("Коментар:"),
             rx.text(ViewAdmissionState.item.movement.comment)
         ),
         rx.spacer(),
         rx.hstack(
             rx.button(
-                "Редактировать",
+                "Редагувати",
 
                 on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_EDIT_ID}{ViewAdmissionState.item.id}")
             ),
             rx.spacer(),
             rx.button(
-                "Удалить",
+                "Видалити",
                 color_scheme="red",
 
                 on_click=AdmissionState.delete_one(ViewAdmissionState.item.id)
@@ -454,7 +470,7 @@ def table_row(item: Tuple[int, Admission]) -> rx.Component:
         rx.table.cell(rx.text(item[1].movement.destination_owner.title)),
         rx.table.cell(rx.text(item[1].payment_type.title)),
         rx.table.cell(rx.text(item[1].movement.total_cost)),
-        rx.table.cell(rx.text(rx.cond(item[1].flag_nds, "Да", "Нет"))),
+        rx.table.cell(rx.text(rx.cond(item[1].flag_nds, "Так", "Ні"))),
         rx.table.cell(rx.text(ListAdmissionState.get_movement_statuses[item[1].movement.status]))
     )
 
@@ -464,12 +480,12 @@ def table() -> rx.Component:
             rx.table.row(
                 rx.table.column_header_cell("№", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Дата", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Поставщик", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Постачальник", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Склад", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Владелец", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Тип платежа", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Сумма", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("НДС", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Одержувач", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Тип платежу", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("ПДВ", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Статус", color=rx.color("accent", 2)),
             ),
 
@@ -491,10 +507,10 @@ def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
             rx.hstack(
-                rx.heading("Поставки", size="6"),
+                rx.heading("Постачання", size="6"),
                 rx.spacer(),
                 rx.button(
-                    "Добавить",
+                    "Додати",
                     on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS_ADD)
                 ),
 
@@ -502,7 +518,7 @@ def list_tab_content() -> rx.Component:
             ),
             rx.cond(ListAdmissionState.has_items,
                 table(),
-                rx.text("Записей нет.")
+                rx.text("Записів немає.")
             ),
 
             width="100%",
@@ -517,10 +533,10 @@ def add_form() -> rx.Component:
             rx.vstack(
                 rx.text("Дата:"),
                 rx.input(name="date", type="date", required=True, size="3", default_value=AddAdmissionState.item.movement.date, width="100%", on_change=AddAdmissionState.on_change_date),
-                rx.text("Поставщик:"),
+                rx.text("Постачальник:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -541,7 +557,7 @@ def add_form() -> rx.Component:
                 rx.text("Склад:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -554,7 +570,7 @@ def add_form() -> rx.Component:
                                     on_click=AddAdmissionState.on_click_search_name_destination_storage
                                 ),
                                 rx.input(
-                                    placeholder="Введите название для поиска",
+                                    placeholder="Введіть назву для пошуку",
                                     width="100%",
 
                                     value=AddAdmissionState.search_name_destination_storage,
@@ -582,10 +598,10 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_storage
                 ),
-                rx.text("Владелец:"),
+                rx.text("Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -603,20 +619,20 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_owner
                 ),
-                rx.text("Товары из каталога:"),
+                rx.text("Товари з каталогу:"),
                 add_admission_products_catalog_dialog(),
                 rx.cond(AddAdmissionState.has_item_movement_products_catalog,
                         add_admission_products_catalog_table(),
-                        rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
                 rx.button(
-                    "Добавить",
+                    "Додати",
 
                     on_click=AddAdmissionState.add_product_catalog_dialog_open
                 ),
-                rx.text("Способ оплаты:"),
+                rx.text("Спосіб оплати:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -634,6 +650,29 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_payment_type
                 ),
+                rx.text("Номер накладної оплати:"),
+                rx.input(
+                    name="invoice_number",
+                    value=AddAdmissionState.invoice_number,
+                    on_change=AddAdmissionState.on_change_invoice_number,
+                ),
+                rx.text("Ставка ПДВ:"),
+                rx.select.root(
+                    rx.select.trigger(
+                        placeholder="Без ПДВ",
+                        width="100%",
+                    ),
+                    rx.select.content(
+                        rx.foreach(
+                            AddAdmissionState.list_nds_rates,
+                            lambda nr: rx.select.item(nr[0], value=nr[1])
+                        ),
+                        width="100%",
+                    ),
+                    name="id_nds_rate",
+                    value=AddAdmissionState.id_nds_rate,
+                    on_change=AddAdmissionState.on_change_id_nds_rate,
+                ),
                 rx.hstack(
                     rx.switch(
                         name="flag_nds",
@@ -643,10 +682,16 @@ def add_form() -> rx.Component:
 
                         on_change=AddAdmissionState.on_change_flag_nds
                     ),
-                    rx.text("НДС")
+                    rx.text("Ціна в рядках вказана з ПДВ")
+                ),
+                rx.vstack(
+                    rx.hstack(rx.text("Сума без ПДВ:"), rx.text(AddAdmissionState.subtotal_display)),
+                    rx.hstack(rx.text("Сума ПДВ:"), rx.text(AddAdmissionState.nds_amount_display)),
+                    rx.hstack(rx.text("Разом з ПДВ:"), rx.text(AddAdmissionState.total_display)),
+                    width="100%",
                 ),
                 rx.hstack(
-                    rx.text("Курс доллара:"),
+                    rx.text("Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -662,7 +707,7 @@ def add_form() -> rx.Component:
                         AddAdmissionState.get_movement_statuses,
 
                         name="status",
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         required=True,
 
                         value=AddAdmissionState.status,
@@ -670,12 +715,12 @@ def add_form() -> rx.Component:
                         on_change=AddAdmissionState.on_change_status
                     ),
                 ),
-                rx.text("Комментарий:"),
+                rx.text("Коментар:"),
                 rx.text_area(name="comment", value=AddAdmissionState.item.movement.comment, on_change=AddAdmissionState.on_change_comment),
 
                 rx.hstack(
-                    rx.button("Отмена", type="reset", color_scheme="red", on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS)),
-                    rx.button("Сохранить", color_scheme="green", type="submit", on_click=AddAdmissionState.add_one),
+                    rx.button("Скасувати", type="reset", color_scheme="red", on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS)),
+                    rx.button("Зберегти", color_scheme="green", type="submit", on_click=AddAdmissionState.add_one),
 
                     justify="end"
                 ),
@@ -692,10 +737,10 @@ def edit_form() -> rx.Component:
             rx.vstack(
                 rx.text("Дата:"),
                 rx.input(name="date", type="date", required=True, size="3", default_value=EditAdmissionState.item.movement.date, disabled=True),
-                rx.text("Поставщик:"),
+                rx.text("Постачальник:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -718,7 +763,7 @@ def edit_form() -> rx.Component:
                 rx.text("Склад:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -731,7 +776,7 @@ def edit_form() -> rx.Component:
                                     on_click=EditAdmissionState.on_click_search_name_destination_storage
                                 ),
                                 rx.input(
-                                    placeholder="Введите название для поиска",
+                                    placeholder="Введіть назву для пошуку",
                                     width="100%",
 
                                     value=EditAdmissionState.search_name_destination_storage,
@@ -761,10 +806,10 @@ def edit_form() -> rx.Component:
 
                     on_change=EditAdmissionState.on_change_id_destination_storage
                 ),
-                rx.text("Владелец:"),
+                rx.text("Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -783,15 +828,15 @@ def edit_form() -> rx.Component:
 
                     on_change=EditAdmissionState.on_change_id_destination_owner
                 ),
-                rx.text("Товары из каталога:"),
+                rx.text("Товари з каталогу:"),
                 add_admission_products_catalog_dialog(),
                 rx.cond(EditAdmissionState.has_item_movement_products_catalog,
                         add_admission_products_catalog_table(),
-                        rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")),
-                rx.text("Способ оплаты:"),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
+                rx.text("Спосіб оплати:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -810,6 +855,29 @@ def edit_form() -> rx.Component:
 
                     on_change=EditAdmissionState.on_change_id_payment_type
                 ),
+                rx.text("Номер накладної оплати:"),
+                rx.input(
+                    name="invoice_number",
+                    value=EditAdmissionState.invoice_number,
+                    on_change=EditAdmissionState.on_change_invoice_number,
+                ),
+                rx.text("Ставка ПДВ:"),
+                rx.select.root(
+                    rx.select.trigger(
+                        placeholder="Без ПДВ",
+                        width="100%",
+                    ),
+                    rx.select.content(
+                        rx.foreach(
+                            EditAdmissionState.list_nds_rates,
+                            lambda nr: rx.select.item(nr[0], value=nr[1])
+                        ),
+                        width="100%",
+                    ),
+                    name="id_nds_rate",
+                    value=EditAdmissionState.id_nds_rate,
+                    on_change=EditAdmissionState.on_change_id_nds_rate,
+                ),
                 rx.hstack(
                     rx.switch(
                         name="flag_nds",
@@ -820,10 +888,16 @@ def edit_form() -> rx.Component:
 
                         on_change=EditAdmissionState.on_change_flag_nds
                     ),
-                    rx.text("НДС")
+                    rx.text("Ціна в рядках вказана з ПДВ")
+                ),
+                rx.vstack(
+                    rx.hstack(rx.text("Сума без ПДВ:"), rx.text(EditAdmissionState.subtotal_display)),
+                    rx.hstack(rx.text("Сума ПДВ:"), rx.text(EditAdmissionState.nds_amount_display)),
+                    rx.hstack(rx.text("Разом з ПДВ:"), rx.text(EditAdmissionState.total_display)),
+                    width="100%",
                 ),
                 rx.hstack(
-                    rx.text("Курс доллара:"),
+                    rx.text("Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -840,7 +914,7 @@ def edit_form() -> rx.Component:
                         EditAdmissionState.get_movement_statuses,
 
                         name="status",
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         required=True,
 
                         value=EditAdmissionState.status,
@@ -848,12 +922,12 @@ def edit_form() -> rx.Component:
                         on_change=EditAdmissionState.on_change_status
                     ),
                 ),
-                rx.text("Комментарий:"),
+                rx.text("Коментар:"),
                 rx.text_area(name="comment", value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment),
 
                 rx.hstack(
-                    rx.button("Отмена", type="reset", color_scheme="red", on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS)),
-                    rx.button("Сохранить", color_scheme="green", type="submit", on_click=EditAdmissionState.edit_one),
+                    rx.button("Скасувати", type="reset", color_scheme="red", on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS)),
+                    rx.button("Зберегти", color_scheme="green", type="submit", on_click=EditAdmissionState.edit_one),
 
                     justify="end"
                 ),
@@ -867,7 +941,7 @@ def edit_form() -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Добавление поставки", size="7", width="100%", margin_bottom="0.5em"),
+        rx.heading("Додавання постачання", size="7", width="100%", margin_bottom="0.5em"),
         add_form(),
 
         value=AdmissionState.Pages.ADD
@@ -875,7 +949,7 @@ def add_tab_content() -> rx.Component:
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редактирование поставки", size="7", width="100%", margin_bottom="0.5em"),
+        rx.heading("Редагування постачання", size="7", width="100%", margin_bottom="0.5em"),
         edit_form(),
 
         value=AdmissionState.Pages.EDIT
