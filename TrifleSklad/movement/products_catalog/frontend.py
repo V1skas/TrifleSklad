@@ -7,18 +7,18 @@ from TrifleSklad.movement.products_catalog.backend import MovementProductCatalog
 
 def view_page():
     return rx.vstack(
-        rx.heading("Товарная позиция"),
+        rx.heading("Товарна позиція"),
         rx.hstack(
-            rx.text("Название:"),
+            rx.text("Назва:"),
             rx.text(rx.cond(MovementProductCatalogState.item.product,
-                            MovementProductCatalogState.item.product.title, "Не указано"))
+                            MovementProductCatalogState.item.product.title, "Не вказано"))
         ),
         rx.hstack(
-            rx.text("Количество:"),
+            rx.text("Кількість:"),
             rx.text(MovementProductCatalogState.item.count)
         ),
         rx.hstack(
-            rx.text("Стоимость за единицу:"),
+            rx.text("Вартість за одиницю:"),
             rx.text(MovementProductCatalogState.item.price)
         ),
 
@@ -28,11 +28,11 @@ def view_page():
 
 def add_page():
     return rx.vstack(
-        rx.heading("Добавления товарной позиции"),
-        rx.text("Название:"),
+        rx.heading("Додавання товарної позиції"),
+        rx.text("Назва:"),
         rx.select.root(
             rx.select.trigger(
-                placeholder="Выберите из списка",
+                placeholder="Оберіть зі списку",
 
                 style=rx.cond(
                     MovementProductCatalogState.product_error,
@@ -57,7 +57,7 @@ def add_page():
 
             width="100%"
         ),
-        rx.text("Количество:"),
+        rx.text("Кількість:"),
         rx.input(
             type="number",
             min="0",
@@ -75,7 +75,7 @@ def add_page():
             on_change=MovementProductCatalogState.on_change_count
         ),
 
-        rx.text("Стоимость единицы:"),
+        rx.text("Вартість за одиницю:"),
         rx.input(
             type="number",
             min="0.0",
@@ -100,11 +100,11 @@ def add_page():
 
 def edit_page():
     return rx.vstack(
-        rx.heading("Редактирование товарной позиции"),
-        rx.text("Название:"),
+        rx.heading("Редагування товарної позиції"),
+        rx.text("Назва:"),
         rx.select.root(
             rx.select.trigger(
-                placeholder="Выберите из списка",
+                placeholder="Оберіть зі списку",
 
                 style=rx.cond(
                     MovementProductCatalogState.product_error,
@@ -129,7 +129,7 @@ def edit_page():
 
             width="100%"
         ),
-        rx.text("Количество:"),
+        rx.text("Кількість:"),
         rx.input(
             type="number",
             min="0",
@@ -143,7 +143,7 @@ def edit_page():
             width="100%",
             on_change=MovementProductCatalogState.on_change_count
         ),
-        rx.text("Стоимость единицы:"),
+        rx.text("Вартість за одиницю:"),
         rx.input(
             type="number",
             min="0.0",
@@ -172,8 +172,8 @@ def dialog():
                         rx.cond(MovementProductCatalogState.has_error,
                                 rx.text(MovementProductCatalogState.error_text, color="red")),
                         rx.hstack(
-                            rx.button("Сохранить", on_click=MovementProductCatalogListState.on_save),
-                            rx.button("Отмена", on_click=MovementProductCatalogListState.close_dialog),
+                            rx.button("Зберегти", on_click=MovementProductCatalogListState.on_save),
+                            rx.button("Скасувати", on_click=MovementProductCatalogListState.close_dialog),
 
                             width="100%"
                         ),
@@ -191,10 +191,10 @@ def dialog():
                     rx.vstack(
                         edit_page(),
                         rx.cond(MovementProductCatalogState.has_error,
-                                rx.text(MovementProductCatalogState.error_text, color_sсheme="red")),
+                                rx.text(MovementProductCatalogState.error_text, color_scheme="red")),
                         rx.hstack(
-                            rx.button("Сохранить", on_click=MovementProductCatalogListState.on_save),
-                            rx.button("Отмена", on_click=MovementProductCatalogListState.close_dialog)
+                            rx.button("Зберегти", on_click=MovementProductCatalogListState.on_save),
+                            rx.button("Скасувати", on_click=MovementProductCatalogListState.close_dialog)
                         ),
 
                         width="100%",
@@ -211,8 +211,8 @@ def dialog():
                         view_page(),
                         rx.spacer(),
                         rx.hstack(
-                            rx.button("Редактировать", on_click=MovementProductCatalogState.on_click_edit()),
-                            rx.button("Удалить", color_scheme="red", on_click=MovementProductCatalogListState.on_delete())
+                            rx.button("Редагувати", on_click=MovementProductCatalogState.on_click_edit()),
+                            rx.button("Видалити", color_scheme="red", on_click=MovementProductCatalogListState.on_delete())
                         ),
 
                         width="100%",
@@ -260,7 +260,7 @@ def table():
             rx.table.row(
                 rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Количество", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Стоимость", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
             ),
 
             background_color=rx.color("accent", 9)
@@ -284,21 +284,21 @@ def table():
 def index(*args, **kwargs):
     return rx.vstack(
         rx.hstack(
-            rx.heading("Товары:", size="3"),
+            rx.heading("Товари:", size="3"),
             rx.spacer(),
             rx.cond(MovementProductCatalogListState.is_view_mode,
                     rx.Component(),
-                    rx.button("Добавить", type="button", on_click=MovementProductCatalogListState.on_add)),
+                    rx.button("Додати", type="button", on_click=MovementProductCatalogListState.on_add)),
             width="100%"
         ),
         rx.cond(MovementProductCatalogListState.has_items,
                 table(),
-                rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")),
+                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
         dialog(),
         rx.cond(MovementProductCatalogListState.is_view_mode,
                 rx.Component(),
                 rx.hstack(
-                    rx.text("Итоговая стоимость:"),
+                    rx.text("Загальна вартість:"),
                     rx.input(id="total_cost", type="number", read_only=True,
                              value=f"{MovementProductCatalogListState.total_cost}")
                 )),

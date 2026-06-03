@@ -95,7 +95,7 @@ def selector_list() -> rx.Component:
 def selector(*child, **prop) -> rx.Component:
     return rx.vstack(
         rx.heading(
-            "Выбор ТМЦ:",
+            "Вибір ТМЦ:",
             size="8",
             color=rx.color("accent", 2),
             background_color=rx.color("accent", 9),
@@ -105,7 +105,7 @@ def selector(*child, **prop) -> rx.Component:
         ),
         rx.input(
             rx.input.slot(rx.icon("search")),
-            placeholder="Поиск",
+            placeholder="Пошук",
             value=ProductsSelectorState.filter_many,
             width="100%",
             size="3",
@@ -116,7 +116,7 @@ def selector(*child, **prop) -> rx.Component:
                 ProductsSelectorState.has_items(),
                 selector_list(),
                 rx.text(
-                    "Нет доступных ТМЦ", color=rx.color("accent", 6), user_select="none"
+                    "Немає доступних ТМЦ", color=rx.color("accent", 6), user_select="none"
                 ),
             ),
             padding="1em",

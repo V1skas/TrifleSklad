@@ -3,8 +3,10 @@ from typing import List, Optional, Tuple
 import reflex as rx
 
 from TrifleSklad import routes
+from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import MovementsStatus, movements_status_list
 from TrifleSklad.models import Issue
+from TrifleSklad.state import AppState
 from TrifleSklad.movement.issues.backend import (
     AddIssueState,
     EditIssueState,
@@ -40,9 +42,9 @@ def issues_table() -> rx.Component:
                 rx.table.column_header_cell("№", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Дата", color=rx.color("accent", 2)),
                 rx.table.column_header_cell(
-                    "Место назначения", color=rx.color("accent", 2)
+                    "Місце призначення", color=rx.color("accent", 2)
                 ),
-                rx.table.column_header_cell("Получатель", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Одержувач", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Статус", color=rx.color("accent", 2)),
             ),
             background_color=rx.color("accent", 9),
@@ -62,12 +64,15 @@ def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
             rx.hstack(
-                rx.heading("Выдачи", size="6"),
+                rx.heading("Видачі", size="6"),
                 rx.spacer(),
-                rx.button("Добавить", on_click=rx.redirect(routes.MOVEMENT_ISSUES_ADD)),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.ISSUES_CREATE),
+                    rx.button("Додати", on_click=rx.redirect(routes.MOVEMENT_ISSUES_ADD)),
+                ),
                 width="100%",
             ),
-            rx.cond(ListIssueState.has_items, issues_table(), rx.text("Записей нет.")),
+            rx.cond(ListIssueState.has_items, issues_table(), rx.text("Записів немає.")),
             width="100%",
             height="100%",
         ),
@@ -77,7 +82,7 @@ def list_tab_content() -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Добавление выдачи", size="7", width="100%", margin_bottom="0.5em"),
+        rx.heading("Додавання видачі", size="7", width="100%", margin_bottom="0.5em"),
         rx.card(
             rx.vstack(
                 rx.text("Дата:"),
@@ -93,7 +98,7 @@ def add_tab_content() -> rx.Component:
                 rx.text("Склад:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -110,10 +115,10 @@ def add_tab_content() -> rx.Component:
                     value=AddIssueState.id_incoming_storage,
                     on_change=AddIssueState.on_change_id_incoming_storage,
                 ),
-                rx.text("Владелец:"),
+                rx.text("Власник:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -128,22 +133,22 @@ def add_tab_content() -> rx.Component:
                     value=AddIssueState.id_incoming_owner,
                     on_change=AddIssueState.on_change_id_incoming_owner,
                 ),
-                rx.text("Место назначения:"),
+                rx.text("Місце призначення:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
                         rx.vstack(
                             rx.hstack(
                                 rx.button(
-                                    "Поиск",
+                                    "Пошук",
                                     type="button",
                                     on_click=AddIssueState.on_click_search_name_destination_storage,
                                 ),
                                 rx.input(
-                                    placeholder="Введите название для поиска",
+                                    placeholder="Введіть назву для пошуку",
                                     width="100%",
                                     value=AddIssueState.search_name_destination_storage,
                                     on_change=AddIssueState.on_change_search_name_destination_storage,
@@ -165,10 +170,10 @@ def add_tab_content() -> rx.Component:
                     value=AddIssueState.id_destination_storage,
                     on_change=AddIssueState.on_change_id_destination_storage,
                 ),
-                rx.text("Получатель:"),
+                rx.text("Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -189,14 +194,14 @@ def add_tab_content() -> rx.Component:
                     rx.select(
                         AddIssueState.get_movement_statuses,
                         name="status",
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         required=True,
                         width="100%",
                         value=AddIssueState.status,
                         on_change=AddIssueState.on_change_status,
                     ),
                 ),
-                rx.text("Комментарий:"),
+                rx.text("Коментар:"),
                 rx.text_area(
                     name="comment",
                     width="100%",
@@ -205,12 +210,12 @@ def add_tab_content() -> rx.Component:
                 ),
                 rx.hstack(
                     rx.button(
-                        "Отмена",
+                        "Скасувати",
                         color_scheme="red",
                         on_click=rx.redirect(routes.MOVEMENT_ISSUES),
                     ),
                     rx.button(
-                        "Сохранить",
+                        "Зберегти",
                         color_scheme="green",
                         type="submit",
                         on_click=AddIssueState.add_one,
@@ -226,7 +231,7 @@ def add_tab_content() -> rx.Component:
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.heading(
-            "Редактирование выдачи", size="7", width="100%", margin_bottom="0.5em"
+            "Редагування видачі", size="7", width="100%", margin_bottom="0.5em"
         ),
         rx.card(
             rx.vstack(
@@ -244,7 +249,7 @@ def edit_tab_content() -> rx.Component:
                 rx.text("Склад:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -262,10 +267,10 @@ def edit_tab_content() -> rx.Component:
                     value=EditIssueState.id_incoming_storage,
                     on_change=EditIssueState.on_change_id_incoming_storage,
                 ),
-                rx.text("Владелец:"),
+                rx.text("Власник:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -281,22 +286,22 @@ def edit_tab_content() -> rx.Component:
                     value=EditIssueState.id_incoming_owner,
                     on_change=EditIssueState.on_change_id_incoming_owner,
                 ),
-                rx.text("Место назначения:"),
+                rx.text("Місце призначення:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
                         rx.vstack(
                             rx.hstack(
                                 rx.button(
-                                    "Поиск",
+                                    "Пошук",
                                     type="button",
                                     on_click=EditIssueState.on_click_search_name_destination_storage,
                                 ),
                                 rx.input(
-                                    placeholder="Введите название для поиска",
+                                    placeholder="Введіть назву для пошуку",
                                     width="100%",
                                     value=EditIssueState.search_name_destination_storage,
                                     on_change=EditIssueState.on_change_search_name_destination_storage,
@@ -319,10 +324,10 @@ def edit_tab_content() -> rx.Component:
                     value=EditIssueState.id_destination_storage,
                     on_change=EditIssueState.on_change_id_destination_storage,
                 ),
-                rx.text("Получатель:"),
+                rx.text("Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         width="100%",
                     ),
                     rx.select.content(
@@ -344,14 +349,14 @@ def edit_tab_content() -> rx.Component:
                     rx.select(
                         EditIssueState.get_movement_statuses,
                         name="status",
-                        placeholder="Выберите из списка",
+                        placeholder="Оберіть зі списку",
                         required=True,
                         width="100%",
                         value=EditIssueState.status,
                         on_change=EditIssueState.on_change_status,
                     ),
                 ),
-                rx.text("Комментарий:"),
+                rx.text("Коментар:"),
                 rx.text_area(
                     name="comment",
                     width="100%",
@@ -360,12 +365,12 @@ def edit_tab_content() -> rx.Component:
                 ),
                 rx.hstack(
                     rx.button(
-                        "Отмена",
+                        "Скасувати",
                         color_scheme="red",
                         on_click=rx.redirect(routes.MOVEMENT_ISSUES),
                     ),
                     rx.button(
-                        "Сохранить",
+                        "Зберегти",
                         color_scheme="green",
                         type="submit",
                         on_click=EditIssueState.edit_one,
@@ -381,7 +386,7 @@ def edit_tab_content() -> rx.Component:
 def view_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.heading(
-            f"Выдача №{ViewIssueState.item.id}",
+            f"Видача №{ViewIssueState.item.id}",
             size="7",
             width="100%",
             margin_bottom="0.5em",
@@ -393,16 +398,16 @@ def view_tab_content() -> rx.Component:
                     f"Склад: {ViewIssueState.item.movement.incoming_storage.title}"
                 ),
                 rx.text(
-                    f"Владелец: {ViewIssueState.item.movement.incoming_owner.title}"
+                    f"Власник: {ViewIssueState.item.movement.incoming_owner.title}"
                 ),
                 rx.text(
-                    f"Место назначения: {ViewIssueState.item.movement.destination_storage.title}"
+                    f"Місце призначення: {ViewIssueState.item.movement.destination_storage.title}"
                 ),
-                rx.text(f"Получатель: {ViewIssueState.item.recipient.fio}"),
+                rx.text(f"Одержувач: {ViewIssueState.item.recipient.fio}"),
                 rx.text(
                     f"Статус: {ListIssueState.get_movement_statuses[ViewIssueState.item.movement.status]}"
                 ),
-                rx.text(f"Комментарий: {ViewIssueState.item.movement.comment}"),
+                rx.text(f"Коментар: {ViewIssueState.item.movement.comment}"),
                 products(width="100%"),
                 rx.hstack(
                     rx.button(
@@ -427,10 +432,14 @@ def view_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        list_tab_content(),
-        add_tab_content(),
-        view_tab_content(),
-        edit_tab_content(),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST),
+            list_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ISSUES_CREATE),
+            add_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ISSUES_VIEW),
+            view_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ISSUES_EDIT),
+            edit_tab_content()),
         value=IssueState.current_page,
         height="100%",
         width="100%",

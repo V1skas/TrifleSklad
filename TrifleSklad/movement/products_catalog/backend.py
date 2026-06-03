@@ -33,7 +33,7 @@ class MovementProductCatalogListState(rx.State):
             return None
         else:
             self.selected_item = -1
-            return rx.toast.error("Выбранный элемент вне диапазона")
+            return rx.toast.error("Обраний елемент поза діапазоном!")
 
     @rx.event
     def set_items(self, items: List[MovementProductsCatalog]):
@@ -76,7 +76,7 @@ class MovementProductCatalogListState(rx.State):
             self.open_dialog()
             return None
         else:
-            return rx.toast.error("Не выбрана запись для просмотра")
+            return rx.toast.error("Не обрано запис для перегляду!")
 
     @rx.event
     async def on_delete(self):
@@ -88,7 +88,7 @@ class MovementProductCatalogListState(rx.State):
             self.selected_item = -1
             return None
         else:
-            return rx.toast.error("Не выбрана запись для удаления")
+            return rx.toast.error("Не обрано запис для видалення!")
 
     @rx.event
     async def on_save(self):
@@ -111,7 +111,7 @@ class MovementProductCatalogListState(rx.State):
             self.total_cost += item.count * item.price
 
         self.close_dialog()
-        return rx.toast.success("Позиция добавлена/изменена успешно")
+        return rx.toast.success("Позицію збережено!")
 
 
 class MovementProductCatalogState(rx.State):
@@ -131,7 +131,7 @@ class MovementProductCatalogState(rx.State):
     count_error: bool = False
     price_error: bool = False
 
-    error_text: str = "Обнаружена ошибка"
+    error_text: str = "Виявлено помилку"
 
     current_page: str = ""
 

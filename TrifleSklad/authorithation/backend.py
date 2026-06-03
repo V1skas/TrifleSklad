@@ -68,9 +68,10 @@ class AuthorizationState(rx.State):
                 return None
 
             app_state = await self.get_state(AppState)
-            
+
             app_state.user = user
             app_state.user_actions = UserDAO.get_user_actions_by_id(user.login)
+            app_state.fio = UserDAO.get_user_fio_by_login(user.login)
 
             auth_token: str = generations.generate_auth_token()
             AuthTokenDAO.add_one(AuthToken(token=auth_token, id_user=user.login))

@@ -36,6 +36,12 @@ class MovementState(AppState):
 
     @rx.event
     def on_load(self):
+        if (not self.has_section_access("admissions")
+            and not self.has_section_access("write_offs")
+            and not self.has_section_access("movements")
+            and not self.has_section_access("issues")):
+            return rx.redirect(routes.WELCOME)
+        self.current_tab = ""
         result = self._check_path()
         if result is not None:
             return result

@@ -44,6 +44,30 @@ class Action(StrEnum):
     NDS_RATES_LIST = ("nds_rates:list", "Список ставок ПДВ", "Дозволяє переглядати список ставок ПДВ")
     NDS_RATES_VIEW = ("nds_rates:view", "Перегляд ставок ПДВ", "Дозволяє переглядати інформацію про ставки ПДВ")
 
+    ADMISSIONS_CREATE = ("admissions:create", "Додавання постачань", "Дозволяє створювати постачання")
+    ADMISSIONS_DELETE = ("admissions:delete", "Видалення постачань", "Дозволяє видаляти постачання")
+    ADMISSIONS_EDIT = ("admissions:edit", "Редагування постачань", "Дозволяє редагувати постачання")
+    ADMISSIONS_LIST = ("admissions:list", "Список постачань", "Дозволяє переглядати список постачань")
+    ADMISSIONS_VIEW = ("admissions:view", "Перегляд постачань", "Дозволяє переглядати інформацію про постачання")
+
+    WRITE_OFFS_CREATE = ("write_offs:create", "Додавання списань", "Дозволяє створювати списання")
+    WRITE_OFFS_DELETE = ("write_offs:delete", "Скасування списань", "Дозволяє скасовувати списання")
+    WRITE_OFFS_EDIT = ("write_offs:edit", "Редагування списань", "Дозволяє редагувати списання")
+    WRITE_OFFS_LIST = ("write_offs:list", "Список списань", "Дозволяє переглядати список списань")
+    WRITE_OFFS_VIEW = ("write_offs:view", "Перегляд списань", "Дозволяє переглядати інформацію про списання")
+
+    MOVEMENTS_CREATE = ("movements:create", "Додавання переміщень", "Дозволяє створювати переміщення")
+    MOVEMENTS_DELETE = ("movements:delete", "Скасування переміщень", "Дозволяє скасовувати переміщення")
+    MOVEMENTS_EDIT = ("movements:edit", "Редагування переміщень", "Дозволяє редагувати переміщення")
+    MOVEMENTS_LIST = ("movements:list", "Список переміщень", "Дозволяє переглядати список переміщень")
+    MOVEMENTS_VIEW = ("movements:view", "Перегляд переміщень", "Дозволяє переглядати інформацію про переміщення")
+
+    ISSUES_CREATE = ("issues:create", "Додавання видач", "Дозволяє створювати видачі")
+    ISSUES_DELETE = ("issues:delete", "Видалення видач", "Дозволяє видаляти видачі")
+    ISSUES_EDIT = ("issues:edit", "Редагування видач", "Дозволяє редагувати видачі")
+    ISSUES_LIST = ("issues:list", "Список видач", "Дозволяє переглядати список видач")
+    ISSUES_VIEW = ("issues:view", "Перегляд видач", "Дозволяє переглядати інформацію про видачі")
+
     STORAGE_CREATE = ("storage:create", "Додавання складів", "Дозволяє додавати склади")
     STORAGE_DELETE = ("storage:delete", "Видалення складів", "Дозволяє видаляти склади")
     STORAGE_EDIT = ("storage:edit", "Редагування складів", "Дозволяє редагувати інформацію про склади")

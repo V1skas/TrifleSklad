@@ -1,6 +1,6 @@
 import reflex as rx
-from docutils.nodes import decoration
 
+from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import movements_status_list
 
 from TrifleSklad import routes
@@ -10,6 +10,7 @@ from TrifleSklad.movement.products_catalog.frontend import index as products_cat
 from TrifleSklad.movement.admissions.backend import AdmissionState, AddAdmissionState, MovementProductCatalogAddEditFormState, MovementProductCatalogDetailedViewState
 from TrifleSklad.models import Admission
 from TrifleSklad.declared import MovementsStatus
+from TrifleSklad.state import AppState
 
 def movement_product_catalog_add_edit_form() -> rx.Component:
     return rx.vstack(
@@ -425,17 +426,21 @@ def item_preview() -> rx.Component:
         ),
         rx.spacer(),
         rx.hstack(
-            rx.button(
-                "Редагувати",
-
-                on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_EDIT_ID}{ViewAdmissionState.item.id}")
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_EDIT),
+                rx.button(
+                    "Редагувати",
+                    on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_EDIT_ID}{ViewAdmissionState.item.id}")
+                ),
             ),
             rx.spacer(),
-            rx.button(
-                "Видалити",
-                color_scheme="red",
-
-                on_click=AdmissionState.delete_one(ViewAdmissionState.item.id)
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_DELETE),
+                rx.button(
+                    "Видалити",
+                    color_scheme="red",
+                    on_click=AdmissionState.delete_one(ViewAdmissionState.item.id)
+                ),
             ),
 
             width="100%",
@@ -509,9 +514,12 @@ def list_tab_content() -> rx.Component:
             rx.hstack(
                 rx.heading("Постачання", size="6"),
                 rx.spacer(),
-                rx.button(
-                    "Додати",
-                    on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS_ADD)
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
+                    rx.button(
+                        "Додати",
+                        on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS_ADD)
+                    ),
                 ),
 
                 width="100%"
@@ -957,10 +965,14 @@ def edit_tab_content() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.tabs.root(
-        list_tab_content(),
-        add_tab_content(),
-        edit_tab_content(),
-        item_preview_tab_content(),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST),
+            list_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
+            add_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_EDIT),
+            edit_tab_content()),
+        rx.cond(AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_VIEW),
+            item_preview_tab_content()),
 
         value=AdmissionState.current_page,
 

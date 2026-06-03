@@ -13,7 +13,7 @@ def dialog():
             products_selector(
                 rx.hstack(
                     rx.spacer(),
-                    rx.button("Выбрать", type="button", on_click=ProductsMovementListState.on_save_selected)
+                    rx.button("Обрати", type="button", on_click=ProductsMovementListState.on_save_selected)
                 ),
                 width="100%",
                 height="100%"
@@ -37,7 +37,7 @@ def table_row(item: Tuple[int, Product]):
     return rx.table.row(
         rx.table.cell(item[1].id, width="1%", white_space="nowrap"),
         rx.table.cell(item[1].product_catalog.title),
-        rx.table.cell(rx.button("Удалить", color_scheme="red", on_click=ProductsMovementListState.on_remove_selected(item[0])), width="1", white_space="nowrap"),
+        rx.table.cell(rx.button("Видалити", color_scheme="red", on_click=ProductsMovementListState.on_remove_selected(item[0])), width="1", white_space="nowrap"),
     )
 
 def table():
@@ -46,11 +46,11 @@ def table():
             rx.cond(ProductsMovementListState.is_view_mode,
                     rx.table.row(
                         rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                        rx.table.column_header_cell("Название", color=rx.color("accent", 2))),
+                        rx.table.column_header_cell("Назва", color=rx.color("accent", 2))),
                     rx.table.row(
                         rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                        rx.table.column_header_cell("Название", color=rx.color("accent", 2)),
-                        rx.table.column_header_cell("Действие", color=rx.color("accent", 2), width="1%", white_space="nowrap")),
+                        rx.table.column_header_cell("Назва", color=rx.color("accent", 2)),
+                        rx.table.column_header_cell("Дія", color=rx.color("accent", 2), width="1%", white_space="nowrap")),
                     ),
 
             background_color=rx.color("accent", 9)
@@ -74,11 +74,11 @@ def table():
 def index(*args, **kwargs):
     return rx.vstack(
         rx.hstack(
-            rx.heading("Товары:", size="3"),
+            rx.heading("Товари:", size="3"),
             rx.spacer(),
             rx.cond(ProductsMovementListState.is_view_mode,
                     rx.Component(),
-                    rx.button("Добавить",
+                    rx.button("Додати",
                                 type="button",
                                 disabled=rx.cond(ProductsMovementListState.ability_open_dialog, False, True),
                                 on_click=ProductsMovementListState.open_dialog,
@@ -89,7 +89,7 @@ def index(*args, **kwargs):
         dialog(),
         rx.cond(ProductsMovementListState.has_items,
                 table(),
-                rx.center(rx.text("Ничего не выбрано", color="gray"), width="100%", size="3")),
+                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
 
         *args,
         **kwargs
