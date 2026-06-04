@@ -5,12 +5,20 @@ import reflex as rx
 
 import TrifleSklad.routes as routes
 from TrifleSklad.actions import Action as ActionEnum
-from TrifleSklad.dao import IssueDAO, OwnerDAO, ProductDAO, StorageDAO, WorkerDAO
+from TrifleSklad.dao import (
+    IssueDAO,
+    MovementDAO,
+    OwnerDAO,
+    ProductDAO,
+    StorageDAO,
+    WorkerDAO,
+)
 from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
     StorageType,
     movements_status_list,
+    movements_type_list,
 )
 from TrifleSklad.models import (
     Issue,
@@ -73,6 +81,12 @@ class ViewIssueState(rx.State):
 
     app_state: Optional[AppState] = None
 
+    # Cancel-conflict dialog
+    # ======================
+    cancel_conflict_movements: List[Movement] = []
+    is_cancel_conflict_dialog_open: bool = False
+    # ======================
+
     # Backend only
     # ======================
     @rx.event
@@ -106,7 +120,26 @@ class ViewIssueState(rx.State):
     def item_status(self) -> str:
         return movements_status_list[self.item.movement.status]
 
+    @rx.var
+    def current_is_canceled(self) -> bool:
+        return self.item is not None and self.item.movement.status == MovementsStatus.CANCELED
+
+    @rx.var
+    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str]]:
+        return [
+            (
+                str(m.id),
+                movements_type_list.get(m.type, "—"),
+                m.date,
+                movements_status_list[m.status],
+            )
+            for m in self.cancel_conflict_movements
+        ]
     # ======================
+
+    @rx.event
+    def set_cancel_conflict_dialog_open(self, value: bool):
+        self.is_cancel_conflict_dialog_open = value
 
 
 class AddIssueState(rx.State):
@@ -435,6 +468,14 @@ class EditIssueState(rx.State):
         await self.products_selector_state.on_load()
         self.products_selector_state.set_view_mode(True)
 
+        # Завантажуємо позиції видачі для відображення (склад позицій не редагується).
+        all_products: List[Product] = []
+        for product_category in self.item.movement.products_catalog:
+            for product in product_category.products:
+                product.product_catalog = product_category.product
+                all_products.append(product)
+        self.products_selector_state.items = all_products
+
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 
@@ -473,6 +514,15 @@ class EditIssueState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати» (з поверненням залишків).
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
     # ======================
 
     # Event handlers for form fields
@@ -549,6 +599,8 @@ class EditIssueState(rx.State):
         if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
             or self.item.id_recipient == -1 or self.products_selector_state is None or len(self.products_selector_state.items) == 0:
             return rx.toast.error("Не всі обов'язкові поля заповнені!")
+        if self.item.movement.status == MovementsStatus.CANCELED:
+            return rx.toast.error("Скасування виконується кнопкою «Скасувати», а не через редагування!")
 
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
@@ -621,6 +673,43 @@ class IssueState(rx.State):
         return self._check_path()
 
     @rx.event
-    def delete_one(self, id):
+    async def delete_one(self):
         if not self.app_state.has_permission(ActionEnum.ISSUES_DELETE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+
+        view_state = await self.get_state(ViewIssueState)
+        if view_state.item is None or view_state.products_selector_state is None:
+            return rx.toast.error("Не обрано запис для скасування!")
+        if view_state.item.movement.status == MovementsStatus.CANCELED:
+            return rx.toast.error("Видачу вже скасовано!")
+
+        list_id_products: List[int] = [
+            p.id for p in view_state.products_selector_state.items
+        ]
+
+        # Якщо товар бере участь у пізніших рухах — скасування заборонено.
+        # Показуємо перелік усіх рухів із цим товаром, починаючи з поточного.
+        related_movements = MovementDAO.get_with_products_from_id(
+            list_id_products, view_state.item.id
+        )
+        if any(m.id != view_state.item.id for m in related_movements):
+            view_state.cancel_conflict_movements = related_movements
+            view_state.is_cancel_conflict_dialog_open = True
+            return rx.toast.error(
+                "Скасування неможливе: товар бере участь у пізніших рухах!"
+            )
+
+        flag, text = MovementDAO.cancel_movement(view_state.item.id)
+        if not flag:
+            return rx.toast.error(text)
+
+        # Скасування видачі повертає ТМЦ на склад/власника відправлення.
+        ProductDAO.update_owner_storage(
+            list_id_products,
+            view_state.item.movement.id_incoming_owner,
+            view_state.item.movement.id_incoming_storage,
+        )
+        return [
+            rx.toast.success("Видачу скасовано!"),
+            rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{view_state.item.id}"),
+        ]

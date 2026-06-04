@@ -6,6 +6,13 @@ class MovementsType:
     MOVEMENT = 3
     ISSUE = 4
 
+movements_type_list: Dict[int, str] = {
+    MovementsType.ADMISSION: "Постачання",
+    MovementsType.WRITE_OFF: "Списання",
+    MovementsType.MOVEMENT: "Переміщення",
+    MovementsType.ISSUE: "Видача",
+}
+
 class StorageType:
     WAREHOUSE = 1
     TECHNICAL_SITE = 2

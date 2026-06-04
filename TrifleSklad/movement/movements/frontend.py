@@ -15,8 +15,58 @@ from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
 
 
+def cancel_conflict_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Скасування неможливе"),
+            rx.dialog.description(
+                "Товар із цього переміщення бере участь у наведених нижче рухах. "
+                "Спочатку скасуйте пізніші рухи."
+            ),
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("№"),
+                        rx.table.column_header_cell("Тип"),
+                        rx.table.column_header_cell("Дата"),
+                        rx.table.column_header_cell("Статус"),
+                    ),
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        ViewMovementsState.cancel_conflict_rows,
+                        lambda row: rx.table.row(
+                            rx.table.cell(row[0]),
+                            rx.table.cell(row[1]),
+                            rx.table.cell(row[2]),
+                            rx.table.cell(row[3]),
+                        ),
+                    ),
+                ),
+                variant="surface",
+                width="100%",
+                margin_top="1em",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        "Закрити",
+                        on_click=ViewMovementsState.set_cancel_conflict_dialog_open(False),
+                    ),
+                ),
+                justify="end",
+                margin_top="1em",
+            ),
+            max_width="42em",
+        ),
+        open=ViewMovementsState.is_cancel_conflict_dialog_open,
+        on_open_change=ViewMovementsState.set_cancel_conflict_dialog_open,
+    )
+
+
 def item_preview() -> rx.Component:
     return rx.vstack(
+        cancel_conflict_dialog(),
         rx.heading(f"Переміщення №{ViewMovementsState.item.id}", size="7", width="100%"),
         rx.hstack(
             rx.text("Дата:"),

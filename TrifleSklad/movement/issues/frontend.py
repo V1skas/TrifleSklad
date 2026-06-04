@@ -347,7 +347,7 @@ def edit_tab_content() -> rx.Component:
                 rx.hstack(
                     rx.text("Статус:"),
                     rx.select(
-                        EditIssueState.get_movement_statuses,
+                        EditIssueState.editable_statuses,
                         name="status",
                         placeholder="Оберіть зі списку",
                         required=True,
@@ -383,8 +383,58 @@ def edit_tab_content() -> rx.Component:
     )
 
 
+def cancel_conflict_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Скасування неможливе"),
+            rx.dialog.description(
+                "Товар із цієї видачі бере участь у наведених нижче рухах. "
+                "Спочатку скасуйте пізніші рухи."
+            ),
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("№"),
+                        rx.table.column_header_cell("Тип"),
+                        rx.table.column_header_cell("Дата"),
+                        rx.table.column_header_cell("Статус"),
+                    ),
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        ViewIssueState.cancel_conflict_rows,
+                        lambda row: rx.table.row(
+                            rx.table.cell(row[0]),
+                            rx.table.cell(row[1]),
+                            rx.table.cell(row[2]),
+                            rx.table.cell(row[3]),
+                        ),
+                    ),
+                ),
+                variant="surface",
+                width="100%",
+                margin_top="1em",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        "Закрити",
+                        on_click=ViewIssueState.set_cancel_conflict_dialog_open(False),
+                    ),
+                ),
+                justify="end",
+                margin_top="1em",
+            ),
+            max_width="42em",
+        ),
+        open=ViewIssueState.is_cancel_conflict_dialog_open,
+        on_open_change=ViewIssueState.set_cancel_conflict_dialog_open,
+    )
+
+
 def view_tab_content() -> rx.Component:
     return rx.tabs.content(
+        cancel_conflict_dialog(),
         rx.heading(
             f"Видача №{ViewIssueState.item.id}",
             size="7",
@@ -410,18 +460,26 @@ def view_tab_content() -> rx.Component:
                 rx.text(f"Коментар: {ViewIssueState.item.movement.comment}"),
                 products(width="100%"),
                 rx.hstack(
-                    rx.button(
-                        "Редактировать",
-                        on_click=rx.redirect(
-                            f"{routes.MOVEMENT_ISSUES_EDIT_ID}{ViewIssueState.item.id}"
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ISSUES_EDIT)
+                        & (ViewIssueState.current_is_canceled == False),
+                        rx.button(
+                            "Редагувати",
+                            on_click=rx.redirect(
+                                f"{routes.MOVEMENT_ISSUES_EDIT_ID}{ViewIssueState.item.id}"
+                            ),
                         ),
                     ),
                     rx.spacer(),
-                    # rx.button(
-                    #     "Удалить",
-                    #     color_scheme="red",
-                    #     on_click=IssueState.delete_one(ViewIssueState.item.id),
-                    # ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ISSUES_DELETE)
+                        & (ViewIssueState.current_is_canceled == False),
+                        rx.button(
+                            "Скасувати",
+                            color_scheme="red",
+                            on_click=IssueState.delete_one,
+                        ),
+                    ),
                     width="100%",
                 ),
             ),

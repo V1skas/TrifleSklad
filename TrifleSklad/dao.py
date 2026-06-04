@@ -1757,6 +1757,38 @@ class MovementDAO:
         except Exception as e:
             return False, f"Ошибка: {str(e)}"
 
+    @classmethod
+    def get_with_products_from_id(
+        cls, product_ids: List[int], from_movement_id: int
+    ) -> List[Movement]:
+        """Движения, в которые входят указанные товары, начиная с from_movement_id
+        (включительно), отсортированные по возрастанию id (порядку создания)."""
+        if len(product_ids) == 0:
+            return []
+
+        statement = (
+            select(Movement)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .join(
+                MovementProducts,
+                MovementProducts.id_movement_product == MovementProductsCatalog.id,
+            )
+            .where(MovementProducts.id_product.in_(product_ids))
+            .where(Movement.id >= from_movement_id)
+            .distinct()
+            .order_by(Movement.id)
+        )
+
+        with rx.session() as session:
+            movements = session.exec(statement).all()
+
+            if len(movements) > 0:
+                session.expunge_all()
+            return list(movements)
+
 
 class MovementProductsCatalogDAO:
     @classmethod
@@ -2407,7 +2439,7 @@ class IssueDAO:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
-                session.add(issue)
+                session.merge(issue)
                 session.commit()
                 return True, "Выдача успешно изменена", issue.id
 

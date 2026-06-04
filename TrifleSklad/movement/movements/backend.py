@@ -6,7 +6,12 @@ import reflex as rx
 import TrifleSklad.routes as routes
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.dao import MovementDAO, OwnerDAO, ProductDAO, StorageDAO
-from TrifleSklad.declared import MovementsStatus, MovementsType, movements_status_list
+from TrifleSklad.declared import (
+    MovementsStatus,
+    MovementsType,
+    movements_status_list,
+    movements_type_list,
+)
 from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
@@ -48,6 +53,12 @@ class ViewMovementsState(rx.State):
 
     app_state: Optional[AppState] = None
 
+    # Cancel-conflict dialog
+    # ======================
+    cancel_conflict_movements: List[Movement] = []
+    is_cancel_conflict_dialog_open: bool = False
+    # ======================
+
     # Dynamic variables
     # ======================
     @rx.var
@@ -57,7 +68,23 @@ class ViewMovementsState(rx.State):
     @rx.var
     def current_is_canceled(self) -> bool:
         return self.item is not None and self.item.status == MovementsStatus.CANCELED
+
+    @rx.var
+    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str]]:
+        return [
+            (
+                str(m.id),
+                movements_type_list.get(m.type, "—"),
+                m.date,
+                movements_status_list[m.status],
+            )
+            for m in self.cancel_conflict_movements
+        ]
     # ======================
+
+    @rx.event
+    def set_cancel_conflict_dialog_open(self, value: bool):
+        self.is_cancel_conflict_dialog_open = value
 
     # Action handlers
     # ======================
@@ -451,7 +478,43 @@ class MovementsState(rx.State):
         return self._check_path()
 
     @rx.event
-    def delete_one(self):
+    async def delete_one(self):
         if not self.app_state.has_permission(ActionEnum.MOVEMENTS_DELETE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        return rx.toast.info("Скасування переміщення поки що не підтримується.")
+
+        view_state = await self.get_state(ViewMovementsState)
+        if view_state.item is None or view_state.products_movement_list_state is None:
+            return rx.toast.error("Не обрано запис для скасування!")
+        if view_state.item.status == MovementsStatus.CANCELED:
+            return rx.toast.error("Переміщення вже скасовано!")
+
+        list_id_products: List[int] = [
+            p.id for p in view_state.products_movement_list_state.items
+        ]
+
+        # Якщо товар бере участь у пізніших рухах — скасування заборонено.
+        # Показуємо перелік усіх рухів із цим товаром, починаючи з поточного.
+        related_movements = MovementDAO.get_with_products_from_id(
+            list_id_products, view_state.item.id
+        )
+        if any(m.id != view_state.item.id for m in related_movements):
+            view_state.cancel_conflict_movements = related_movements
+            view_state.is_cancel_conflict_dialog_open = True
+            return rx.toast.error(
+                "Скасування неможливе: товар бере участь у пізніших рухах!"
+            )
+
+        flag, text = MovementDAO.cancel_movement(view_state.item.id)
+        if not flag:
+            return rx.toast.error(text)
+
+        # Скасування переміщення повертає ТМЦ на склад/власника відправлення.
+        ProductDAO.update_owner_storage(
+            list_id_products,
+            view_state.item.id_incoming_owner,
+            view_state.item.id_incoming_storage,
+        )
+        return [
+            rx.toast.success("Переміщення скасовано!"),
+            rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{view_state.item.id}"),
+        ]
