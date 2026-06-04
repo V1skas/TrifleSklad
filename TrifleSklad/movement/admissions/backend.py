@@ -659,7 +659,16 @@ class AddAdmissionState(rx.State):
     async def add_one(self):
         if not self.app_state.has_permission(ActionEnum.ADMISSIONS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+        if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
+            return rx.toast.error("Не обрано склад або власника призначення!")
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
+
+        # Товар поступає на склад призначення поставки — проставляємо склад/власника
+        # кожній одиниці ТМЦ, інакше залишки не знайдуться при списанні/русі.
+        for pc in self.item.movement.products_catalog:
+            for product in pc.products:
+                product.id_storage = self.item.movement.id_destination_storage
+                product.id_owner = self.item.movement.id_destination_owner
 
         flag, text, id = AdmissionDAO.add_one(self.item)
         if flag:
@@ -1065,7 +1074,15 @@ class EditAdmissionState(rx.State):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.item is None:
             return rx.toast.error("Запис не завантажено!")
+        if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
+            return rx.toast.error("Не обрано склад або власника призначення!")
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
+
+        # Синхронізуємо склад/власника одиниць ТМЦ зі складом призначення поставки.
+        for pc in self.item.movement.products_catalog:
+            for product in pc.products:
+                product.id_storage = self.item.movement.id_destination_storage
+                product.id_owner = self.item.movement.id_destination_owner
 
         flag, text, id = AdmissionDAO.edit_one(self.item)
         if flag:
@@ -1256,7 +1273,7 @@ class AdmissionState(rx.State):
                     return
                 id = self.router.page.params.get("id", "")
                 if id != "":
-                    yield ViewAdmissionState.on_load(id)
+                    yield ViewAdmissionState.on_load(int(id))
                 else:
                     yield rx.redirect(routes.MOVEMENT_ADMISSIONS)
                     return

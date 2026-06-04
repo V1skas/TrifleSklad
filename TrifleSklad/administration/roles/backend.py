@@ -148,7 +148,6 @@ class EditRoleState(rx.State):
 
     @rx.event
     def change_actions(self):
-        print(self.actions_state._get_selected_items())
         self.item.actions = self.actions_state._get_selected_items()
 
     @rx.event
@@ -162,8 +161,6 @@ class EditRoleState(rx.State):
         
         if len(self.item.actions) == 0 or self.item.title == "":
             return rx.toast.error("Заповніть всі обов'язкові поля!")
-        
-        print(self.item)
 
         flag, text, id = RoleDAO.edit_one(self.item)
         if flag:

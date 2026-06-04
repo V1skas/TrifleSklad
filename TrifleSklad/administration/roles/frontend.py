@@ -501,7 +501,7 @@ def selector_list() -> rx.Component:
 
 def selector(*child, **prop) -> rx.Component:
     return rx.vstack(
-        rx.heading("Выбор ролей:", size="8", color=rx.color("accent", 2), background_color=rx.color("accent", 9), width="100%", padding="0.5em"),
+        rx.heading("Вибір ролей:", size="8", color=rx.color("accent", 2), background_color=rx.color("accent", 9), width="100%", padding="0.5em"),
         rx.input(
             rx.input.slot(rx.icon("search")),
 

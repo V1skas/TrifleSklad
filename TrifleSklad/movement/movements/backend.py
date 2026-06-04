@@ -245,8 +245,8 @@ class AddMovementsState(rx.State):
         if flag:
             ProductDAO.update_owner_storage(
                 list_id_products,
-                self.id_destination_owner,
-                self.id_destination_storage,
+                int(self.id_destination_owner),
+                int(self.id_destination_storage),
             )
             return [
                 rx.toast.success("Переміщення проведено!"),

@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import TrifleSklad.routes as routes
 from TrifleSklad.models import Owner
-from TrifleSklad.dao import OwnerDAO
+from TrifleSklad.dao import OwnerDAO, ProductDAO
 
 from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
@@ -206,6 +206,9 @@ class OwnerState(rx.State):
         if id > -1:
             if not self.app_state.has_permission(ActionEnum.OWNERS_DELETE):
                 return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+
+            if ProductDAO.count_by_owner(id) > 0:
+                return rx.toast.error("Неможливо видалити власника, за яким закріплено ТМЦ!")
 
             flag, text = OwnerDAO.delete_one(id)
             if flag:

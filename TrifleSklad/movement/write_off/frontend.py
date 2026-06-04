@@ -27,7 +27,7 @@ def item_preview() -> rx.Component:
             rx.text(ViewWriteOffState.item.incoming_storage.title)
         ),
         rx.hstack(
-            rx.text("Одержувач:"),
+            rx.text("Власник:"),
             rx.text(ViewWriteOffState.item.incoming_owner.title)
         ),
         products(width="100%"),
@@ -93,7 +93,7 @@ def table() -> rx.Component:
                 rx.table.column_header_cell("№", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Дата", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Склад", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Одержувач", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Власник", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Статус", color=rx.color("accent", 2)),
             ),
 
@@ -187,7 +187,7 @@ def add_form() -> rx.Component:
                 value=AddWriteOffState.id_incoming_storage,
                 on_change=AddWriteOffState.on_change_id_incoming_storage,
             ),
-            rx.text("Одержувач:"),
+            rx.text("Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -285,7 +285,7 @@ def edit_form() -> rx.Component:
                 value=EditWriteOffState.id_incoming_storage,
                 on_change=EditWriteOffState.on_change_id_incoming_storage,
             ),
-            rx.text("Одержувач:"),
+            rx.text("Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",

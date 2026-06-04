@@ -386,10 +386,11 @@ class WriteOffState(rx.State):
         if not flag:
             return rx.toast.error(text)
 
-        list_id_item_for_delete: List[int] = [
+        # Скасування списання повертає товари у залишки (вони були "видалені" при списанні).
+        list_id_item_for_restore: List[int] = [
             p.id for p in view_state.products_movement_list_state.items
         ]
-        ProductDAO.delete_list(list_id_item_for_delete)
+        ProductDAO.undelete_list(list_id_item_for_restore)
         return [
             rx.toast.success("Списання скасовано!"),
             rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{view_state.item.id}"),

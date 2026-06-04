@@ -5,7 +5,7 @@ import reflex as rx
 
 import TrifleSklad.routes as routes
 from TrifleSklad.actions import Action as ActionEnum
-from TrifleSklad.dao import IssueDAO, OwnerDAO, StorageDAO, WorkerDAO
+from TrifleSklad.dao import IssueDAO, OwnerDAO, ProductDAO, StorageDAO, WorkerDAO
 from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
@@ -162,7 +162,7 @@ class AddIssueState(rx.State):
     def _load_destination_storages(self):
         self.list_destination_storages = [
             (item.title, str(item.id))
-            for item in StorageDAO.get_all()
+            for item in StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE)
             if self.search_name_destination_storage == ""
             or self.search_name_destination_storage.lower() in item.title.lower()
         ]
@@ -318,6 +318,8 @@ class AddIssueState(rx.State):
         if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
             or self.item.id_recipient == -1 or self.products_selector_state is None or len(self.products_selector_state.items) == 0:
             return rx.toast.error("Не всі обов'язкові поля заповнені!")
+        if self.item.movement.id_destination_storage == -1:
+            return rx.toast.error("Не обрано майданчик призначення!")
 
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
@@ -346,8 +348,15 @@ class AddIssueState(rx.State):
 
         self.item.movement.products_catalog = movement_products_catalog
 
+        list_id_products: List[int] = [p.id for p in products_list]
         flag, text, id = IssueDAO.add_one(self.item)
         if flag:
+            # Видача переміщує ТМЦ на майданчик призначення (власник лишається той самий).
+            ProductDAO.update_owner_storage(
+                list_id_products,
+                int(self.item.movement.id_destination_owner),
+                int(self.item.movement.id_destination_storage),
+            )
             return [
                 rx.toast.success(text),
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),
@@ -396,7 +405,7 @@ class EditIssueState(rx.State):
     def _load_destination_storages(self):
         self.list_destination_storages = [
             (item.title, str(item.id))
-            for item in StorageDAO.get_all()
+            for item in StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE)
             if self.search_name_destination_storage == ""
             or self.search_name_destination_storage.lower() in item.title.lower()
         ]
@@ -592,7 +601,7 @@ class IssueState(rx.State):
                     return
                 id = self.router.page.params.get("id", "")
                 if id != "":
-                    yield ViewIssueState.on_load(id)
+                    yield ViewIssueState.on_load(int(id))
                 else:
                     yield rx.redirect(routes.MOVEMENT_ISSUES)
                     return

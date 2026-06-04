@@ -9,7 +9,7 @@ from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
 
 from TrifleSklad.models import Storage, Worker
-from TrifleSklad.dao import StorageDAO, WorkerDAO
+from TrifleSklad.dao import ProductDAO, StorageDAO, WorkerDAO
 
 
 class ViewStorageState(rx.State):
@@ -349,6 +349,8 @@ class StorageState(rx.State):
         if id > -1:
             if not self.app_state.has_permission(ActionEnum.STORAGE_DELETE):
                 return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+            if ProductDAO.count_by_storage(id) > 0:
+                return rx.toast.error("Неможливо видалити склад, на якому є ТМЦ!")
             flag, text = StorageDAO.delete_one(id)
             if flag:
                 return [rx.toast.success(text), rx.redirect(routes.CATALOG_STORAGES)]

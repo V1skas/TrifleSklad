@@ -297,7 +297,7 @@ class ListProductsState(rx.State):
 
     def _load_items(self):
         self._all_pages, self.items = ProductCatalogDAO.get_all_with_relationships_by_page(page=self._current_page,
-                                                                                           count_items=ProductCatalogDAO.get_count_with_search(),
+                                                                                           count_items=ProductCatalogDAO.get_count_with_search(self.search_str),
                                                                                            limit=self._limit_items,
                                                                                            search_str=self.search_str)
 

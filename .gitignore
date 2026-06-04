@@ -30,6 +30,9 @@ dist/
 CLAUDE.md
 .claude/
 
+# Документация (ТЗ не коммитим)
+doc/ТЗ TrifleSklad.md
+
 # Разное
 .idea/
 *.swp

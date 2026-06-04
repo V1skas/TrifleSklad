@@ -300,15 +300,6 @@ class UserState(rx.State):
     app_state: Optional[AppState] = None
 
     def _check_path(self):
-        if not (
-            self.app_state.has_permission(ActionEnum.USERS_CREATE)
-            or self.app_state.has_permission(ActionEnum.USERS_EDIT)
-            or self.app_state.has_permission(ActionEnum.USERS_VIEW)
-            or self.app_state.has_permission(ActionEnum.USERS_LIST)
-        ):
-            yield rx.redirect(routes.WELCOME)
-            return
-
         page = self.router.page.params.get("page", "")
         if page != "":
             id = -1
@@ -318,9 +309,15 @@ class UserState(rx.State):
 
             # /users/add
             if page == self.Pages.ADD:
+                if not self.app_state.has_permission(ActionEnum.USERS_CREATE):
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 yield AddUserState.on_load()
             # /users/edit/[id]
             elif page == self.Pages.EDIT:
+                if not self.app_state.has_permission(ActionEnum.USERS_EDIT):
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get("id", "")
                 if id != "" and UserDAO.get_user_by_id(id) is not None:
                     yield EditUserState.on_load(id)
@@ -329,6 +326,9 @@ class UserState(rx.State):
                     return
             # /users/view/[id]
             elif page == self.Pages.VIEW:
+                if not self.app_state.has_permission(ActionEnum.USERS_VIEW):
+                    yield rx.redirect(routes.WELCOME)
+                    return
                 id = self.router.page.params.get("id", "")
                 if id != "" and UserDAO.get_user_by_id(id) is not None:
                     yield ViewUserState.on_load(id)
@@ -339,6 +339,9 @@ class UserState(rx.State):
             self.current_page = page
         else:
             # /users
+            if not self.app_state.has_permission(ActionEnum.USERS_LIST):
+                yield rx.redirect(routes.WELCOME)
+                return
             yield ListUserState.on_load()
             self.current_page = self.Pages.LIST
 
@@ -350,7 +353,10 @@ class UserState(rx.State):
 
     @rx.event
     def delete_one(self, login: str):
-        if login is not None or len(login) > 0:
+        if not self.app_state.has_permission(ActionEnum.USERS_DELETE):
+            return rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
+
+        if login is not None and len(login) > 0:
             flag, text = UserDAO.delete_one(login)
             if flag:
                 return [rx.redirect(routes.ADMIN_USERS), rx.toast.success(text)]

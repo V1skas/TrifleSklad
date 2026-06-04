@@ -1438,6 +1438,28 @@ class ProductDAO:
             return list(products)
 
     @classmethod
+    def count_by_storage(cls, storage_id: int) -> int:
+        statement = (
+            select(func.count(Product.id))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+
+    @classmethod
+    def count_by_owner(cls, owner_id: int) -> int:
+        statement = (
+            select(func.count(Product.id))
+            .where(Product.id_owner == owner_id)
+            .where(Product.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+
+    @classmethod
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         product = Product(**form_data)
 
