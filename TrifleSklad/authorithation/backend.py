@@ -80,7 +80,9 @@ class AuthorizationState(rx.State):
             return [rx.redirect(WELCOME), AuthorizationState.reset_all()]
             
         except SQLAlchemyError as e:
-            self.error_message = f"Помилка при обробці запиту. Зверніться до адміністратора."
+            self.flag_err = True
+            self.text_err = "Помилка при обробці запиту. Зверніться до адміністратора."
+            self.password = ""
             print(f"[AuthorizationState][ERROR] {e}")
 
     

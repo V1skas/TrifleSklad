@@ -13,8 +13,7 @@ class AppState(rx.State):
     auth_token: str = rx.LocalStorage(name="auth_token")
 
     def check_params(self):
-        print(self.router.page.path)
-        print(self.router.page.params)
+        pass
         
     @rx.var
     def get_user_actions(self) -> List[str]:
