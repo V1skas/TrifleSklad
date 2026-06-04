@@ -5,7 +5,6 @@ from TrifleSklad.declared import movements_status_list
 
 from TrifleSklad import routes
 from TrifleSklad.movement.admissions.backend import *
-from TrifleSklad.movement.products_catalog.frontend import index as products_catalog_table
 
 from TrifleSklad.movement.admissions.backend import AdmissionState, AddAdmissionState, MovementProductCatalogAddEditFormState, MovementProductCatalogDetailedViewState
 from TrifleSklad.models import Admission
