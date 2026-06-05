@@ -406,7 +406,13 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(row[2]),
+                            rx.table.cell(
+                                rx.link(
+                                    row[2],
+                                    on_click=rx.redirect(row[4]),
+                                    cursor="pointer",
+                                ),
+                            ),
                             rx.table.cell(row[3]),
                         ),
                     ),

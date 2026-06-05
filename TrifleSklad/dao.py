@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select, func
 
-from TrifleSklad.declared import MovementsStatus, get_status_by_text
+from TrifleSklad.declared import MovementsStatus
 from TrifleSklad.models import (
     Action,
     Admission,
@@ -1542,6 +1542,48 @@ class ProductDAO:
             return False, f"Ошибка: {str(e)}"
 
     @classmethod
+    def split_product(
+        cls, parent_id: int, amount: int
+    ) -> tuple[bool, str, Optional[Product]]:
+        """Відділяє від подільної одиниці товару частину обсягом `amount`:
+        створює нову дочірню одиницю (id_parent = parent_id) із вказаним count
+        у тому ж місці зберігання, а в батьківської одиниці зменшує count.
+        Заборонено відділяти весь обсяг (amount має бути < поточного count)."""
+        try:
+            with rx.session() as session:
+                parent = session.get(Product, parent_id)
+                if parent is None:
+                    return False, "Помилка: одиницю товару не знайдено", None
+                if amount < 1 or amount >= parent.count:
+                    return (
+                        False,
+                        "Помилка: некоректний обсяг для розділення одиниці товару",
+                        None,
+                    )
+
+                child = Product(
+                    serial_number=parent.serial_number,
+                    id_product_catalog=parent.id_product_catalog,
+                    id_storage=parent.id_storage,
+                    id_owner=parent.id_owner,
+                    id_parent=parent.id,
+                    count=amount,
+                    is_deleted=False,
+                )
+                parent.count -= amount
+
+                session.add(child)
+                session.add(parent)
+                session.commit()
+                session.refresh(child)
+                session.expunge(child)
+                return True, "Одиницю товару розділено", child
+
+        except SQLAlchemyError as e:
+            print("[ProductDAO] split_product: ", e)
+            return False, f"Ошибка: {str(e)}", None
+
+    @classmethod
     def update_owner_storage(
         cls, id_list: List[int], new_owner_id: int, new_storage_id: int
     ) -> tuple[bool, str]:
@@ -1671,7 +1713,7 @@ class MovementDAO:
                 movement.type = form_data.get("type")
                 movement.date = form_data.get("date")
                 movement.comment = form_data.get("comment")
-                movement.status = get_status_by_text(form_data.get("status"))
+                movement.status = form_data.get("status")
                 movement.total_cost = 0.0
                 movement.id_user = form_data["id_user"]
 
@@ -1788,6 +1830,60 @@ class MovementDAO:
             if len(movements) > 0:
                 session.expunge_all()
             return list(movements)
+
+    @classmethod
+    def restore_products_to_previous_location(
+        cls, product_ids: List[int], current_movement_id: int
+    ) -> tuple[bool, str]:
+        """Повертає кожну одиницю товару на місце, куди її привів попередній рух —
+        рух із максимальним id < current_movement_id, що містить цю одиницю і не
+        скасований. За точку призначення береться destination_owner/destination_storage
+        того руху (наскрізна нумерація рухів = порядок у часі). Якщо попереднього руху
+        немає або в нього не задано місце призначення — одиниця залишається на місці."""
+        if len(product_ids) == 0:
+            return True, "Нет единиц для возврата"
+        try:
+            with rx.session() as session:
+                for product_id in product_ids:
+                    statement = (
+                        select(Movement)
+                        .join(
+                            MovementProductsCatalog,
+                            MovementProductsCatalog.id_movement == Movement.id,
+                        )
+                        .join(
+                            MovementProducts,
+                            MovementProducts.id_movement_product
+                            == MovementProductsCatalog.id,
+                        )
+                        .where(MovementProducts.id_product == product_id)
+                        .where(Movement.id < current_movement_id)
+                        .where(Movement.status != MovementsStatus.CANCELED)
+                        .order_by(Movement.id.desc())
+                        .limit(1)
+                    )
+                    previous = session.exec(statement).first()
+                    if previous is None:
+                        continue
+                    if (
+                        previous.id_destination_owner is None
+                        or previous.id_destination_storage is None
+                    ):
+                        continue
+
+                    product = session.get(Product, product_id)
+                    if product is None:
+                        continue
+                    product.id_owner = previous.id_destination_owner
+                    product.id_storage = previous.id_destination_storage
+                    session.add(product)
+
+                session.commit()
+                return True, "Единицы товара возвращены на предыдущее место"
+
+        except SQLAlchemyError as e:
+            print("[MovementDAO] restore_products_to_previous_location: ", e)
+            return False, f"Ошибка: {str(e)}"
 
 
 class MovementProductsCatalogDAO:

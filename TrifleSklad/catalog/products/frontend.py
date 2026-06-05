@@ -271,7 +271,7 @@ def add_form() -> rx.Component:
                 id="units-datalist"
             ),
             rx.text("Місткість", size="3", width="100%"),
-            rx.input(id="capacity", required=True, size="3", width="100%", value=AddProductsState.capacity, on_change=AddProductsState.on_change_capacity),
+            rx.input(id="capacity", required=True, size="3", width="100%", value=AddProductsState.capacity, on_change=AddProductsState.on_change_capacity, disabled=AddProductsState.uniq),
             rx.checkbox(
                 text="Має серійний номер",
                 id="uniq",
@@ -284,7 +284,8 @@ def add_form() -> rx.Component:
                 id="divisible",
                 size="3",
                 checked=AddProductsState.divisible,
-                on_change=AddProductsState.on_change_divisible
+                on_change=AddProductsState.on_change_divisible,
+                disabled=AddProductsState.uniq
             ),
 
             spacing="3",
@@ -381,7 +382,7 @@ def edit_form() -> rx.Component:
                 id="units-datalist"
             ),
             rx.text("Місткість", size="3", width="100%"),
-            rx.input(id="capacity", required=True, size="3", width="100%", value=EditProductsState.capacity, on_change=EditProductsState.on_change_capacity),
+            rx.input(id="capacity", required=True, size="3", width="100%", value=EditProductsState.capacity, on_change=EditProductsState.on_change_capacity, disabled=EditProductsState.uniq),
             rx.checkbox(
                 "Має серійний номер",
                 id="uniq",
@@ -394,7 +395,8 @@ def edit_form() -> rx.Component:
                 id="divisible",
                 size="3",
                 checked=EditProductsState.divisible,
-                on_change=EditProductsState.on_change_divisible
+                on_change=EditProductsState.on_change_divisible,
+                disabled=EditProductsState.uniq
             ),
 
             spacing="3",

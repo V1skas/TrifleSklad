@@ -150,24 +150,41 @@ class AddProductsState(rx.State):
 
     @rx.event
     def on_change_divisible(self, value: bool):
+        # Товар із серійним номером (uniq) не може бути подільним.
+        if self.item.uniq:
+            self.item.divisible = False
+            return
         self.item.divisible = value
 
     @rx.event
     def on_change_capacity(self, value: str):
+        # Товар із серійним номером завжди має місткість 1.
+        if self.item.uniq:
+            self.item.capacity = 1
+            return
         self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
 
     @rx.event
     def on_change_uniq(self, value: bool):
         self.item.uniq = value
+        if value:
+            # Серійний номер ⇒ неподільний, місткість = 1.
+            self.item.divisible = False
+            self.item.capacity = 1
 
     @rx.event
     def add_one(self):
         if not self.app_state.has_permission(ActionEnum.PRODUCTS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        
+
         if self.item.title is None or self.item.id_category is None:
             return rx.toast.error("Усі обов'язкові поля мають бути заповненими!")
-        
+
+        if self.item.uniq and self.item.divisible:
+            return rx.toast.error("Товар із серійним номером не може бути подільним!")
+        if self.item.uniq:
+            self.item.capacity = 1
+
         flag, text, id = ProductCatalogDAO.add_one(self.item)
         if flag:
             return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]
@@ -262,24 +279,41 @@ class EditProductsState(rx.State):
 
     @rx.event
     def on_change_divisible(self, value: bool):
+        # Товар із серійним номером (uniq) не може бути подільним.
+        if self.item.uniq:
+            self.item.divisible = False
+            return
         self.item.divisible = value
 
     @rx.event
     def on_change_capacity(self, value: str):
+        # Товар із серійним номером завжди має місткість 1.
+        if self.item.uniq:
+            self.item.capacity = 1
+            return
         self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
 
     @rx.event
     def on_change_uniq(self, value: bool):
         self.item.uniq = value
+        if value:
+            # Серійний номер ⇒ неподільний, місткість = 1.
+            self.item.divisible = False
+            self.item.capacity = 1
 
     @rx.event
     def edit_one(self):
         if not self.app_state.has_permission(ActionEnum.PRODUCTS_EDIT):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        
+
         if self.item.title is None or self.item.id_category is None:
             return rx.toast.error("Усі обов'язкові поля мають бути заповненими!")
-        
+
+        if self.item.uniq and self.item.divisible:
+            return rx.toast.error("Товар із серійним номером не може бути подільним!")
+        if self.item.uniq:
+            self.item.capacity = 1
+
         flag, text, id = ProductCatalogDAO.edit_one(self.item)
         if flag:
             return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]

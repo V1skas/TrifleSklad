@@ -6,12 +6,21 @@ from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
 
+def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
+    # Для подільного ТМЦ показуємо поточну ємність, для решти — серійний номер.
+    return rx.cond(
+        item[1].product_catalog.divisible,
+        rx.text(f"Ємність: {item[1].count}", size="1", user_select="none"),
+        rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+    )
+
+
 def selector_item(item: Tuple[int, Product]) -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.heading(item[1].product_catalog.title, size="3", user_select="none"),
             rx.text(f"id: {item[1].id}", size="1", user_select="none"),
-            rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+            product_detail_line(item),
             spacing="0",
             width="100%",
         ),
@@ -48,7 +57,7 @@ def selector_item_selected(item: Tuple[int, Product]) -> rx.Component:
                     user_select="none",
                 ),
                 rx.text(f"id: {item[1].id}", size="1", user_select="none"),
-                rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+                product_detail_line(item),
                 flex="1",
                 spacing="0",
                 height="100%",

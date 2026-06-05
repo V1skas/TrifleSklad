@@ -6,7 +6,12 @@ import reflex as rx
 import TrifleSklad.routes as routes
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.dao import MovementDAO, OwnerDAO, ProductDAO, StorageDAO
-from TrifleSklad.declared import MovementsStatus, MovementsType, movements_status_list
+from TrifleSklad.declared import (
+    MovementsStatus,
+    MovementsType,
+    movements_status_list,
+    movements_type_list,
+)
 from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
@@ -48,6 +53,12 @@ class ViewWriteOffState(rx.State):
 
     app_state: Optional[AppState] = None
 
+    # Cancel-conflict dialog
+    # ======================
+    cancel_conflict_movements: List[Movement] = []
+    is_cancel_conflict_dialog_open: bool = False
+    # ======================
+
     # Dynamic variables
     # ======================
     @rx.var
@@ -57,7 +68,24 @@ class ViewWriteOffState(rx.State):
     @rx.var
     def current_is_canceled(self) -> bool:
         return self.item is not None and self.item.status == MovementsStatus.CANCELED
+
+    @rx.var
+    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str, str]]:
+        return [
+            (
+                str(m.id),
+                movements_type_list.get(m.type, "—"),
+                m.date,
+                movements_status_list[m.status],
+                routes.movement_view_url(m.type, m.id),
+            )
+            for m in self.cancel_conflict_movements
+        ]
     # ======================
+
+    @rx.event
+    def set_cancel_conflict_dialog_open(self, value: bool):
+        self.is_cancel_conflict_dialog_open = value
 
     # Action handlers
     # ======================
@@ -119,6 +147,15 @@ class AddWriteOffState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати» (з поверненням залишків).
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
     # ======================
 
     # Action handlers
@@ -186,6 +223,11 @@ class AddWriteOffState(rx.State):
         if self.products_movement_list_state is None or len(self.products_movement_list_state.items) == 0:
             return rx.toast.error("Список товарів для списання порожній!")
 
+        # Розділення подільного ТМЦ: підсумковий перелік одиниць (з дочірніми частинами).
+        ok, msg, products_list = self.products_movement_list_state.resolve_movement_products()
+        if not ok:
+            return rx.toast.error(msg)
+
         form_data = {
             "type": MovementsType.WRITE_OFF,
             "date": self.current_date,
@@ -193,11 +235,11 @@ class AddWriteOffState(rx.State):
             "id_incoming_owner": int(self.id_incoming_owner),
             "status": self._status_index(),
             "comment": self.comment,
-            "movement_products_list": self.products_movement_list_state.items,
+            "movement_products_list": products_list,
             "id_user": (await self.get_state(AppState)).user.login,
         }
 
-        list_id_item_for_delete: List[int] = [p.id for p in self.products_movement_list_state.items]
+        list_id_item_for_delete: List[int] = [p.id for p in products_list]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
             ProductDAO.delete_list(list_id_item_for_delete)
@@ -247,6 +289,24 @@ class EditWriteOffState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати» (з поверненням залишків).
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
+    # ======================
+
+    # Backend only
+    # ======================
+    def _status_index(self) -> int:
+        for index, status_text in enumerate(movements_status_list):
+            if status_text == self.status:
+                return index
+        return MovementsStatus.CREATED
     # ======================
 
     # Action handlers
@@ -270,7 +330,7 @@ class EditWriteOffState(rx.State):
 
         self.products_movement_list_state = await self.get_state(ProductsMovementListState)
         await self.products_movement_list_state.on_load()
-        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_view_mode(True)
 
         all_products: List[Product] = []
         for product_category in self.item.products_catalog:
@@ -311,8 +371,30 @@ class EditWriteOffState(rx.State):
     def edit_one(self):
         if not self.app_state.has_permission(ActionEnum.WRITE_OFFS_EDIT):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        # Реалізація редагування списання поки не підтримується.
-        return rx.toast.info("Редагування списання поки що не підтримується.")
+        if self.item is None:
+            return rx.toast.error("Запис не завантажено!")
+        if self.item.status == MovementsStatus.CANCELED:
+            return rx.toast.error("Списання вже скасовано!")
+
+        status_index = self._status_index()
+        if status_index == MovementsStatus.CANCELED:
+            return rx.toast.error(
+                "Скасування виконується кнопкою «Скасувати», а не через редагування!"
+            )
+
+        # Склад/власник/позиції списання не редагуються — змінюються лише статус і коментар.
+        form_data = {
+            "id": self.item.id,
+            "status": status_index,
+            "comment": self.item.comment,
+        }
+        flag, text, id = MovementDAO.edit_one(form_data)
+        if flag:
+            return [
+                rx.toast.success("Списання змінено!"),
+                rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}"),
+            ]
+        return rx.toast.error(text)
     # ======================
 
 
@@ -381,16 +463,32 @@ class WriteOffState(rx.State):
         view_state = await self.get_state(ViewWriteOffState)
         if view_state.item is None or view_state.products_movement_list_state is None:
             return rx.toast.error("Не обрано запис для скасування!")
+        if view_state.item.status == MovementsStatus.CANCELED:
+            return rx.toast.error("Списання вже скасовано!")
+
+        list_id_products: List[int] = [
+            p.id for p in view_state.products_movement_list_state.items
+        ]
+
+        # Якщо товар бере участь у пізніших рухах (за наскрізним номером) —
+        # скасування заборонено. Показуємо перелік усіх рухів із цим товаром,
+        # починаючи з поточного.
+        related_movements = MovementDAO.get_with_products_from_id(
+            list_id_products, view_state.item.id
+        )
+        if any(m.id != view_state.item.id for m in related_movements):
+            view_state.cancel_conflict_movements = related_movements
+            view_state.is_cancel_conflict_dialog_open = True
+            return rx.toast.error(
+                "Скасування неможливе: товар бере участь у пізніших рухах!"
+            )
 
         flag, text = MovementDAO.cancel_movement(view_state.item.id)
         if not flag:
             return rx.toast.error(text)
 
         # Скасування списання повертає товари у залишки (вони були "видалені" при списанні).
-        list_id_item_for_restore: List[int] = [
-            p.id for p in view_state.products_movement_list_state.items
-        ]
-        ProductDAO.undelete_list(list_id_item_for_restore)
+        ProductDAO.undelete_list(list_id_products)
         return [
             rx.toast.success("Списання скасовано!"),
             rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{view_state.item.id}"),

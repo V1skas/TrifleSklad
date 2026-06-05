@@ -351,8 +351,64 @@ def view_admission_products_catalog_table() -> rx.Component:
         width="100%",
     )
 
+def cancel_conflict_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Видалення неможливе"),
+            rx.dialog.description(
+                "Товар із цього постачання бере участь у наведених нижче рухах. "
+                "Спочатку скасуйте пізніші рухи."
+            ),
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("№"),
+                        rx.table.column_header_cell("Тип"),
+                        rx.table.column_header_cell("Дата"),
+                        rx.table.column_header_cell("Статус"),
+                    ),
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        ViewAdmissionState.cancel_conflict_rows,
+                        lambda row: rx.table.row(
+                            rx.table.cell(row[0]),
+                            rx.table.cell(row[1]),
+                            rx.table.cell(
+                                rx.link(
+                                    row[2],
+                                    on_click=rx.redirect(row[4]),
+                                    cursor="pointer",
+                                ),
+                            ),
+                            rx.table.cell(row[3]),
+                        ),
+                    ),
+                ),
+                variant="surface",
+                width="100%",
+                margin_top="1em",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        "Закрити",
+                        on_click=ViewAdmissionState.set_cancel_conflict_dialog_open(False),
+                    ),
+                ),
+                justify="end",
+                margin_top="1em",
+            ),
+            max_width="42em",
+        ),
+        open=ViewAdmissionState.is_cancel_conflict_dialog_open,
+        on_open_change=ViewAdmissionState.set_cancel_conflict_dialog_open,
+    )
+
+
 def item_preview() -> rx.Component:
     return rx.vstack(
+        cancel_conflict_dialog(),
         rx.heading(f"Постачання №{ViewAdmissionState.item.id}", size="7", width="100%"),
         rx.hstack(
             rx.text("Дата:"),
@@ -711,7 +767,7 @@ def add_form() -> rx.Component:
                 rx.hstack(
                     rx.text("Статус:"),
                     rx.select(
-                        AddAdmissionState.get_movement_statuses,
+                        AddAdmissionState.editable_statuses,
 
                         name="status",
                         placeholder="Оберіть зі списку",

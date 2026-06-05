@@ -15,8 +15,64 @@ from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
 
 
+def cancel_conflict_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Скасування неможливе"),
+            rx.dialog.description(
+                "Товар із цього списання бере участь у наведених нижче рухах. "
+                "Спочатку скасуйте пізніші рухи."
+            ),
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("№"),
+                        rx.table.column_header_cell("Тип"),
+                        rx.table.column_header_cell("Дата"),
+                        rx.table.column_header_cell("Статус"),
+                    ),
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        ViewWriteOffState.cancel_conflict_rows,
+                        lambda row: rx.table.row(
+                            rx.table.cell(row[0]),
+                            rx.table.cell(row[1]),
+                            rx.table.cell(
+                                rx.link(
+                                    row[2],
+                                    on_click=rx.redirect(row[4]),
+                                    cursor="pointer",
+                                ),
+                            ),
+                            rx.table.cell(row[3]),
+                        ),
+                    ),
+                ),
+                variant="surface",
+                width="100%",
+                margin_top="1em",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        "Закрити",
+                        on_click=ViewWriteOffState.set_cancel_conflict_dialog_open(False),
+                    ),
+                ),
+                justify="end",
+                margin_top="1em",
+            ),
+            max_width="42em",
+        ),
+        open=ViewWriteOffState.is_cancel_conflict_dialog_open,
+        on_open_change=ViewWriteOffState.set_cancel_conflict_dialog_open,
+    )
+
+
 def item_preview() -> rx.Component:
     return rx.vstack(
+        cancel_conflict_dialog(),
         rx.heading(f"Списання №{ViewWriteOffState.item.id}", size="7", width="100%"),
         rx.hstack(
             rx.text("Дата:"),
@@ -41,6 +97,15 @@ def item_preview() -> rx.Component:
         ),
         rx.spacer(),
         rx.hstack(
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_EDIT) & (ViewWriteOffState.current_is_canceled == False),
+                rx.button(
+                    "Редагувати",
+                    on_click=rx.redirect(
+                        f"{routes.MOVEMENT_WRITE_OFFS_EDIT_ID}{ViewWriteOffState.item.id}"
+                    ),
+                ),
+            ),
             rx.spacer(),
             rx.cond(
                 AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_DELETE) & (ViewWriteOffState.current_is_canceled == False),
@@ -208,7 +273,7 @@ def add_form() -> rx.Component:
             rx.hstack(
                 rx.text("Статус:"),
                 rx.select(
-                    AddWriteOffState.get_movement_statuses,
+                    AddWriteOffState.editable_statuses,
                     placeholder="Оберіть зі списку",
                     required=True,
                     value=AddWriteOffState.status,
@@ -258,30 +323,14 @@ def edit_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.select.content(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.button(
-                                "Пошук",
-                                type="button",
-                                on_click=EditWriteOffState.on_click_search_name_incoming_storage,
-                            ),
-                            rx.input(
-                                value=EditWriteOffState.search_name_incoming_storage,
-                                on_change=EditWriteOffState.on_change_search_name_incoming_storage,
-                                placeholder="Введіть назву для пошуку",
-                                width="100%",
-                            ),
-                            width="100%",
-                        ),
-                        rx.foreach(
-                            EditWriteOffState.list_storages,
-                            lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
-                        ),
-                        width="100%",
+                    rx.foreach(
+                        EditWriteOffState.list_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
                     ),
                     width="100%",
                 ),
                 required=True,
+                disabled=True,
                 value=EditWriteOffState.id_incoming_storage,
                 on_change=EditWriteOffState.on_change_id_incoming_storage,
             ),
@@ -299,6 +348,7 @@ def edit_form() -> rx.Component:
                     width="100%",
                 ),
                 required=True,
+                disabled=True,
                 value=EditWriteOffState.id_incoming_owner,
                 on_change=EditWriteOffState.on_change_id_incoming_owner,
             ),
@@ -306,7 +356,7 @@ def edit_form() -> rx.Component:
             rx.hstack(
                 rx.text("Статус:"),
                 rx.select(
-                    EditWriteOffState.get_movement_statuses,
+                    EditWriteOffState.editable_statuses,
                     placeholder="Оберіть зі списку",
                     required=True,
                     value=EditWriteOffState.status,

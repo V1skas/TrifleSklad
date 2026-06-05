@@ -193,6 +193,8 @@ class Product(rx.Model, table=True):
     id_product_catalog: int = Field(foreign_key="products_catalog.id", nullable=False)
     id_storage: int = Field(foreign_key="storages.id", nullable=False)
     id_owner: int = Field(foreign_key="owners.id", nullable=False)
+    # Для подільного ТМЦ: посилання на одиницю-«батька», від якої відділили цю частину.
+    id_parent: Optional[int] = Field(default=None, foreign_key="products.id", nullable=True)
     count: int = Field(default=1, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 

@@ -26,7 +26,7 @@ class MovementsStatus:
     CLOSED = 2
     CANCELED = 3
 
-movements_status_list: List[str] = ["Создано", "В работе", "Закрыто", "Отменено"]
+movements_status_list: List[str] = ["Створено", "В роботі", "Закрито", "Скасовано"]
 
 def get_status_by_text(text: str) -> Optional[int]:
     for index, status in enumerate(movements_status_list):

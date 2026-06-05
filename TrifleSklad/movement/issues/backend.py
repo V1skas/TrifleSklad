@@ -125,13 +125,14 @@ class ViewIssueState(rx.State):
         return self.item is not None and self.item.movement.status == MovementsStatus.CANCELED
 
     @rx.var
-    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str]]:
+    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str, str]]:
         return [
             (
                 str(m.id),
                 movements_type_list.get(m.type, "—"),
                 m.date,
                 movements_status_list[m.status],
+                routes.movement_view_url(m.type, m.id),
             )
             for m in self.cancel_conflict_movements
         ]
@@ -356,9 +357,13 @@ class AddIssueState(rx.State):
 
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
+        # Розділення подільного ТМЦ: підсумковий перелік одиниць (з дочірніми частинами).
+        ok, msg, products_list = self.products_selector_state.resolve_movement_products()
+        if not ok:
+            return rx.toast.error(msg)
+
         products_catalog: List[ProductCatalog] = []
         movement_products_catalog: List[MovementProductsCatalog] = []
-        products_list: List[Product] = self.products_selector_state.items
 
         for product in products_list:
             if product.product_catalog not in products_catalog:
@@ -703,11 +708,10 @@ class IssueState(rx.State):
         if not flag:
             return rx.toast.error(text)
 
-        # Скасування видачі повертає ТМЦ на склад/власника відправлення.
-        ProductDAO.update_owner_storage(
-            list_id_products,
-            view_state.item.movement.id_incoming_owner,
-            view_state.item.movement.id_incoming_storage,
+        # Скасування видачі повертає кожну одиницю ТМЦ туди, куди її привів
+        # попередній рух (за наскрізним номером), а не просто на склад відправлення.
+        MovementDAO.restore_products_to_previous_location(
+            list_id_products, view_state.item.id
         )
         return [
             rx.toast.success("Видачу скасовано!"),

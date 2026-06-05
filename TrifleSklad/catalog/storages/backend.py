@@ -287,7 +287,7 @@ class StorageState(rx.State):
         return [(str(key), value) for key, value in declared.storage_type_list.items()]
     
     @rx.var
-    def get_titles_type_storages_dict_as_dict(self) -> Dict[str, str]:
+    def get_titles_type_storages_dict_as_dict(self) -> Dict[int, str]:
         return declared.storage_type_list
 
     def _check_path(self):

@@ -89,3 +89,20 @@ MOVEMENT_ISSUES = "/movement/issues/"
 MOVEMENT_ISSUES_VIEW_ID = "/movement/issues/view/"
 MOVEMENT_ISSUES_EDIT_ID = "/movement/issues/edit/"
 MOVEMENT_ISSUES_ADD = "/movement/issues/add/"
+
+
+# Нумерація рухів наскрізна, але кожен тип живе у власній підсекції.
+# Хелпер будує посилання на перегляд руху з потрібного розділу за його типом.
+from TrifleSklad.declared import MovementsType  # noqa: E402
+
+_MOVEMENT_VIEW_ROUTES = {
+    MovementsType.ADMISSION: MOVEMENT_ADMISSIONS_VIEW_ID,
+    MovementsType.WRITE_OFF: MOVEMENT_WRITE_OFFS_VIEW_ID,
+    MovementsType.MOVEMENT: MOVEMENT_MOVEMENTS_VIEW_ID,
+    MovementsType.ISSUE: MOVEMENT_ISSUES_VIEW_ID,
+}
+
+
+def movement_view_url(movement_type: int, movement_id: int) -> str:
+    base = _MOVEMENT_VIEW_ROUTES.get(movement_type, "")
+    return f"{base}{movement_id}" if base else ""

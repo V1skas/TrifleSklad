@@ -7,6 +7,7 @@ import TrifleSklad.routes as routes
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.dao import (
     AdmissionDAO,
+    MovementDAO,
     NDSRateDAO,
     OwnerDAO,
     PaymentTypeDAO,
@@ -19,6 +20,7 @@ from TrifleSklad.declared import (
     MovementsType,
     StorageType,
     movements_status_list,
+    movements_type_list,
 )
 from TrifleSklad.models import (
     Admission,
@@ -570,6 +572,15 @@ class AddAdmissionState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати» (з поверненням залишків).
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
 
     @rx.var
     def item_movement_products_catalog_list(
@@ -1151,6 +1162,29 @@ class ViewAdmissionState(rx.State):
 
     # ======================
 
+    # Cancel-conflict dialog
+    # ======================
+    cancel_conflict_movements: List[Movement] = []
+    is_cancel_conflict_dialog_open: bool = False
+
+    @rx.var
+    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str, str]]:
+        return [
+            (
+                str(m.id),
+                movements_type_list.get(m.type, "—"),
+                m.date,
+                movements_status_list[m.status],
+                routes.movement_view_url(m.type, m.id),
+            )
+            for m in self.cancel_conflict_movements
+        ]
+
+    @rx.event
+    def set_cancel_conflict_dialog_open(self, value: bool):
+        self.is_cancel_conflict_dialog_open = value
+    # ======================
+
     # Getters for form fields
     # ======================
     @rx.var
@@ -1293,13 +1327,33 @@ class AdmissionState(rx.State):
         return self._check_path()
 
     @rx.event
-    def delete_one(self, id):
-        if id != -1:
-            if not self.app_state.has_permission(ActionEnum.ADMISSIONS_DELETE):
-                return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-            flag, text = AdmissionDAO.delete_one(id)
-            if flag:
-                return [rx.toast.success(text), rx.redirect(routes.MOVEMENT_ADMISSIONS)]
-            else:
-                return [rx.toast.error(text)]
-        return rx.toast.error("Не обрано запис для видалення!")
+    async def delete_one(self, id):
+        if id == -1:
+            return rx.toast.error("Не обрано запис для видалення!")
+        if not self.app_state.has_permission(ActionEnum.ADMISSIONS_DELETE):
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+
+        view_state = await self.get_state(ViewAdmissionState)
+
+        # Одиниці товару, що надійшли цим постачанням.
+        list_id_products: List[int] = [
+            product.id
+            for pc in view_state.item.movement.products_catalog
+            for product in pc.products
+        ]
+
+        # Якщо товар бере участь у пізніших рухах (за наскрізним номером) —
+        # видалення заборонено. Показуємо перелік рухів із цим товаром,
+        # починаючи з поточного.
+        related_movements = MovementDAO.get_with_products_from_id(list_id_products, id)
+        if any(m.id != id for m in related_movements):
+            view_state.cancel_conflict_movements = related_movements
+            view_state.is_cancel_conflict_dialog_open = True
+            return rx.toast.error(
+                "Видалення неможливе: товар бере участь у пізніших рухах!"
+            )
+
+        flag, text = AdmissionDAO.delete_one(id)
+        if flag:
+            return [rx.toast.success(text), rx.redirect(routes.MOVEMENT_ADMISSIONS)]
+        return rx.toast.error(text)

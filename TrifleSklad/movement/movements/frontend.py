@@ -38,7 +38,13 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(row[2]),
+                            rx.table.cell(
+                                rx.link(
+                                    row[2],
+                                    on_click=rx.redirect(row[4]),
+                                    cursor="pointer",
+                                ),
+                            ),
                             rx.table.cell(row[3]),
                         ),
                     ),
@@ -99,6 +105,15 @@ def item_preview() -> rx.Component:
         ),
         rx.spacer(),
         rx.hstack(
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_EDIT) & (ViewMovementsState.current_is_canceled == False),
+                rx.button(
+                    "Редагувати",
+                    on_click=rx.redirect(
+                        f"{routes.MOVEMENT_MOVEMENTS_EDIT_ID}{ViewMovementsState.item.id}"
+                    ),
+                ),
+            ),
             rx.spacer(),
             rx.cond(
                 AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_DELETE) & (ViewMovementsState.current_is_canceled == False),
@@ -321,7 +336,7 @@ def add_form() -> rx.Component:
             rx.hstack(
                 rx.text("Статус:"),
                 rx.select(
-                    AddMovementsState.get_movement_statuses,
+                    AddMovementsState.editable_statuses,
                     placeholder="Оберіть зі списку",
                     required=True,
                     value=AddMovementsState.status,
@@ -362,10 +377,134 @@ def add_tab_content() -> rx.Component:
     )
 
 
+def edit_form() -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.text("Дата:"),
+            rx.input(
+                value=EditMovementsState.item.date,
+                type="date",
+                required=True,
+                size="3",
+                disabled=True,
+            ),
+            rx.text("Склад відправлення:"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%",
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        EditMovementsState.list_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=True,
+                value=EditMovementsState.id_incoming_storage,
+                on_change=EditMovementsState.on_change_id_incoming_storage,
+            ),
+            rx.text("Власник відправлення:"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%",
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        EditMovementsState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=True,
+                value=EditMovementsState.id_incoming_owner,
+                on_change=EditMovementsState.on_change_id_incoming_owner,
+            ),
+            rx.text("Склад призначення:"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%",
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        EditMovementsState.list_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=True,
+                value=EditMovementsState.id_destination_storage,
+                on_change=EditMovementsState.on_change_id_destination_storage,
+            ),
+            rx.text("Власник призначення:"),
+            rx.select.root(
+                rx.select.trigger(
+                    placeholder="Оберіть зі списку",
+                    width="100%",
+                ),
+                rx.select.content(
+                    rx.foreach(
+                        EditMovementsState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=True,
+                value=EditMovementsState.id_destination_owner,
+                on_change=EditMovementsState.on_change_id_destination_owner,
+            ),
+            products(width="100%"),
+            rx.hstack(
+                rx.text("Статус:"),
+                rx.select(
+                    EditMovementsState.editable_statuses,
+                    placeholder="Оберіть зі списку",
+                    required=True,
+                    value=EditMovementsState.status,
+                    on_change=EditMovementsState.on_change_status,
+                ),
+            ),
+            rx.text("Коментар:"),
+            rx.text_area(
+                value=EditMovementsState.item.comment,
+                on_change=EditMovementsState.on_change_comment,
+            ),
+            rx.hstack(
+                rx.button(
+                    "Скасувати",
+                    color_scheme="red",
+                    on_click=rx.redirect(
+                        f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{EditMovementsState.item.id}"
+                    ),
+                ),
+                rx.button(
+                    "Зберегти",
+                    color_scheme="green",
+                    on_click=EditMovementsState.edit_one,
+                ),
+
+                justify="end",
+            ),
+
+            align="stretch",
+        ),
+
+        height="100%",
+        width="100%",
+    )
+
+
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.heading("Редагування переміщення", size="7", width="100%", margin_bottom="0.5em"),
-        rx.text("Редагування переміщення поки що не реалізовано."),
+        edit_form(),
 
         value=MovementsState.Pages.EDIT,
     )

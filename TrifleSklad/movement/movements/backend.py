@@ -70,13 +70,14 @@ class ViewMovementsState(rx.State):
         return self.item is not None and self.item.status == MovementsStatus.CANCELED
 
     @rx.var
-    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str]]:
+    def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str, str]]:
         return [
             (
                 str(m.id),
                 movements_type_list.get(m.type, "—"),
                 m.date,
                 movements_status_list[m.status],
+                routes.movement_view_url(m.type, m.id),
             )
             for m in self.cancel_conflict_movements
         ]
@@ -168,6 +169,15 @@ class AddMovementsState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати» (з поверненням залишків).
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
     # ======================
 
     # Action handlers
@@ -254,6 +264,11 @@ class AddMovementsState(rx.State):
         if self.products_movement_list_state is None or len(self.products_movement_list_state.items) == 0:
             return rx.toast.error("Список товарів для переміщення порожній!")
 
+        # Розділення подільного ТМЦ: підсумковий перелік одиниць (з дочірніми частинами).
+        ok, msg, products_list = self.products_movement_list_state.resolve_movement_products()
+        if not ok:
+            return rx.toast.error(msg)
+
         form_data = {
             "type": MovementsType.MOVEMENT,
             "date": self.current_date,
@@ -263,11 +278,11 @@ class AddMovementsState(rx.State):
             "id_destination_owner": int(self.id_destination_owner),
             "status": self._status_index(),
             "comment": self.comment,
-            "movement_products_list": self.products_movement_list_state.items,
+            "movement_products_list": products_list,
             "id_user": (await self.get_state(AppState)).user.login,
         }
 
-        list_id_products: List[int] = [p.id for p in self.products_movement_list_state.items]
+        list_id_products: List[int] = [p.id for p in products_list]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
             ProductDAO.update_owner_storage(
@@ -308,6 +323,12 @@ class EditMovementsState(rx.State):
 
     def _load_list_owners(self):
         self.list_owners = [(item.title, str(item.id)) for item in OwnerDAO.get_all()]
+
+    def _status_index(self) -> int:
+        for index, status_text in enumerate(movements_status_list):
+            if status_text == self.status:
+                return index
+        return MovementsStatus.CREATED
     # ======================
 
     # Dynamic variables
@@ -331,6 +352,15 @@ class EditMovementsState(rx.State):
     @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
+
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати» (з поверненням залишків).
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
     # ======================
 
     # Action handlers
@@ -358,7 +388,7 @@ class EditMovementsState(rx.State):
 
         self.products_movement_list_state = await self.get_state(ProductsMovementListState)
         await self.products_movement_list_state.on_load()
-        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_view_mode(True)
 
         all_products: List[Product] = []
         for product_category in self.item.products_catalog:
@@ -415,7 +445,30 @@ class EditMovementsState(rx.State):
     def edit_one(self):
         if not self.app_state.has_permission(ActionEnum.MOVEMENTS_EDIT):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        return rx.toast.info("Редагування переміщення поки що не підтримується.")
+        if self.item is None:
+            return rx.toast.error("Запис не завантажено!")
+        if self.item.status == MovementsStatus.CANCELED:
+            return rx.toast.error("Переміщення вже скасовано!")
+
+        status_index = self._status_index()
+        if status_index == MovementsStatus.CANCELED:
+            return rx.toast.error(
+                "Скасування виконується кнопкою «Скасувати», а не через редагування!"
+            )
+
+        # Склади/власники/позиції переміщення не редагуються — змінюються лише статус і коментар.
+        form_data = {
+            "id": self.item.id,
+            "status": status_index,
+            "comment": self.item.comment,
+        }
+        flag, text, id = MovementDAO.edit_one(form_data)
+        if flag:
+            return [
+                rx.toast.success("Переміщення змінено!"),
+                rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}"),
+            ]
+        return rx.toast.error(text)
     # ======================
 
 
@@ -508,11 +561,10 @@ class MovementsState(rx.State):
         if not flag:
             return rx.toast.error(text)
 
-        # Скасування переміщення повертає ТМЦ на склад/власника відправлення.
-        ProductDAO.update_owner_storage(
-            list_id_products,
-            view_state.item.id_incoming_owner,
-            view_state.item.id_incoming_storage,
+        # Скасування переміщення повертає кожну одиницю ТМЦ туди, куди її привів
+        # попередній рух (за наскрізним номером), а не просто на склад відправлення.
+        MovementDAO.restore_products_to_previous_location(
+            list_id_products, view_state.item.id
         )
         return [
             rx.toast.success("Переміщення скасовано!"),
