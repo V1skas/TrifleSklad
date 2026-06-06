@@ -64,6 +64,12 @@ CATALOG_NDS_RATES_VIEW_ID = "/catalog/nds_rates/view/"
 CATALOG_NDS_RATES_EDIT_ID = "/catalog/nds_rates/edit/"
 CATALOG_NDS_RATES_ADD = "/catalog/nds_rates/add/"
 
+CATALOG_REQUESTS = "/catalog/requests/"
+CATALOG_REQUESTS_VIEW_ID = "/catalog/requests/view/"
+CATALOG_REQUESTS_EDIT_ID = "/catalog/requests/edit/"
+CATALOG_REQUESTS_ADD = "/catalog/requests/add/"
+CATALOG_REQUESTS_PROCESS_ID = "/catalog/requests/process/"
+
 MOVEMENT_TAB = "/movement/[tab]/"
 MOVEMENT_TAB_PAGE = "/movement/[tab]/[page]/"
 MOVEMENT_TAB_PAGE_ID = "/movement/[tab]/[page]/[id]/"

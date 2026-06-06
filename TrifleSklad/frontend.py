@@ -53,7 +53,7 @@ def navbar() -> rx.Component:
                     navbar_link("Адміністрування", routes.ADMIN),
                 ),
                 rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST) | AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST) | AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST) | AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST) | AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST) | AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST) | AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
+                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST) | AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST) | AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST) | AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST) | AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST) | AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST) | AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
                     navbar_link("Каталог", routes.CATALOG),
                 ),
                 rx.cond(

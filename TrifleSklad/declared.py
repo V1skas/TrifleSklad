@@ -18,9 +18,11 @@ movements_type_list: Dict[int, str] = {
 class StorageType:
     WAREHOUSE = 1
     TECHNICAL_SITE = 2
+    DEPARTMENT = 3
 
 storage_type_list: Dict[int, str] = {StorageType.WAREHOUSE: "Склад",
-                     StorageType.TECHNICAL_SITE: "Тех. площадка"}
+                     StorageType.TECHNICAL_SITE: "Тех. площадка",
+                     StorageType.DEPARTMENT: "Відділ"}
 
 class MovementsStatus:
     CREATED = 0
@@ -29,6 +31,13 @@ class MovementsStatus:
     CANCELED = 3
 
 movements_status_list: List[str] = ["Створено", "В роботі", "Закрито", "Скасовано"]
+
+
+class RequestStatus:
+    NEW = 0
+    COMPLETED = 1
+
+request_status_list: List[str] = ["Нова", "Виконана"]
 
 def get_status_by_text(text: str) -> Optional[int]:
     for index, status in enumerate(movements_status_list):

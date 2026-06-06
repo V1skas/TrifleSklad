@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select, func
 
-from TrifleSklad.declared import MovementsStatus, MovementsType
+from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus
 from TrifleSklad.models import (
     Action,
     Admission,
@@ -23,6 +23,8 @@ from TrifleSklad.models import (
     Product,
     ProductCatalog,
     ProductCategory,
+    Request,
+    RequestProductsCatalog,
     Role,
     RolesActions,
     Sale,
@@ -2939,3 +2941,162 @@ class SaleDAO:
         except SQLAlchemyError as e:
             print("[SaleDAO] SQLAlchemyError: ", e)
             return False, f"Помилка: {str(e)}", -1
+
+
+class RequestDAO:
+    @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        statuses: Optional[List[int]] = None,
+        author_login: Optional[str] = None,
+    ) -> tuple[int, List[Request]]:
+        """Сторінкований перелік заявок. `statuses` — фільтр за статусом,
+        `author_login` (якщо задано) обмежує вибірку заявками цього автора
+        (для користувача без права бачити всі заявки)."""
+        conditions = [Request.is_deleted == False]
+        if statuses:
+            conditions.append(Request.status.in_(statuses))
+        if author_login is not None:
+            conditions.append(Request.id_author == author_login)
+
+        count_stmt = select(func.count(Request.id))
+        for cond in conditions:
+            count_stmt = count_stmt.where(cond)
+
+        with rx.session() as session:
+            total = session.exec(count_stmt).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = select(Request).options(
+                joinedload(Request.author).joinedload(User.worker),
+                joinedload(Request.responsible),
+                joinedload(Request.destination_storage),
+            )
+            for cond in conditions:
+                statement = statement.where(cond)
+            statement = statement.order_by(Request.id.desc()).offset(skip).limit(limit)
+
+            requests = session.exec(statement).all()
+            if len(requests) > 0:
+                session.expunge_all()
+            return total_pages, list(requests)
+
+    @classmethod
+    def get_by_id_with_relationships(cls, id: int) -> Optional[Request]:
+        statement = (
+            select(Request)
+            .options(
+                joinedload(Request.author).joinedload(User.worker),
+                joinedload(Request.responsible),
+                joinedload(Request.destination_storage),
+                joinedload(Request.movement),
+                selectinload(Request.products_catalog).joinedload(
+                    RequestProductsCatalog.product
+                ),
+            )
+            .where(Request.id == id)
+            .where(Request.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            request = session.exec(statement).unique().one_or_none()
+            if request is not None:
+                session.expunge_all()
+            return request
+
+    @classmethod
+    def add_one(cls, request: Request) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
+                session.add(request)
+                session.commit()
+                return True, "Заявку успішно створено!", request.id
+
+        except IntegrityError as e:
+            print("[RequestDAO] IntegrityError: ", e)
+            return False, "Помилка! Заявка не може бути створена.", -1
+        except SQLAlchemyError as e:
+            print("[RequestDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Редагування заявки (лише невиконаної): тип/отримувач/призначення/
+        коментар + перелік позицій. Позиції повністю перестворюються."""
+        try:
+            with rx.session() as session:
+                request = session.get(Request, form_data["id"])
+                if request is None:
+                    return False, "Помилка: заявку не знайдено", -1
+                if request.status == RequestStatus.COMPLETED:
+                    return False, "Помилка: виконану заявку не можна редагувати", -1
+
+                for key in (
+                    "type",
+                    "id_responsible",
+                    "id_destination_storage",
+                    "comment",
+                ):
+                    if key in form_data:
+                        setattr(request, key, form_data[key])
+
+                if "positions" in form_data:
+                    for old in session.exec(
+                        select(RequestProductsCatalog).where(
+                            RequestProductsCatalog.id_request == request.id
+                        )
+                    ).all():
+                        session.delete(old)
+                    for catalog_id, count in form_data["positions"]:
+                        session.add(
+                            RequestProductsCatalog(
+                                id_request=request.id,
+                                id_product_catalog=catalog_id,
+                                count=count,
+                            )
+                        )
+
+                session.commit()
+                return True, "Заявку успішно змінено!", request.id
+
+        except IntegrityError as e:
+            print("[RequestDAO] IntegrityError: ", e)
+            return False, "Помилка! Заявка не може бути змінена.", -1
+        except SQLAlchemyError as e:
+            print("[RequestDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!", -1
+
+    @classmethod
+    def mark_completed(cls, id: int, id_movement: int) -> tuple[bool, str]:
+        try:
+            with rx.session() as session:
+                request = session.get(Request, id)
+                if request is None:
+                    return False, "Помилка: заявку не знайдено"
+                request.status = RequestStatus.COMPLETED
+                request.id_movement = id_movement
+                session.commit()
+                return True, "Заявку виконано"
+
+        except SQLAlchemyError as e:
+            print("[RequestDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
+
+    @classmethod
+    def delete_one(cls, id: int) -> tuple[bool, str]:
+        try:
+            with rx.session() as session:
+                request = session.get(Request, id)
+                if request is None:
+                    return False, "Помилка: заявку не знайдено"
+                request.is_deleted = True
+                session.commit()
+                return True, "Заявку видалено"
+
+        except SQLAlchemyError as e:
+            print("[RequestDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"

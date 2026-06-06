@@ -18,6 +18,7 @@ import TrifleSklad.catalog.storages as storages
 import TrifleSklad.catalog.suppliers as suppliers
 import TrifleSklad.catalog.payment_types as payment_types
 import TrifleSklad.catalog.nds_rates as nds_rates
+import TrifleSklad.catalog.requests as requests
 
 def categories_tab() -> rx.Component:
     return rx.tabs.content(
@@ -103,6 +104,18 @@ def nds_rates_tab() -> rx.Component:
         value=CatalogState.Tabs.NDS_RATES,
     )
 
+def requests_tab() -> rx.Component:
+    return rx.tabs.content(
+        rx.vstack(
+            requests.frontend.index(),
+
+            width="100%",
+            height="100%",
+        ),
+
+        value=CatalogState.Tabs.REQUESTS,
+    )
+
 def index():
     return rx.hstack(
         sidebar(
@@ -134,6 +147,11 @@ def index():
                 AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
                 sidebar_link("Ставки ПДВ", routes.CATALOG_NDS_RATES),
             ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST)
+                | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
+                sidebar_link("Заявки на видачу", routes.CATALOG_REQUESTS),
+            ),
         ),
         workspace(
             categories_tab(),
@@ -143,6 +161,7 @@ def index():
             suppliers_tab(),
             payment_types_tab(),
             nds_rates_tab(),
+            requests_tab(),
 
             size="4",
 

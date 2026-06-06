@@ -324,3 +324,39 @@ class Sale(rx.Model, table=True):
     # Relationship
     responsible: Optional[Worker] = Relationship(back_populates="sales")
     movement: Optional[Movement] = Relationship()
+
+
+class Request(rx.Model, table=True):
+    __tablename__ = "requests"
+
+    # Table columns
+    id: int = Field(primary_key=True)
+    type: int = Field(nullable=False)  # MovementsType.ISSUE / SALE
+    id_author: str = Field(foreign_key="users.login", nullable=False)
+    id_responsible: Optional[int] = Field(default=None, foreign_key="workers.id", nullable=True)
+    id_destination_storage: Optional[int] = Field(default=None, foreign_key="storages.id", nullable=True)
+    date: str = Field(nullable=False)
+    comment: Optional[str] = Field(nullable=True)
+    status: int = Field(default=0, nullable=False)  # RequestStatus
+    id_movement: Optional[int] = Field(default=None, foreign_key="movements.id", nullable=True)
+    is_deleted: bool = Field(default=False, nullable=False)
+
+    # Relationship
+    author: Optional['User'] = Relationship()
+    responsible: Optional['Worker'] = Relationship()
+    destination_storage: Optional['Storage'] = Relationship()
+    movement: Optional['Movement'] = Relationship()
+    products_catalog: Optional[List['RequestProductsCatalog']] = Relationship()
+
+
+class RequestProductsCatalog(rx.Model, table=True):
+    __tablename__ = "requests_products_catalog"
+
+    # Table columns
+    id: int = Field(primary_key=True)
+    id_request: int = Field(foreign_key="requests.id", nullable=False)
+    id_product_catalog: int = Field(foreign_key="products_catalog.id", nullable=False)
+    count: int = Field(default=0, nullable=False)
+
+    # Relationship
+    product: Optional['ProductCatalog'] = Relationship()
