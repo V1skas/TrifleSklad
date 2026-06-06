@@ -1,5 +1,7 @@
 import reflex as rx
 
+from components.elements import subpage_header
+
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import movements_status_list
 
@@ -408,8 +410,6 @@ def cancel_conflict_dialog() -> rx.Component:
 
 def item_preview() -> rx.Component:
     return rx.vstack(
-        cancel_conflict_dialog(),
-        rx.heading(f"Постачання №{ViewAdmissionState.item.id}", size="7", width="100%"),
         rx.hstack(
             rx.text("Дата:"),
             rx.text(ViewAdmissionState.item.movement.date)
@@ -479,29 +479,9 @@ def item_preview() -> rx.Component:
             rx.text("Коментар:"),
             rx.text(ViewAdmissionState.item.movement.comment)
         ),
-        rx.spacer(),
-        rx.hstack(
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_EDIT),
-                rx.button(
-                    "Редагувати",
-                    on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_EDIT_ID}{ViewAdmissionState.item.id}")
-                ),
-            ),
-            rx.spacer(),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_DELETE),
-                rx.button(
-                    "Видалити",
-                    color_scheme="red",
-                    on_click=AdmissionState.delete_one(ViewAdmissionState.item.id)
-                ),
-            ),
-
-            width="100%",
-        ),
 
         spacing="3",
+        align="stretch",
 
         height="100%",
         width="100%"
@@ -509,8 +489,43 @@ def item_preview() -> rx.Component:
 
 def item_preview_tab_content() -> rx.Component:
     return rx.tabs.content(
-        item_preview(),
-
+        rx.vstack(
+            cancel_conflict_dialog(),
+            subpage_header(
+                "Постачання/Перегляд",
+                left=rx.button(
+                    "Повернутись",
+                    variant="ghost",
+                    size="3",
+                    on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS),
+                ),
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_EDIT),
+                        rx.button(
+                            "Редагувати",
+                            variant="ghost",
+                            size="3",
+                            on_click=rx.redirect(
+                                f"{routes.MOVEMENT_ADMISSIONS_EDIT_ID}{ViewAdmissionState.item.id}"
+                            ),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_DELETE),
+                        rx.button(
+                            "Видалити",
+                            color_scheme="red",
+                            variant="ghost",
+                            size="3",
+                            on_click=AdmissionState.delete_one(ViewAdmissionState.item.id),
+                        ),
+                    ),
+                ],
+            ),
+            item_preview(),
+            width="100%",
+        ),
         value=AdmissionState.Pages.VIEW
     )
 
@@ -566,18 +581,19 @@ def table() -> rx.Component:
 def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
-            rx.hstack(
-                rx.heading("Постачання", size="6"),
-                rx.spacer(),
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
-                    rx.button(
-                        "Додати",
-                        on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS_ADD)
+            subpage_header(
+                "Постачання",
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
+                        rx.button(
+                            "Додати",
+                            variant="ghost",
+                            size="3",
+                            on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS_ADD),
+                        ),
                     ),
-                ),
-
-                width="100%"
+                ],
             ),
             rx.cond(ListAdmissionState.has_items,
                 table(),
@@ -720,21 +736,35 @@ def add_form() -> rx.Component:
                     on_change=AddAdmissionState.on_change_invoice_number,
                 ),
                 rx.text("Ставка ПДВ:"),
-                rx.select.root(
-                    rx.select.trigger(
-                        placeholder="Без ПДВ",
-                        width="100%",
-                    ),
-                    rx.select.content(
-                        rx.foreach(
-                            AddAdmissionState.list_nds_rates,
-                            lambda nr: rx.select.item(nr[0], value=nr[1])
+                rx.hstack(
+                    rx.select.root(
+                        rx.select.trigger(
+                            placeholder="Без ПДВ",
+                            width="100%",
                         ),
+                        rx.select.content(
+                            rx.foreach(
+                                AddAdmissionState.list_nds_rates,
+                                lambda nr: rx.select.item(nr[0], value=nr[1])
+                            ),
+                            width="100%",
+                        ),
+                        name="id_nds_rate",
+                        value=AddAdmissionState.id_nds_rate,
+                        on_change=AddAdmissionState.on_change_id_nds_rate,
                         width="100%",
                     ),
-                    name="id_nds_rate",
-                    value=AddAdmissionState.id_nds_rate,
-                    on_change=AddAdmissionState.on_change_id_nds_rate,
+                    rx.button(
+                        rx.icon("x", size=16),
+                        type="button",
+                        variant="soft",
+                        color_scheme="gray",
+                        title="Скинути ставку ПДВ",
+                        disabled=AddAdmissionState.id_nds_rate == "",
+                        on_click=AddAdmissionState.on_change_id_nds_rate(""),
+                    ),
+                    width="100%",
+                    align="center",
                 ),
                 rx.hstack(
                     rx.switch(
@@ -779,16 +809,11 @@ def add_form() -> rx.Component:
                     ),
                 ),
                 rx.text("Коментар:"),
-                rx.text_area(name="comment", value=AddAdmissionState.item.movement.comment, on_change=AddAdmissionState.on_change_comment),
+                rx.text_area(name="comment", value=AddAdmissionState.item.movement.comment, on_change=AddAdmissionState.on_change_comment, width="100%"),
 
-                rx.hstack(
-                    rx.button("Скасувати", type="reset", color_scheme="red", on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS)),
-                    rx.button("Зберегти", color_scheme="green", type="submit", on_click=AddAdmissionState.add_one),
-
-                    justify="end"
-                ),
-
-                align="stretch"
+                spacing="3",
+                align="stretch",
+                width="100%",
             ),
 
         height="100%",
@@ -925,21 +950,35 @@ def edit_form() -> rx.Component:
                     on_change=EditAdmissionState.on_change_invoice_number,
                 ),
                 rx.text("Ставка ПДВ:"),
-                rx.select.root(
-                    rx.select.trigger(
-                        placeholder="Без ПДВ",
-                        width="100%",
-                    ),
-                    rx.select.content(
-                        rx.foreach(
-                            EditAdmissionState.list_nds_rates,
-                            lambda nr: rx.select.item(nr[0], value=nr[1])
+                rx.hstack(
+                    rx.select.root(
+                        rx.select.trigger(
+                            placeholder="Без ПДВ",
+                            width="100%",
                         ),
+                        rx.select.content(
+                            rx.foreach(
+                                EditAdmissionState.list_nds_rates,
+                                lambda nr: rx.select.item(nr[0], value=nr[1])
+                            ),
+                            width="100%",
+                        ),
+                        name="id_nds_rate",
+                        value=EditAdmissionState.id_nds_rate,
+                        on_change=EditAdmissionState.on_change_id_nds_rate,
                         width="100%",
                     ),
-                    name="id_nds_rate",
-                    value=EditAdmissionState.id_nds_rate,
-                    on_change=EditAdmissionState.on_change_id_nds_rate,
+                    rx.button(
+                        rx.icon("x", size=16),
+                        type="button",
+                        variant="soft",
+                        color_scheme="gray",
+                        title="Скинути ставку ПДВ",
+                        disabled=EditAdmissionState.id_nds_rate == "",
+                        on_click=EditAdmissionState.on_change_id_nds_rate(""),
+                    ),
+                    width="100%",
+                    align="center",
                 ),
                 rx.hstack(
                     rx.switch(
@@ -986,16 +1025,11 @@ def edit_form() -> rx.Component:
                     ),
                 ),
                 rx.text("Коментар:"),
-                rx.text_area(name="comment", value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment),
+                rx.text_area(name="comment", value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment, width="100%"),
 
-                rx.hstack(
-                    rx.button("Скасувати", type="reset", color_scheme="red", on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS)),
-                    rx.button("Зберегти", color_scheme="green", type="submit", on_click=EditAdmissionState.edit_one),
-
-                    justify="end"
-                ),
-
-                align="stretch"
+                spacing="3",
+                align="stretch",
+                width="100%",
             ),
 
         height="100%",
@@ -1004,17 +1038,59 @@ def edit_form() -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Додавання постачання", size="7", width="100%", margin_bottom="0.5em"),
-        add_form(),
-
+        rx.vstack(
+            subpage_header(
+                "Постачання/Додавання",
+                left=rx.button(
+                    "Скасувати",
+                    variant="ghost",
+                    size="3",
+                    on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS),
+                ),
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
+                        rx.button(
+                            "Зберегти",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddAdmissionState.add_one,
+                        ),
+                    ),
+                ],
+            ),
+            add_form(),
+            width="100%",
+        ),
         value=AdmissionState.Pages.ADD
     )
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редагування постачання", size="7", width="100%", margin_bottom="0.5em"),
-        edit_form(),
-
+        rx.vstack(
+            subpage_header(
+                "Постачання/Редагування",
+                left=rx.button(
+                    "Скасувати",
+                    variant="ghost",
+                    size="3",
+                    on_click=rx.redirect(routes.MOVEMENT_ADMISSIONS),
+                ),
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_EDIT),
+                        rx.button(
+                            "Зберегти",
+                            variant="ghost",
+                            size="3",
+                            on_click=EditAdmissionState.edit_one,
+                        ),
+                    ),
+                ],
+            ),
+            edit_form(),
+            width="100%",
+        ),
         value=AdmissionState.Pages.EDIT
     )
 

@@ -93,34 +93,30 @@ class AddProductsState(rx.State):
         return self.item.description if self.item is not None and self.item.description is not None else ""
         
     @rx.var
-    def category(self) -> str:
-        return self.item.category.title if self.item is not None and self.item.category is not None else "None"
-    
-    @rx.var
     def category_id(self) -> str:
         return str(self.item.id_category) if self.item is not None and self.item.id_category is not None else ""
-        
+
     @rx.var
     def unit(self) -> str:
         return str(self.item.unit) if self.item is not None and self.item.unit is not None else ""
-        
+
     @rx.var
     def divisible(self) -> bool:
         return self.item.divisible if self.item is not None and self.item.divisible is not None else False
-        
+
     @rx.var
     def uniq(self) -> bool:
         return self.item.uniq if self.item is not None and self.item.uniq is not None else False
-        
+
     @rx.var
     def capacity(self) -> str:
         return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else "None"
-        
+
     @rx.var
     def count(self) -> str:
         return str(self.item.count) if self.item is not None and self.item.count is not None else "None"
     # ====
-    
+
     # Action handlers
     # ===============
     @rx.event
@@ -218,34 +214,30 @@ class EditProductsState(rx.State):
         return self.item.description if self.item is not None and self.item.description is not None else ""
         
     @rx.var
-    def category(self) -> str:
-        return self.item.category.title if self.item is not None and self.item.category is not None else "None"
-    
-    @rx.var
     def category_id(self) -> str:
         return str(self.item.id_category) if self.item is not None and self.item.id_category is not None else ""
-        
+
     @rx.var
     def unit(self) -> str:
         return str(self.item.unit) if self.item is not None and self.item.unit is not None else ""
-        
+
     @rx.var
     def divisible(self) -> bool:
         return self.item.divisible if self.item is not None and self.item.divisible is not None else False
-        
+
     @rx.var
     def uniq(self) -> bool:
         return self.item.uniq if self.item is not None and self.item.uniq is not None else False
-        
+
     @rx.var
     def capacity(self) -> str:
         return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else "None"
-        
+
     @rx.var
     def count(self) -> str:
         return str(self.item.count) if self.item is not None and self.item.count is not None else "None"
     # ====
-    
+
     # Action handlers
     # ===============
     @rx.event

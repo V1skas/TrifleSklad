@@ -86,6 +86,19 @@ def selector_item_selected(item: Tuple[int, Product]) -> rx.Component:
     )
 
 
+def selector_skeleton() -> rx.Component:
+    # Скелетон на час завантаження доступного ТМЦ.
+    return rx.vstack(
+        rx.foreach(
+            [0, 1, 2, 3, 4],
+            lambda _: rx.skeleton(height="3.5em", width="100%", border_radius="0.5em"),
+        ),
+        spacing="2",
+        width="100%",
+        height="100%",
+    )
+
+
 def selector_list() -> rx.Component:
     return rx.scroll_area(
         rx.vstack(
@@ -122,10 +135,21 @@ def selector(*child, **prop) -> rx.Component:
         ),
         rx.card(
             rx.cond(
-                ProductsSelectorState.has_items(),
-                selector_list(),
-                rx.text(
-                    "Немає доступних ТМЦ", color=rx.color("accent", 6), user_select="none"
+                ProductsSelectorState.is_loading,
+                selector_skeleton(),
+                rx.cond(
+                    ProductsSelectorState.has_items,
+                    selector_list(),
+                    rx.center(
+                        rx.text(
+                            "ТМЦ не знайдено",
+                            color=rx.color("accent", 8),
+                            user_select="none",
+                            size="3",
+                        ),
+                        width="100%",
+                        height="100%",
+                    ),
                 ),
             ),
             padding="1em",

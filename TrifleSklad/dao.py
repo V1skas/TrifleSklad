@@ -1,4 +1,5 @@
-from typing import List, Optional
+from collections import OrderedDict
+from typing import Dict, List, Optional
 
 import reflex as rx
 import math
@@ -7,7 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select, func
 
-from TrifleSklad.declared import MovementsStatus
+from TrifleSklad.declared import MovementsStatus, MovementsType
 from TrifleSklad.models import (
     Action,
     Admission,
@@ -1607,6 +1608,28 @@ class ProductDAO:
         except Exception as e:
             return False, f"Ошибка: {str(e)}"
 
+    @classmethod
+    def update_serial_numbers(cls, serials: Dict[int, str]) -> tuple[bool, str]:
+        if not serials:
+            return True, ""
+        try:
+            with rx.session() as session:
+                statement = select(Product).where(Product.id.in_(list(serials.keys())))
+                products = session.exec(statement).all()
+
+                for product in products:
+                    if product.id in serials:
+                        product.serial_number = serials[product.id]
+                        session.add(product)
+
+                session.commit()
+                return True, "Серійні номери оновлено"
+
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
+
 
 class MovementDAO:
     @classmethod
@@ -2302,6 +2325,18 @@ class AdmissionDAO:
             return admission
 
     @classmethod
+    def is_invoice_number_exists(cls, invoice_number: str, exclude_id: Optional[int] = None) -> bool:
+        if invoice_number is None or not invoice_number.strip():
+            return False
+
+        statement = select(Admission).where(Admission.invoice_number == invoice_number.strip())
+        if exclude_id is not None:
+            statement = statement.where(Admission.id != exclude_id)
+
+        with rx.session() as session:
+            return session.exec(statement).first() is not None
+
+    @classmethod
     def add_one(cls, movement: Admission) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -2560,6 +2595,29 @@ class SaleDAO:
             return list(sales)
 
     @classmethod
+    def get_all_with_all_relationship(cls) -> List[Sale]:
+        statement = select(Sale).options(
+            joinedload(Sale.movement).options(
+                selectinload(Movement.products_catalog).options(
+                    joinedload(MovementProductsCatalog.product),
+                    selectinload(MovementProductsCatalog.products).options(
+                        joinedload(Product.product_catalog),
+                    ),
+                ),
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.incoming_owner),
+            ),
+            joinedload(Sale.responsible),
+        )
+
+        with rx.session() as session:
+            sales = session.exec(statement).all()
+
+            if len(sales) > 0:
+                session.expunge_all()
+            return list(sales)
+
+    @classmethod
     def get_by_id(cls, id: str) -> Optional[Sale]:
         statement = select(Sale).where(Sale.id == id)
 
@@ -2571,41 +2629,131 @@ class SaleDAO:
             return sale
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
-        sale = Sale(**form_data)
+    def get_by_id_with_all_relationship(cls, id: str) -> Optional[Sale]:
+        statement = (
+            select(Sale)
+            .options(
+                joinedload(Sale.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                        ),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                ),
+                joinedload(Sale.responsible),
+            )
+            .where(Sale.id == id)
+        )
 
+        with rx.session() as session:
+            sale = session.exec(statement).one_or_none()
+
+            if sale:
+                session.expunge(sale)
+            return sale
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Створює продаж: будує поліморфний Movement (тип SALE), його позиції
+        (MovementProductsCatalog з ціною за позицією) і дочірній запис Sale.
+        `movement_products_list` — підсумковий перелік одиниць ТМЦ, `prices` —
+        ціна за одиницю за ключем id позиції каталогу."""
         try:
             with rx.session() as session:
+                prices: Dict[int, float] = form_data.get("prices", {})
+
+                movement: Movement = Movement(
+                    type=MovementsType.SALE,
+                    id_user=form_data["id_user"],
+                    id_incoming_storage=form_data.get("id_incoming_storage"),
+                    id_incoming_owner=form_data.get("id_incoming_owner"),
+                    date=form_data.get("date"),
+                    comment=form_data.get("comment"),
+                    status=form_data.get("status"),
+                    total_cost=0.0,
+                )
+
+                # Групуємо за колонкою id_product_catalog (завжди завантажена),
+                # не чіпаючи ліниву зв'язку product_catalog у відокремлених інстансів.
+                # Самі ж одиниці ТМЦ перечитуємо в межах поточної сесії за id —
+                # інакше зв'язування відокремлених інстансів дає DetachedInstanceError.
+                products_list: List[Product] = form_data.get("movement_products_list", [])
+                catalog_to_ids: "OrderedDict[int, List[int]]" = OrderedDict()
+                for product in products_list:
+                    catalog_to_ids.setdefault(product.id_product_catalog, []).append(
+                        product.id
+                    )
+
+                all_ids = [pid for ids in catalog_to_ids.values() for pid in ids]
+                bound_products = {
+                    p.id: p
+                    for p in session.exec(
+                        select(Product).where(Product.id.in_(all_ids))
+                    ).all()
+                }
+
+                movement_products_catalog: List[MovementProductsCatalog] = []
+                total_cost = 0.0
+                for catalog_id, ids in catalog_to_ids.items():
+                    price = float(prices.get(catalog_id, 0.0))
+                    units = [bound_products[i] for i in ids if i in bound_products]
+                    movement_products_catalog.append(
+                        MovementProductsCatalog(
+                            id_product_catalog=catalog_id,
+                            count=len(units),
+                            price=price,
+                            products=units,
+                        )
+                    )
+                    total_cost += price * len(units)
+
+                movement.products_catalog = movement_products_catalog
+                movement.total_cost = total_cost
+
+                sale: Sale = Sale(
+                    id_responsible=form_data["id_responsible"],
+                    movement=movement,
+                )
+
                 session.add(sale)
                 session.commit()
-                session.refresh(sale)
-                return True, "Продажа успешно добавлена", sale.id
+                return True, "Продаж успішно додано", sale.id
 
         except IntegrityError as e:
             print("[SaleDAO] IntegrityError: ", e)
-            return False, "Ошибка: Продажа не может быть добавлена", -1
+            return False, "Помилка: Продаж не може бути додано", -1
         except SQLAlchemyError as e:
-            return False, f"Ошибка: {str(e)}", -1
+            print("[SaleDAO] SQLAlchemyError: ", e)
+            return False, f"Помилка: {str(e)}", -1
 
     @classmethod
     def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Редагування продажу: змінюються лише статус і коментар руху
+        (склад/власник/позиції продажу не редагуються)."""
         try:
             with rx.session() as session:
                 sale = session.get(Sale, form_data["id"])
-
                 if sale is None:
-                    return False, "Ошибка: Продажа не найдена", -1
+                    return False, "Помилка: Продаж не знайдено", -1
 
-                for key, value in form_data.items():
-                    setattr(sale, key, value)
+                movement = session.get(Movement, form_data["id"])
+                if movement is None:
+                    return False, "Помилка: Рух товару не знайдено", -1
+
+                if "status" in form_data:
+                    movement.status = form_data["status"]
+                if "comment" in form_data:
+                    movement.comment = form_data["comment"]
 
                 session.commit()
-                session.refresh(sale)
-                return True, "Продажа успешно изменена", sale.id
+                return True, "Продаж успішно змінено", sale.id
 
         except IntegrityError as e:
             print("[SaleDAO] IntegrityError: ", e)
-            return False, "Ошибка: Продажа не может быть изменена", -1
+            return False, "Помилка: Продаж не може бути змінено", -1
         except SQLAlchemyError as e:
             print("[SaleDAO] SQLAlchemyError: ", e)
-            return False, f"Ошибка: {str(e)}", -1
+            return False, f"Помилка: {str(e)}", -1

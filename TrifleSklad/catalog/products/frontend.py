@@ -388,7 +388,8 @@ def edit_form() -> rx.Component:
                 id="uniq",
                 size="3",
                 checked=EditProductsState.uniq,
-                on_change=EditProductsState.on_change_uniq
+                on_change=EditProductsState.on_change_uniq,
+                disabled=True,
             ),
             rx.checkbox(
                 "Подільний",
@@ -396,7 +397,7 @@ def edit_form() -> rx.Component:
                 size="3",
                 checked=EditProductsState.divisible,
                 on_change=EditProductsState.on_change_divisible,
-                disabled=EditProductsState.uniq
+                disabled=True,
             ),
 
             spacing="3",

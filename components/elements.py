@@ -60,3 +60,28 @@ def workspace(*tabs, **prop):
 
         **prop
     )
+
+
+def subpage_header(title, left=None, actions=None) -> rx.Component:
+    """Єдина шапка підсторінки (як у розділах адміністрування/каталогу):
+    зліва — кнопка повернення/скасування (необов'язково), по центру — заголовок,
+    праворуч — кнопки дій. Знизу — лінія-роздільник."""
+    children = []
+    if left is not None:
+        children.append(left)
+    children.append(rx.heading(title, size="7", color=rx.color("accent", 9)))
+    children.append(rx.hstack(*(actions or []), spacing="6"))
+
+    return rx.box(
+        rx.hstack(
+            *children,
+            align="center",
+            justify="between",
+            padding="0.5em",
+            width="100%",
+        ),
+        width="100%",
+        style={
+            "border_bottom": f"1px solid {rx.color('accent', 9)}",
+        },
+    )

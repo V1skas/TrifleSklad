@@ -18,6 +18,9 @@ class ProductsSelectorState(rx.State):
     filter_by_storage: int = -1
     filter_by_products: List[int] = []
 
+    # Прапорець завантаження доступного ТМЦ (для показу скелетону в діалозі).
+    is_loading: bool = False
+
     def clear(self) -> None:
         self.items = []
         self.unselected_items = []
@@ -28,7 +31,9 @@ class ProductsSelectorState(rx.State):
         self.filter_by_owner = -1
         self.filter_by_storage = -1
         self.filter_by_products = []
+        self.is_loading = False
 
+    @rx.var
     def has_items(self) -> bool:
         return len(self.items) > 0
 

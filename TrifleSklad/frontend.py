@@ -57,7 +57,7 @@ def navbar() -> rx.Component:
                     navbar_link("Каталог", routes.CATALOG),
                 ),
                 rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST),
+                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST) | AppState.get_user_actions.contains(ActionEnum.SALES_LIST),
                     navbar_link("Рух ТМЦ", routes.MOVEMENT),
                 ),
 
@@ -164,7 +164,7 @@ def welcome_page() -> rx.Component:
             width="100%",
         ),
 
-        width="100vw",
+        width="100%",
     )
 
 @require_login
@@ -173,7 +173,7 @@ def administration_page() -> rx.Component:
         navbar(),
         administration.frontend.index(),
 
-        width="100vw",
+        width="100%",
     )
 
 @require_login
@@ -182,7 +182,7 @@ def catalog_page() -> rx.Component:
         navbar(),
         catalog.frontend.index(),
 
-        width="100vw",
+        width="100%",
     )
 
 @require_login
@@ -191,5 +191,5 @@ def movement_page() -> rx.Component:
         navbar(),
         movement.frontend.index(),
 
-        width="100vw",
+        width="100%",
     )

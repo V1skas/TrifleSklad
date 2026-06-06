@@ -234,6 +234,8 @@ class AddIssueState(rx.State):
         self.products_selector_state = await self.get_state(ProductsMovementListState)
         await self.products_selector_state.on_load()
         self.products_selector_state.set_view_mode(False)
+        # При видачі серійний номер ТМЦ обов'язковий для одиниць із серійним номером.
+        self.products_selector_state.set_require_serial(True)
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
@@ -341,6 +343,15 @@ class AddIssueState(rx.State):
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
 
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        # «Скасовано» виставляється лише кнопкою «Скасувати», не вручну.
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
+
     # ======================
 
     # Action handlers
@@ -389,6 +400,13 @@ class AddIssueState(rx.State):
         list_id_products: List[int] = [p.id for p in products_list]
         flag, text, id = IssueDAO.add_one(self.item)
         if flag:
+            # Зберігаємо серійні номери, введені/уточнені під час видачі.
+            serials = {
+                p.id: p.serial_number
+                for p in products_list
+                if p.product_catalog is not None and p.product_catalog.uniq
+            }
+            ProductDAO.update_serial_numbers(serials)
             # Видача переміщує ТМЦ на майданчик призначення (власник лишається той самий).
             ProductDAO.update_owner_storage(
                 list_id_products,

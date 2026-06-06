@@ -8,6 +8,7 @@ import TrifleSklad.movement.admissions as admissions
 import TrifleSklad.movement.write_off as write_off
 import TrifleSklad.movement.movements as movements
 import TrifleSklad.movement.issues as issues
+import TrifleSklad.movement.sale as sale
 
 def admissions_tab() -> rx.Component:
     return rx.tabs.content(
@@ -37,6 +38,13 @@ def issues_tab() -> rx.Component:
         value=MovementState.Tabs.ISSUES,
     )
 
+def sales_tab() -> rx.Component:
+    return rx.tabs.content(
+        sale.frontend.index(),
+
+        value=MovementState.Tabs.SALES,
+    )
+
 def index():
     return rx.hstack(
         sidebar(
@@ -44,13 +52,14 @@ def index():
             sidebar_link("Списання", routes.MOVEMENT_WRITE_OFFS),
             sidebar_link("Переміщення", routes.MOVEMENT_MOVEMENTS),
             sidebar_link("Видачі", routes.MOVEMENT_ISSUES),
-            sidebar_link("Продажі", routes.CATALOG_CATEGORIES),
+            sidebar_link("Продажі", routes.MOVEMENT_SALES),
         ),
         workspace(
             admissions_tab(),
             write_offs_tab(),
             movements_tab(),
             issues_tab(),
+            sales_tab(),
 
             size="4",
 

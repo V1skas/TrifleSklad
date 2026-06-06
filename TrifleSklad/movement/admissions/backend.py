@@ -121,6 +121,19 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     # Event handlers for form fields
     # ======================
+    def _per_unit_count(self) -> int:
+        # Подільна одиниця ТМЦ створюється з повною місткістю (capacity) — це її
+        # максимальний обсяг/залишок. Неподільна одиниця завжди має count = 1.
+        product = self.item.product
+        if (
+            product is not None
+            and product.divisible
+            and product.capacity
+            and product.capacity > 0
+        ):
+            return product.capacity
+        return 1
+
     @rx.event
     def on_change_id_product_catalog(self, value: str):
         self.id_product_catalog_in_cache = value
@@ -129,6 +142,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
                 self.item.products[i].serial_number = ""
+        # Зміна позиції каталогу — оновлюємо вже створені одиниці під нову позицію
+        # (id каталогу та обсяг однієї одиниці: capacity для подільного, інакше 1).
+        per_unit = self._per_unit_count()
+        for unit in self.item.products:
+            unit.id_product_catalog = self.item.product.id
+            unit.count = per_unit
         self.is_product_uniq = self.item.product.uniq
 
     @rx.event
@@ -150,6 +169,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             self.item.products = self.item.products[: int(value)]
             return
 
+        per_unit = self._per_unit_count()
         for _ in range(int(value) - list_len):
             self.item.products.append(
                 Product(
@@ -157,7 +177,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
                     id_storage=-1,
                     id_owner=-1,
                     serial_number="",
-                    count=1,
+                    count=per_unit,
                 )
             )
 
@@ -672,6 +692,8 @@ class AddAdmissionState(rx.State):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
             return rx.toast.error("Не обрано склад або власника призначення!")
+        if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number):
+            return rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
         # Товар поступає на склад призначення поставки — проставляємо склад/власника
@@ -1087,6 +1109,8 @@ class EditAdmissionState(rx.State):
             return rx.toast.error("Запис не завантажено!")
         if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
             return rx.toast.error("Не обрано склад або власника призначення!")
+        if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number, exclude_id=self.item.id):
+            return rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
         # Синхронізуємо склад/власника одиниць ТМЦ зі складом призначення поставки.

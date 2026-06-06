@@ -1,5 +1,7 @@
 import reflex as rx
 
+from components.elements import subpage_header
+
 from TrifleSklad import routes
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.movement.movements.backend import (
@@ -72,8 +74,6 @@ def cancel_conflict_dialog() -> rx.Component:
 
 def item_preview() -> rx.Component:
     return rx.vstack(
-        cancel_conflict_dialog(),
-        rx.heading(f"Переміщення №{ViewMovementsState.item.id}", size="7", width="100%"),
         rx.hstack(
             rx.text("Дата:"),
             rx.text(ViewMovementsState.item.date)
@@ -103,31 +103,9 @@ def item_preview() -> rx.Component:
             rx.text("Коментар:"),
             rx.text(ViewMovementsState.item.comment)
         ),
-        rx.spacer(),
-        rx.hstack(
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_EDIT) & (ViewMovementsState.current_is_canceled == False),
-                rx.button(
-                    "Редагувати",
-                    on_click=rx.redirect(
-                        f"{routes.MOVEMENT_MOVEMENTS_EDIT_ID}{ViewMovementsState.item.id}"
-                    ),
-                ),
-            ),
-            rx.spacer(),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_DELETE) & (ViewMovementsState.current_is_canceled == False),
-                rx.button(
-                    "Скасувати",
-                    color_scheme="red",
-                    on_click=MovementsState.delete_one,
-                ),
-            ),
-
-            width="100%",
-        ),
 
         spacing="3",
+        align="stretch",
 
         height="100%",
         width="100%"
@@ -136,8 +114,45 @@ def item_preview() -> rx.Component:
 
 def item_preview_tab_content() -> rx.Component:
     return rx.tabs.content(
-        item_preview(),
-
+        rx.vstack(
+            cancel_conflict_dialog(),
+            subpage_header(
+                "Переміщення/Перегляд",
+                left=rx.button(
+                    "Повернутись",
+                    variant="ghost",
+                    size="3",
+                    on_click=rx.redirect(routes.MOVEMENT_MOVEMENTS),
+                ),
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_EDIT)
+                        & (ViewMovementsState.current_is_canceled == False),
+                        rx.button(
+                            "Редагувати",
+                            variant="ghost",
+                            size="3",
+                            on_click=rx.redirect(
+                                f"{routes.MOVEMENT_MOVEMENTS_EDIT_ID}{ViewMovementsState.item.id}"
+                            ),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_DELETE)
+                        & (ViewMovementsState.current_is_canceled == False),
+                        rx.button(
+                            "Скасувати",
+                            color_scheme="red",
+                            variant="ghost",
+                            size="3",
+                            on_click=MovementsState.delete_one,
+                        ),
+                    ),
+                ],
+            ),
+            item_preview(),
+            width="100%",
+        ),
         value=MovementsState.Pages.VIEW,
     )
 
@@ -192,18 +207,19 @@ def table() -> rx.Component:
 def list_tab_content() -> rx.Component:
     return rx.tabs.content(
         rx.vstack(
-            rx.hstack(
-                rx.heading("Переміщення", size="6"),
-                rx.spacer(),
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_CREATE),
-                    rx.button(
-                        "Додати",
-                        on_click=rx.redirect(routes.MOVEMENT_MOVEMENTS_ADD)
+            subpage_header(
+                "Переміщення",
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_CREATE),
+                        rx.button(
+                            "Додати",
+                            variant="ghost",
+                            size="3",
+                            on_click=rx.redirect(routes.MOVEMENT_MOVEMENTS_ADD),
+                        ),
                     ),
-                ),
-
-                width="100%"
+                ],
             ),
             rx.cond(
                 ListMovementsState.has_items,
@@ -344,23 +360,11 @@ def add_form() -> rx.Component:
                 ),
             ),
             rx.text("Коментар:"),
-            rx.text_area(value=AddMovementsState.comment, on_change=AddMovementsState.on_change_comment),
-            rx.hstack(
-                rx.button(
-                    "Скасувати",
-                    color_scheme="red",
-                    on_click=rx.redirect(routes.MOVEMENT_MOVEMENTS),
-                ),
-                rx.button(
-                    "Зберегти",
-                    color_scheme="green",
-                    on_click=AddMovementsState.add_one,
-                ),
+            rx.text_area(value=AddMovementsState.comment, on_change=AddMovementsState.on_change_comment, width="100%"),
 
-                justify="end",
-            ),
-
+            spacing="3",
             align="stretch",
+            width="100%",
         ),
 
         height="100%",
@@ -370,9 +374,30 @@ def add_form() -> rx.Component:
 
 def add_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Додавання переміщення", size="7", width="100%", margin_bottom="0.5em"),
-        add_form(),
-
+        rx.vstack(
+            subpage_header(
+                "Переміщення/Додавання",
+                left=rx.button(
+                    "Скасувати",
+                    variant="ghost",
+                    size="3",
+                    on_click=rx.redirect(routes.MOVEMENT_MOVEMENTS),
+                ),
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_CREATE),
+                        rx.button(
+                            "Зберегти",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddMovementsState.add_one,
+                        ),
+                    ),
+                ],
+            ),
+            add_form(),
+            width="100%",
+        ),
         value=MovementsState.Pages.ADD,
     )
 
@@ -475,25 +500,12 @@ def edit_form() -> rx.Component:
             rx.text_area(
                 value=EditMovementsState.item.comment,
                 on_change=EditMovementsState.on_change_comment,
-            ),
-            rx.hstack(
-                rx.button(
-                    "Скасувати",
-                    color_scheme="red",
-                    on_click=rx.redirect(
-                        f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{EditMovementsState.item.id}"
-                    ),
-                ),
-                rx.button(
-                    "Зберегти",
-                    color_scheme="green",
-                    on_click=EditMovementsState.edit_one,
-                ),
-
-                justify="end",
+                width="100%",
             ),
 
+            spacing="3",
             align="stretch",
+            width="100%",
         ),
 
         height="100%",
@@ -503,9 +515,32 @@ def edit_form() -> rx.Component:
 
 def edit_tab_content() -> rx.Component:
     return rx.tabs.content(
-        rx.heading("Редагування переміщення", size="7", width="100%", margin_bottom="0.5em"),
-        edit_form(),
-
+        rx.vstack(
+            subpage_header(
+                "Переміщення/Редагування",
+                left=rx.button(
+                    "Скасувати",
+                    variant="ghost",
+                    size="3",
+                    on_click=rx.redirect(
+                        f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{EditMovementsState.item.id}"
+                    ),
+                ),
+                actions=[
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_EDIT),
+                        rx.button(
+                            "Зберегти",
+                            variant="ghost",
+                            size="3",
+                            on_click=EditMovementsState.edit_one,
+                        ),
+                    ),
+                ],
+            ),
+            edit_form(),
+            width="100%",
+        ),
         value=MovementsState.Pages.EDIT,
     )
 

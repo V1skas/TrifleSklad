@@ -5,12 +5,14 @@ class MovementsType:
     WRITE_OFF = 2
     MOVEMENT = 3
     ISSUE = 4
+    SALE = 5
 
 movements_type_list: Dict[int, str] = {
     MovementsType.ADMISSION: "Постачання",
     MovementsType.WRITE_OFF: "Списання",
     MovementsType.MOVEMENT: "Переміщення",
     MovementsType.ISSUE: "Видача",
+    MovementsType.SALE: "Продаж",
 }
 
 class StorageType:
