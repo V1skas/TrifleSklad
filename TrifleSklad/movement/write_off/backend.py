@@ -13,12 +13,23 @@ from TrifleSklad.declared import (
     movements_type_list,
 )
 from TrifleSklad.models import Movement, Product
+from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
 
-class ListWriteOffState(rx.State):
+class ListWriteOffState(MovementListFilterMixin, rx.State):
     items: List[Movement] = []
+
+    def _reload(self):
+        self._all_pages, self.items = MovementDAO.get_by_type_paginated(
+            MovementsType.WRITE_OFF,
+            self._current_page,
+            self._limit,
+            self.filter_date_from,
+            self.filter_date_to,
+            self.selected_statuses,
+        )
 
     # Dynamic variables
     # ======================
@@ -39,7 +50,8 @@ class ListWriteOffState(rx.State):
     # ======================
     @rx.event
     def on_load(self):
-        self.items = MovementDAO.get_all_by_type_with_storage_owner(MovementsType.WRITE_OFF)
+        self._reset_list_state()
+        self._reload()
     # ======================
 
 

@@ -1631,6 +1631,23 @@ class ProductDAO:
             return False, f"Ошибка: {str(e)}"
 
 
+def movement_filter_conditions(
+    date_from: str = "",
+    date_to: str = "",
+    statuses: Optional[List[int]] = None,
+) -> list:
+    """Список SQLAlchemy-умов фільтрації рухів за датою (рядок ISO) і статусами.
+    Спільний для всіх типів руху (поступлення/списання/переміщення/видача/продаж)."""
+    conditions = []
+    if date_from:
+        conditions.append(Movement.date >= date_from)
+    if date_to:
+        conditions.append(Movement.date <= date_to)
+    if statuses:
+        conditions.append(Movement.status.in_(statuses))
+    return conditions
+
+
 class MovementDAO:
     @classmethod
     def get_all(cls) -> List[Movement]:
@@ -1697,6 +1714,48 @@ class MovementDAO:
             if len(movements) > 0:
                 session.expunge_all()
             return list(movements)
+
+    @classmethod
+    def get_by_type_paginated(
+        cls,
+        type: int,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+    ) -> tuple[int, List[Movement]]:
+        """Сторінкований перелік рухів одного типу з фільтром за датою/статусами.
+        Дата — рядок ISO 'YYYY-MM-DD', лексикографічне порівняння коректне."""
+        conditions = movement_filter_conditions(date_from, date_to, statuses)
+
+        count_stmt = select(func.count(Movement.id)).where(Movement.type == type)
+        for cond in conditions:
+            count_stmt = count_stmt.where(cond)
+
+        with rx.session() as session:
+            total = session.exec(count_stmt).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(Movement)
+                .options(
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_storage),
+                    joinedload(Movement.destination_owner),
+                )
+                .where(Movement.type == type)
+            )
+            for cond in conditions:
+                statement = statement.where(cond)
+            statement = statement.order_by(Movement.id.desc()).offset(skip).limit(limit)
+
+            movements = session.exec(statement).all()
+            if len(movements) > 0:
+                session.expunge_all()
+            return total_pages, list(movements)
 
     @classmethod
     def get_by_id_with_product_storage_owner(cls, id: str) -> Optional[Movement]:
@@ -2256,6 +2315,48 @@ class AdmissionDAO:
             return list(admissions)
 
     @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+    ) -> tuple[int, List[Admission]]:
+        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        movement_ids = select(Movement.id)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        with rx.session() as session:
+            total = session.exec(
+                select(func.count(Admission.id)).where(Admission.id.in_(movement_ids))
+            ).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(Admission)
+                .options(
+                    joinedload(Admission.supplier),
+                    joinedload(Admission.payment_type),
+                    joinedload(Admission.nds_rate),
+                    joinedload(Admission.movement).options(
+                        joinedload(Movement.destination_storage),
+                        joinedload(Movement.destination_owner),
+                    ),
+                )
+                .where(Admission.id.in_(movement_ids))
+                .order_by(Admission.id.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            admissions = session.exec(statement).all()
+            if len(admissions) > 0:
+                session.expunge_all()
+            return total_pages, list(admissions)
+
+    @classmethod
     def get_by_id(cls, id: str) -> Optional[Admission]:
         statement = select(Admission).where(Admission.id == id)
 
@@ -2481,6 +2582,47 @@ class IssueDAO:
             return list(issues)
 
     @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+    ) -> tuple[int, List[Issue]]:
+        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        movement_ids = select(Movement.id)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        with rx.session() as session:
+            total = session.exec(
+                select(func.count(Issue.id)).where(Issue.id.in_(movement_ids))
+            ).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(Issue)
+                .options(
+                    joinedload(Issue.movement).options(
+                        joinedload(Movement.incoming_storage),
+                        joinedload(Movement.incoming_owner),
+                        joinedload(Movement.destination_storage),
+                    ),
+                    joinedload(Issue.recipient),
+                )
+                .where(Issue.id.in_(movement_ids))
+                .order_by(Issue.id.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            issues = session.exec(statement).all()
+            if len(issues) > 0:
+                session.expunge_all()
+            return total_pages, list(issues)
+
+    @classmethod
     def get_by_id(cls, id: str) -> Optional[Issue]:
         statement = select(Issue).where(Issue.id == id)
 
@@ -2616,6 +2758,46 @@ class SaleDAO:
             if len(sales) > 0:
                 session.expunge_all()
             return list(sales)
+
+    @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+    ) -> tuple[int, List[Sale]]:
+        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        movement_ids = select(Movement.id)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        with rx.session() as session:
+            total = session.exec(
+                select(func.count(Sale.id)).where(Sale.id.in_(movement_ids))
+            ).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(Sale)
+                .options(
+                    joinedload(Sale.movement).options(
+                        joinedload(Movement.incoming_storage),
+                        joinedload(Movement.incoming_owner),
+                    ),
+                    joinedload(Sale.responsible),
+                )
+                .where(Sale.id.in_(movement_ids))
+                .order_by(Sale.id.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            sales = session.exec(statement).all()
+            if len(sales) > 0:
+                session.expunge_all()
+            return total_pages, list(sales)
 
     @classmethod
     def get_by_id(cls, id: str) -> Optional[Sale]:

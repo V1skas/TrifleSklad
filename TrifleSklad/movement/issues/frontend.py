@@ -16,6 +16,7 @@ from TrifleSklad.movement.issues.backend import (
     ViewIssueState,
 )
 from TrifleSklad.movement.products.frontend import index as products
+from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
 
 
 def issues_table_row(item: Tuple[int, Issue]) -> rx.Component:
@@ -67,6 +68,7 @@ def list_tab_content() -> rx.Component:
             subpage_header(
                 "Видачі",
                 actions=[
+                    filter_button(ListIssueState),
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.ISSUES_CREATE),
                         rx.button(
@@ -78,7 +80,9 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
+            filter_card(ListIssueState),
             rx.cond(ListIssueState.has_items, issues_table(), rx.text("Записів немає.")),
+            pagination(ListIssueState),
             width="100%",
             height="100%",
         ),

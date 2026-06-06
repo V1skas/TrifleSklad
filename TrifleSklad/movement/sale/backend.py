@@ -20,12 +20,22 @@ from TrifleSklad.declared import (
     movements_type_list,
 )
 from TrifleSklad.models import Movement, Product, Sale
+from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
 
-class ListSaleState(rx.State):
+class ListSaleState(MovementListFilterMixin, rx.State):
     items: List[Sale] = []
+
+    def _reload(self):
+        self._all_pages, self.items = SaleDAO.get_paginated(
+            self._current_page,
+            self._limit,
+            self.filter_date_from,
+            self.filter_date_to,
+            self.selected_statuses,
+        )
 
     # Dynamic variables
     # ======================
@@ -46,7 +56,8 @@ class ListSaleState(rx.State):
     # ======================
     @rx.event
     def on_load(self):
-        self.items = SaleDAO.get_all_with_all_relationship()
+        self._reset_list_state()
+        self._reload()
     # ======================
 
 

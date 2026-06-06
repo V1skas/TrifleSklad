@@ -12,6 +12,7 @@ from TrifleSklad.movement.write_off.backend import (
     WriteOffState,
 )
 from TrifleSklad.movement.products.frontend import index as products
+from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -196,6 +197,7 @@ def list_tab_content() -> rx.Component:
             subpage_header(
                 "Списання",
                 actions=[
+                    filter_button(ListWriteOffState),
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_CREATE),
                         rx.button(
@@ -207,11 +209,13 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
+            filter_card(ListWriteOffState),
             rx.cond(
                 ListWriteOffState.has_items,
                 table(),
                 rx.text("Записів немає.")
             ),
+            pagination(ListWriteOffState),
             width="100%",
             height="100%",
         ),

@@ -16,6 +16,7 @@ from TrifleSklad.movement.sale.backend import (
     ViewSaleState,
 )
 from TrifleSklad.movement.products.frontend import index as products
+from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
 
 
 def cancel_conflict_dialog() -> rx.Component:
@@ -122,6 +123,7 @@ def list_tab_content() -> rx.Component:
             subpage_header(
                 "Продажі",
                 actions=[
+                    filter_button(ListSaleState),
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.SALES_CREATE),
                         rx.button(
@@ -133,7 +135,9 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
+            filter_card(ListSaleState),
             rx.cond(ListSaleState.has_items, table(), rx.text("Записів немає.")),
+            pagination(ListSaleState),
             width="100%",
             height="100%",
         ),

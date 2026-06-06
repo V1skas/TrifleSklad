@@ -1,6 +1,7 @@
 import reflex as rx
 
 from components.elements import subpage_header
+from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
 
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import movements_status_list
@@ -12,6 +13,82 @@ from TrifleSklad.movement.admissions.backend import AdmissionState, AddAdmission
 from TrifleSklad.models import Admission
 from TrifleSklad.declared import MovementsStatus
 from TrifleSklad.state import AppState
+
+def create_product_dialog() -> rx.Component:
+    # Вкладений діалог створення нового товару каталогу прямо з поставки.
+    State = MovementProductCatalogAddEditFormState
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Створення товару каталогу"),
+            rx.vstack(
+                rx.text("*Назва:", size="2"),
+                rx.input(value=State.new_title, on_change=State.on_change_new_title, width="100%"),
+                rx.text("Опис:", size="2"),
+                rx.text_area(value=State.new_description, on_change=State.on_change_new_description, width="100%"),
+                rx.text("*Категорія:", size="2"),
+                rx.select.root(
+                    rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                    rx.select.content(
+                        rx.foreach(
+                            State.list_categories,
+                            lambda c: rx.select.item(c[1], value=c[0]),
+                        ),
+                        width="100%",
+                    ),
+                    value=State.new_id_category,
+                    on_change=State.on_change_new_category,
+                    width="100%",
+                ),
+                rx.text("Одиниця виміру:", size="2"),
+                rx.input(
+                    value=State.new_unit,
+                    on_change=State.on_change_new_unit,
+                    list="units-datalist-admission",
+                    width="100%",
+                ),
+                rx.el.datalist(
+                    rx.foreach(
+                        State.units_cache,
+                        lambda unit: rx.el.option(value=unit),
+                    ),
+                    id="units-datalist-admission",
+                ),
+                rx.text("Місткість:", size="2"),
+                rx.input(
+                    type="number",
+                    min="0",
+                    value=State.new_capacity,
+                    on_change=State.on_change_new_capacity,
+                    disabled=State.new_uniq,
+                    width="100%",
+                ),
+                rx.checkbox(
+                    "Має серійний номер",
+                    checked=State.new_uniq,
+                    on_change=State.on_change_new_uniq,
+                ),
+                rx.checkbox(
+                    "Подільний",
+                    checked=State.new_divisible,
+                    on_change=State.on_change_new_divisible,
+                    disabled=State.new_uniq,
+                ),
+                rx.hstack(
+                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_create_open(False)),
+                    rx.spacer(),
+                    rx.button("Створити", type="button", on_click=State.create_product),
+                    width="100%",
+                    padding_top="0.5em",
+                ),
+                spacing="2",
+                width="100%",
+            ),
+            width="28em",
+        ),
+        open=State.is_create_open,
+        on_open_change=State.set_create_open,
+    )
+
 
 def movement_product_catalog_add_edit_form() -> rx.Component:
     return rx.vstack(
@@ -38,6 +115,19 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
 
             width="100%"
         ),
+        rx.hstack(
+            rx.spacer(),
+            rx.button(
+                rx.icon("plus", size=14),
+                "Створити товар",
+                variant="ghost",
+                size="2",
+                type="button",
+                on_click=MovementProductCatalogAddEditFormState.open_create_product,
+            ),
+            width="100%",
+        ),
+        create_product_dialog(),
         rx.hstack(
             rx.text("Кількість:"),
             rx.input(
@@ -584,6 +674,7 @@ def list_tab_content() -> rx.Component:
             subpage_header(
                 "Постачання",
                 actions=[
+                    filter_button(ListAdmissionState),
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
                         rx.button(
@@ -595,10 +686,12 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
+            filter_card(ListAdmissionState),
             rx.cond(ListAdmissionState.has_items,
                 table(),
                 rx.text("Записів немає.")
             ),
+            pagination(ListAdmissionState),
 
             width="100%",
             height="100%",

@@ -12,6 +12,7 @@ from TrifleSklad.movement.movements.backend import (
     ViewMovementsState,
 )
 from TrifleSklad.movement.products.frontend import index as products
+from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -210,6 +211,7 @@ def list_tab_content() -> rx.Component:
             subpage_header(
                 "Переміщення",
                 actions=[
+                    filter_button(ListMovementsState),
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_CREATE),
                         rx.button(
@@ -221,11 +223,13 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
+            filter_card(ListMovementsState),
             rx.cond(
                 ListMovementsState.has_items,
                 table(),
                 rx.text("Записів немає.")
             ),
+            pagination(ListMovementsState),
 
             width="100%",
             height="100%",

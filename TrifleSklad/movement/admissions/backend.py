@@ -12,6 +12,7 @@ from TrifleSklad.dao import (
     OwnerDAO,
     PaymentTypeDAO,
     ProductCatalogDAO,
+    ProductCategoryDAO,
     StorageDAO,
     SupplierDAO,
 )
@@ -29,6 +30,7 @@ from TrifleSklad.models import (
     Product,
     ProductCatalog,
 )
+from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.state import AppState
 
 
@@ -45,6 +47,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
     id_product_catalog_entered: bool = False
     id_product_catalog_in_cache: str = ""
     is_product_uniq: bool = False
+
+    # Сире (як ввів користувач) значення ціни — щоб поле не переформатувалося
+    # у float-представлення на кожне натискання (інакше заважає вводити).
+    price_input: str = "0"
 
     error_count: bool = False
     error_price: bool = False
@@ -115,7 +121,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     @rx.var
     def price(self) -> str:
-        return str(self.item.price)
+        return self.price_input
 
     # ======================
 
@@ -188,6 +194,13 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     @rx.event
     def on_change_price(self, value: str):
+        # Зберігаємо рядок як є (не переформатовуємо), а у float парсимо лише для
+        # обчислень/валідації. Порожнє поле — ціна 0 (мінімум, без помилки).
+        self.price_input = value
+        if value.strip() == "":
+            self.item.price = 0.0
+            self.error_price = False
+            return
         try:
             self.item.price = float(value)
         except ValueError:
@@ -195,8 +208,6 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return
 
         self.__check_price_correct()
-        if self.error_price:
-            return
 
     # ======================
 
@@ -208,6 +219,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
         self.is_product_uniq = item.product.uniq
         self.id_product_catalog_entered = True
+        self.price_input = str(item.price)
 
     @rx.event
     def clear(self):
@@ -218,9 +230,133 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.is_product_uniq = False
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
+        self.price_input = "0"
         self.error_count = False
         self.error_price = False
+        self._reset_new_product()
+        self.is_create_open = False
 
+    # ======================
+
+    # Створення нового товару каталогу прямо з діалогу поставки
+    # ======================
+    is_create_open: bool = False
+    list_categories: List[Tuple[str, str]] = []
+    units_cache: List[str] = []
+    new_title: str = ""
+    new_description: str = ""
+    new_id_category: str = ""
+    new_unit: str = ""
+    new_divisible: bool = False
+    new_uniq: bool = False
+    new_capacity: str = "0"
+
+    def _reset_new_product(self):
+        self.new_title = ""
+        self.new_description = ""
+        self.new_id_category = ""
+        self.new_unit = ""
+        self.new_divisible = False
+        self.new_uniq = False
+        self.new_capacity = "0"
+
+    @rx.event
+    def open_create_product(self):
+        self.list_categories = [
+            (str(item.id), item.title) for item in ProductCategoryDAO.get_all()
+        ]
+        self.units_cache = ProductCatalogDAO.get_list_units()
+        self._reset_new_product()
+        self.is_create_open = True
+
+    @rx.event
+    def set_create_open(self, value: bool):
+        self.is_create_open = value
+
+    @rx.event
+    def on_change_new_title(self, value: str):
+        self.new_title = value
+
+    @rx.event
+    def on_change_new_description(self, value: str):
+        self.new_description = value
+
+    @rx.event
+    def on_change_new_category(self, value: str):
+        self.new_id_category = value
+
+    @rx.event
+    def on_change_new_unit(self, value: str):
+        self.new_unit = value
+
+    @rx.event
+    def on_change_new_capacity(self, value: str):
+        # Товар із серійним номером завжди має місткість 1.
+        if self.new_uniq:
+            self.new_capacity = "1"
+            return
+        self.new_capacity = value
+
+    @rx.event
+    def on_change_new_uniq(self, value: bool):
+        self.new_uniq = value
+        if value:
+            # Серійний номер ⇒ неподільний, місткість = 1.
+            self.new_divisible = False
+            self.new_capacity = "1"
+
+    @rx.event
+    def on_change_new_divisible(self, value: bool):
+        # Товар із серійним номером (uniq) не може бути подільним.
+        if self.new_uniq:
+            self.new_divisible = False
+            return
+        self.new_divisible = value
+
+    @rx.event
+    def create_product(self):
+        title = self.new_title.strip()
+        if title == "" or self.new_id_category == "":
+            return rx.toast.error("Вкажіть назву та категорію товару!")
+        if self.new_uniq and self.new_divisible:
+            return rx.toast.error("Товар із серійним номером не може бути подільним!")
+
+        capacity = (
+            1
+            if self.new_uniq
+            else (int(self.new_capacity) if self.new_capacity.isdigit() else 0)
+        )
+        product = ProductCatalog(
+            title=title,
+            description=self.new_description.strip() or None,
+            id_category=int(self.new_id_category),
+            unit=self.new_unit.strip(),
+            divisible=False if self.new_uniq else self.new_divisible,
+            uniq=self.new_uniq,
+            capacity=capacity,
+            count=0,
+        )
+        flag, text, new_id = ProductCatalogDAO.add_one(product)
+        if not flag:
+            return rx.toast.error(text)
+
+        # Новий товар одразу обираємо в поточному рядку поставки.
+        self._load_products_catalog_list()
+        for index, catalog in enumerate(self.cache_products_catalog_list):
+            if catalog.id == new_id:
+                self.id_product_catalog_in_cache = str(index)
+                self.item.product = catalog
+                self.item.id_product_catalog = catalog.id
+                self.is_product_uniq = catalog.uniq
+                per_unit = self._per_unit_count()
+                for unit in self.item.products:
+                    unit.id_product_catalog = catalog.id
+                    unit.count = per_unit
+                break
+
+        self.is_create_open = False
+        self._reset_new_product()
+        return rx.toast.success("Товар створено та обрано!")
     # ======================
 
 
@@ -248,8 +384,17 @@ class MovementProductCatalogDetailedViewState(rx.State):
     # ======================
 
 
-class ListAdmissionState(rx.State):
+class ListAdmissionState(MovementListFilterMixin, rx.State):
     items: List[Admission] = []
+
+    def _reload(self):
+        self._all_pages, self.items = AdmissionDAO.get_paginated(
+            self._current_page,
+            self._limit,
+            self.filter_date_from,
+            self.filter_date_to,
+            self.selected_statuses,
+        )
 
     # Dynamic variables
     # ======================
@@ -271,7 +416,8 @@ class ListAdmissionState(rx.State):
     # ======================
     @rx.event
     def on_load(self):
-        self.items = AdmissionDAO.get_all_with_supplier_movement_storage_owner()
+        self._reset_list_state()
+        self._reload()
 
     # ======================
 

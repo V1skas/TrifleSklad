@@ -27,18 +27,29 @@ from TrifleSklad.models import (
     Product,
     ProductCatalog,
 )
+from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
 
-class ListIssueState(rx.State):
+class ListIssueState(MovementListFilterMixin, rx.State):
     items: List[Issue] = []
 
     # Backend methods
     # ======================
+    def _reload(self):
+        self._all_pages, self.items = IssueDAO.get_paginated(
+            self._current_page,
+            self._limit,
+            self.filter_date_from,
+            self.filter_date_to,
+            self.selected_statuses,
+        )
+
     @rx.event
     def on_load(self):
-        self.items = IssueDAO.get_all_with_all_relationship()
+        self._reset_list_state()
+        self._reload()
 
     # ======================
 
