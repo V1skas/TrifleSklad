@@ -664,6 +664,17 @@ class ProcessRequestsState(rx.State):
         if self.products_state is None or len(self.products_state.items) == 0:
             return rx.toast.error("Оберіть одиниці ТМЦ!")
 
+        # Серверна перевірка типів місць: рух лише зі складу; видача — на площадку/відділ.
+        if not StorageDAO.is_type(
+            int(self.id_incoming_storage), StorageType.WAREHOUSE
+        ):
+            return rx.toast.error("Рух можливий лише зі складу!")
+        if self.is_issue and not StorageDAO.is_type(
+            self.item.id_destination_storage,
+            (StorageType.TECHNICAL_SITE, StorageType.DEPARTMENT),
+        ):
+            return rx.toast.error("Видача можлива лише на площадку або відділ!")
+
         ok, msg, products_list = self.products_state.resolve_movement_products()
         if not ok:
             return rx.toast.error(msg)
@@ -698,8 +709,8 @@ class ProcessRequestsState(rx.State):
                 return rx.toast.error(text)
             serials = {p.id: p.serial_number for p in products_list}
             ProductDAO.update_serial_numbers(serials)
-            # Видача: подільний ТМЦ списується на місці (споживається),
-            # неподільний — переміщується на призначення (площадка/відділ).
+            # Видача: витратний (неунікальний) ТМЦ списується на місці (спожитий),
+            # унікальний (серійний) — переміщується на призначення.
             ProductDAO.apply_issue_relocation(
                 products_list,
                 int(self.id_incoming_owner),

@@ -411,6 +411,12 @@ class AddSaleState(rx.State):
         ):
             return rx.toast.error("Список товарів для продажу порожній!")
 
+        # Серверна перевірка типу місця: продаж можливий лише зі складу.
+        if not StorageDAO.is_type(
+            int(self.id_incoming_storage), StorageType.WAREHOUSE
+        ):
+            return rx.toast.error("Продаж можливий лише зі складу!")
+
         # Розділення подільного ТМЦ + перевірка серійних номерів.
         ok, msg, products_list = (
             self.products_movement_list_state.resolve_movement_products()

@@ -439,6 +439,17 @@ class AddIssueState(rx.State):
         if self.item.movement.id_destination_storage == -1:
             return rx.toast.error("Не обрано майданчик призначення!")
 
+        # Серверна перевірка типів місць: видача лише зі складу на площадку/відділ.
+        if not StorageDAO.is_type(
+            self.item.movement.id_incoming_storage, StorageType.WAREHOUSE
+        ):
+            return rx.toast.error("Видача можлива лише зі складу!")
+        if not StorageDAO.is_type(
+            self.item.movement.id_destination_storage,
+            (StorageType.TECHNICAL_SITE, StorageType.DEPARTMENT),
+        ):
+            return rx.toast.error("Видача можлива лише на площадку або відділ!")
+
         self.item.movement.id_user = (await self.get_state(AppState)).user.login
 
         # Розділення подільного ТМЦ: підсумковий перелік одиниць (з дочірніми частинами).
@@ -480,8 +491,9 @@ class AddIssueState(rx.State):
                 if p.product_catalog is not None and p.product_catalog.uniq
             }
             ProductDAO.update_serial_numbers(serials)
-            # Видача: подільний ТМЦ списується на місці (споживається на площадці/
-            # відділі), неподільний — переміщується на призначення (власник той самий).
+            # Видача: витратний (неунікальний) ТМЦ списується на місці (спожитий),
+            # унікальний (серійний) — переміщується на призначення (відстежуване
+            # обладнання). Окремий рух списання не формується.
             ProductDAO.apply_issue_relocation(
                 products_list,
                 int(self.item.movement.id_destination_owner),
@@ -807,7 +819,8 @@ class IssueState(rx.State):
         if not flag:
             return rx.toast.error(text)
 
-        # Подільний ТМЦ при видачі списується (is_deleted) — повертаємо його в обіг.
+        # Витратний (неунікальний) ТМЦ при видачі списувався (is_deleted) —
+        # повертаємо його в обіг.
         ProductDAO.undelete_list(list_id_products)
         # Скасування видачі повертає кожну одиницю ТМЦ туди, куди її привів
         # попередній рух (за наскрізним номером), а не просто на склад відправлення.

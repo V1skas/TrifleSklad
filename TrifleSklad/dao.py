@@ -1071,6 +1071,22 @@ class StorageDAO:
             return list(storages)
 
     @classmethod
+    def is_type(cls, id: int, types) -> bool:
+        """True, якщо склад `id` існує (не видалений) і його тип входить у `types`
+        (одне значення StorageType або колекція). Серверна перевірка типу місця
+        зберігання для операцій руху."""
+        if isinstance(types, int):
+            types = (types,)
+        statement = (
+            select(Storage.type)
+            .where(Storage.id == id)
+            .where(Storage.is_deleted == False)
+        )
+        with rx.session() as session:
+            storage_type = session.exec(statement).one_or_none()
+        return storage_type is not None and storage_type in types
+
+    @classmethod
     def add_one(cls, storage: Storage) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -1614,18 +1630,24 @@ class ProductDAO:
     def apply_issue_relocation(
         cls, products: List[Product], new_owner_id: int, new_storage_id: int
     ) -> tuple[bool, str]:
-        """Фіналізує одиниці ТМЦ при видачі на площадку/відділ: подільні одиниці
-        списуються (is_deleted) — вони вважаються спожитими на місці, решта
-        переміщується на призначення. `products` — перелік Product із завантаженим
-        зв'язком product_catalog (для перевірки divisible)."""
-        divisible_ids = [
+        """Фіналізує одиниці ТМЦ при видачі на площадку/відділ. Видача без
+        окремого руху списання фіксується самим рухом видачі:
+        - **витратний** (неунікальний) ТМЦ — подільний або неподільний без
+          серійного номера — списується на місці (is_deleted), бо вважається
+          спожитим;
+        - **унікальний** (із серійним номером) ТМЦ — переміщується на призначення
+          як відстежуване обладнання.
+        `products` — перелік Product із завантаженим зв'язком product_catalog
+        (для перевірки uniq). Невідомий каталог (None) — про всяк випадок
+        переміщується, а не списується."""
+        write_off_ids = [
             p.id
             for p in products
-            if p.product_catalog is not None and p.product_catalog.divisible
+            if p.product_catalog is not None and not p.product_catalog.uniq
         ]
-        movable_ids = [p.id for p in products if p.id not in divisible_ids]
-        if divisible_ids:
-            flag, text = cls.delete_list(divisible_ids)
+        movable_ids = [p.id for p in products if p.id not in write_off_ids]
+        if write_off_ids:
+            flag, text = cls.delete_list(write_off_ids)
             if not flag:
                 return flag, text
         if movable_ids:

@@ -9,6 +9,7 @@ from TrifleSklad.dao import MovementDAO, OwnerDAO, ProductDAO, StorageDAO
 from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
+    StorageType,
     movements_status_list,
     movements_type_list,
 )
@@ -144,8 +145,10 @@ class AddWriteOffState(rx.State):
     # Backend only
     # ======================
     def _load_list_storages(self):
+        # Списання можливе лише зі складів.
         self.list_storages = [
-            (item.title, str(item.id)) for item in StorageDAO.get_all()
+            (item.title, str(item.id))
+            for item in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)
             if self.search_name_incoming_storage == ""
             or self.search_name_incoming_storage.lower() in item.title.lower()
         ]
@@ -235,6 +238,12 @@ class AddWriteOffState(rx.State):
         if self.products_movement_list_state is None or len(self.products_movement_list_state.items) == 0:
             return rx.toast.error("Список товарів для списання порожній!")
 
+        # Серверна перевірка типу місця: списання можливе лише зі складу.
+        if not StorageDAO.is_type(
+            int(self.id_incoming_storage), StorageType.WAREHOUSE
+        ):
+            return rx.toast.error("Списання можливе лише зі складу!")
+
         # Розділення подільного ТМЦ: підсумковий перелік одиниць (з дочірніми частинами).
         ok, msg, products_list = self.products_movement_list_state.resolve_movement_products()
         if not ok:
@@ -286,8 +295,10 @@ class EditWriteOffState(rx.State):
     # Backend only
     # ======================
     def _load_list_storages(self):
+        # Списання можливе лише зі складів.
         self.list_storages = [
-            (item.title, str(item.id)) for item in StorageDAO.get_all()
+            (item.title, str(item.id))
+            for item in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)
             if self.search_name_incoming_storage == ""
             or self.search_name_incoming_storage.lower() in item.title.lower()
         ]
