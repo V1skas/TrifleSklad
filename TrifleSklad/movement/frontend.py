@@ -3,12 +3,15 @@ import reflex as rx
 from components.elements import sidebar, sidebar_link, workspace
 
 from TrifleSklad import routes
+from TrifleSklad.actions import Action as ActionEnum
+from TrifleSklad.state import AppState
 from TrifleSklad.movement.backend import MovementState
 import TrifleSklad.movement.admissions as admissions
 import TrifleSklad.movement.write_off as write_off
 import TrifleSklad.movement.movements as movements
 import TrifleSklad.movement.issues as issues
 import TrifleSklad.movement.sale as sale
+import TrifleSklad.movement.returns as returns
 
 def admissions_tab() -> rx.Component:
     return rx.tabs.content(
@@ -45,14 +48,40 @@ def sales_tab() -> rx.Component:
         value=MovementState.Tabs.SALES,
     )
 
+def returns_tab() -> rx.Component:
+    return rx.tabs.content(
+        returns.frontend.index(),
+
+        value=MovementState.Tabs.RETURNS,
+    )
+
 def index():
     return rx.hstack(
         sidebar(
-            sidebar_link("Постачання", routes.MOVEMENT_ADMISSIONS),
-            sidebar_link("Списання", routes.MOVEMENT_WRITE_OFFS),
-            sidebar_link("Переміщення", routes.MOVEMENT_MOVEMENTS),
-            sidebar_link("Видачі", routes.MOVEMENT_ISSUES),
-            sidebar_link("Продажі", routes.MOVEMENT_SALES),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST),
+                sidebar_link("Постачання", routes.MOVEMENT_ADMISSIONS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST),
+                sidebar_link("Списання", routes.MOVEMENT_WRITE_OFFS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST),
+                sidebar_link("Переміщення", routes.MOVEMENT_MOVEMENTS),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST),
+                sidebar_link("Видачі", routes.MOVEMENT_ISSUES),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.SALES_LIST),
+                sidebar_link("Продажі", routes.MOVEMENT_SALES),
+            ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.RETURNS_LIST),
+                sidebar_link("Повернення", routes.MOVEMENT_RETURNS),
+            ),
         ),
         workspace(
             admissions_tab(),
@@ -60,6 +89,7 @@ def index():
             movements_tab(),
             issues_tab(),
             sales_tab(),
+            returns_tab(),
 
             size="4",
 

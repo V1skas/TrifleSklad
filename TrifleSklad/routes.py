@@ -101,6 +101,11 @@ MOVEMENT_SALES_VIEW_ID = "/movement/sales/view/"
 MOVEMENT_SALES_EDIT_ID = "/movement/sales/edit/"
 MOVEMENT_SALES_ADD = "/movement/sales/add/"
 
+MOVEMENT_RETURNS = "/movement/returns/"
+MOVEMENT_RETURNS_VIEW_ID = "/movement/returns/view/"
+MOVEMENT_RETURNS_EDIT_ID = "/movement/returns/edit/"
+MOVEMENT_RETURNS_ADD = "/movement/returns/add/"
+
 
 # Нумерація рухів наскрізна, але кожен тип живе у власній підсекції.
 # Хелпер будує посилання на перегляд руху з потрібного розділу за його типом.
@@ -112,6 +117,7 @@ _MOVEMENT_VIEW_ROUTES = {
     MovementsType.MOVEMENT: MOVEMENT_MOVEMENTS_VIEW_ID,
     MovementsType.ISSUE: MOVEMENT_ISSUES_VIEW_ID,
     MovementsType.SALE: MOVEMENT_SALES_VIEW_ID,
+    MovementsType.RETURN: MOVEMENT_RETURNS_VIEW_ID,
 }
 
 

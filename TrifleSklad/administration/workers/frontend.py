@@ -257,11 +257,14 @@ def add_tab_content() -> rx.Component:
                         on_click=rx.redirect(routes.ADMIN_WORKERS)
                     ),
                     rx.heading("Співробітники/Створення", size="7", color=rx.color("accent", 9)),
-                    rx.button(
-                        "Зберегти",
-                        variant="ghost",
-                        size="3",
-                        on_click=AddWorkerState.add_one
+                    rx.cond(
+                        AppState.get_user_actions.contains(Action.WORKERS_CREATE),
+                        rx.button(
+                            "Зберегти",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddWorkerState.add_one
+                        ),
                     ),
 
                     align="center",
@@ -297,11 +300,14 @@ def edit_tab_content() -> rx.Component:
                         on_click=rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}/{EditWorkerState.item.id}")
                     ),
                     rx.heading("Співробітники/Редагування", size="7", color=rx.color("accent", 9)),
-                    rx.button(
-                        "Зберегти",
-                        variant="ghost",
-                        size="3",
-                        on_click=EditWorkerState.edit_one
+                    rx.cond(
+                        AppState.get_user_actions.contains(Action.WORKERS_EDIT),
+                        rx.button(
+                            "Зберегти",
+                            variant="ghost",
+                            size="3",
+                            on_click=EditWorkerState.edit_one
+                        ),
                     ),
 
                     align="center",

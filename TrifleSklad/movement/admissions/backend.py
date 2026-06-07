@@ -314,7 +314,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.new_divisible = value
 
     @rx.event
-    def create_product(self):
+    async def create_product(self):
+        # Створення товару каталогу з поставки потребує права на додавання ТМЦ.
+        if not (await self.get_state(AppState)).has_permission(ActionEnum.PRODUCTS_CREATE):
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         title = self.new_title.strip()
         if title == "" or self.new_id_category == "":
             return rx.toast.error("Вкажіть назву та категорію товару!")

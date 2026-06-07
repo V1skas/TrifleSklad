@@ -6,6 +6,7 @@ class MovementsType:
     MOVEMENT = 3
     ISSUE = 4
     SALE = 5
+    RETURN = 6
 
 movements_type_list: Dict[int, str] = {
     MovementsType.ADMISSION: "Постачання",
@@ -13,6 +14,7 @@ movements_type_list: Dict[int, str] = {
     MovementsType.MOVEMENT: "Переміщення",
     MovementsType.ISSUE: "Видача",
     MovementsType.SALE: "Продаж",
+    MovementsType.RETURN: "Повернення",
 }
 
 class StorageType:

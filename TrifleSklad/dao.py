@@ -119,9 +119,6 @@ class UserDAO:
 
             effective_actions = set(direct_actions).union(set(role_actions))
 
-            print(f"Пользователь {user_login}. Прямые: {direct_actions}. Из ролей: {role_actions}")
-            print(f"Итоговые права: {effective_actions}")
-
             return list(effective_actions)
 
     @classmethod
@@ -157,10 +154,8 @@ class UserDAO:
                 return True, "Користувачаа додано!", user.login
 
         except IntegrityError as e:
-            print("[UserDAO] IntegrityError:", e)
             return False, "Системна помилка! Користувач не може бути доданий.", -1
         except SQLAlchemyError as e:
-            print(f"[UserDAO] SQLAlchemyError:\n{str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -183,13 +178,10 @@ class UserDAO:
                 return True, "Користувача змінено", db_user.login
 
         except IntegrityError as e:
-            print("[UserDAO] IntegrityError: ", e)
             return False, "Помилка! Користувач не може бути змінений.", -1
         except SQLAlchemyError as e:
-            print("[UserDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
         except Exception as e:
-            print("[UserDAO] Exception: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -206,13 +198,10 @@ class UserDAO:
                 return True, "Користувача видалено!"
 
         except IntegrityError as e:
-            print("[UserDAO] IntegrityError: ", e)
             return False, "Помилка! Користувач не може бути видалений.", -1
         except SQLAlchemyError as e:
-            print("[UserDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
         except Exception as e:
-            print("[UserDAO] Exception: ", e)
             return False, "Системна помилка!", -1
 
 
@@ -242,7 +231,6 @@ class AuthTokenDAO:
                 return True, "Токен успешно добавлен", auth_token.id
 
         except IntegrityError as e:
-            print("[AuthTokenDAO] IntegrityError: ", e)
             return False, "Ошибка: Токен не может быть добавлен", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
@@ -371,7 +359,6 @@ class RoleDAO:
                 return True, "Роль успешно добавлена", role.id
 
         except IntegrityError as e:
-            print("[RoleDAO] IntegrityError: ", e)
             return False, "Ошибка: Роль не может быть добавлена", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
@@ -386,10 +373,8 @@ class RoleDAO:
                 session.refresh(role)
                 return True, "Роль успішно змінена!", role.id
         except IntegrityError as e:
-            print("[RoleDAO] IntegrityError: ", e)
             return False, "Системна помилка! Роль не може бути змінена.", -1
         except SQLAlchemyError as e:
-            print("[RoleDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка! Зверніться до розробника.", -1
 
     @classmethod
@@ -406,10 +391,8 @@ class RoleDAO:
                 return True, "Роль видалено."
 
         except IntegrityError as e:
-            print("[RoleDAO] IntegrityError: ", e)
             return False, "Системна помилка! Роль не може бути видалена."
         except SQLAlchemyError as e:
-            print("[RoleDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
         except Exception as e:
             return False, "Системна помилка!"
@@ -505,10 +488,8 @@ class WorkerDAO:
                 return True, "Співробітника додано!", worker.id
 
         except IntegrityError as e:
-            print("[WorkerDAO] IntegrityError: ", e)
             return False, "Системна помилка! Співробітник не може бути доданий.", -1
         except SQLAlchemyError as e:
-            print("[WorkerDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -541,13 +522,10 @@ class WorkerDAO:
                 return True, "Інформацію про співробітника змінено!", worker.id
 
         except IntegrityError as e:
-            print("[WorkerDAO] IntegrityError: ", e)
             return False, "Системна помилка! Співробітник не може бути змінений.", -1
         except SQLAlchemyError as e:
-            print("[WorkerDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
         except Exception as e:
-            print("[WorkerDAO] Exception: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -564,13 +542,10 @@ class WorkerDAO:
                 return True, "Співробітника видалено!"
 
         except IntegrityError as e:
-            print("[WorkerDAO] IntegrityError: ", e)
             return False, "Системна помилка! Співробітник не може бути видалений."
         except SQLAlchemyError as e:
-            print("[WorkerDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
         except Exception as e:
-            print("[WorkerDAO] Exception: ", e)
             return False, "Системна помилка!"
 
 
@@ -670,10 +645,8 @@ class ProductCategoryDAO:
                 return True, "Категорію успішно додано!", category.id
 
         except IntegrityError as e:
-            print("[ProductCategoryDAO] IntegrityError: ", e)
             return False, "Системна помилка! Категорія не може бути додана!", -1
         except SQLAlchemyError as e:
-            print(f"Ошибка: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -699,10 +672,8 @@ class ProductCategoryDAO:
                 return True, "Категорію успішно змінено!", category.id
 
         except IntegrityError as e:
-            print("[ProductCategoryDAO] IntegrityError: ", e)
             return False, "Системна помилка! Категорія не може бути змінена!", -1
         except SQLAlchemyError as e:
-            print("[ProductCategoryDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -719,13 +690,10 @@ class ProductCategoryDAO:
                 return True, "Категорію успішно видалено!"
 
         except IntegrityError as e:
-            print(f"[ProductCategoryDAO] Error: {str(e)}")
             return False, "Системна помилка! Категорія не може бути видалена!"
         except SQLAlchemyError as e:
-            print(f"[ProductCategoryDAO] Error: {str(e)}")
             return False, "Системна помилка!"
         except Exception as e:
-            print(f"[ProductCategoryDAO] Error: {str(e)}")
             return False, "Системна помилка!"
 
 
@@ -909,13 +877,10 @@ class ProductCatalogDAO:
                 return True, "Товар додано!", product.id
 
         except IntegrityError as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка! Товар не може бути доданий!", -1
         except SQLAlchemyError as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка!", -1
         except Exception as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -942,13 +907,10 @@ class ProductCatalogDAO:
                 return True, "Товар успішно змінено!", product.id
 
         except IntegrityError as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка! Товар не може бути змінений!", -1
         except SQLAlchemyError as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка!", -1
         except Exception as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -965,13 +927,10 @@ class ProductCatalogDAO:
                 return True, "Товар видалено!"
 
         except IntegrityError as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка! Товар не може бути видалений!"
         except SQLAlchemyError as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка!"
         except Exception as e:
-            print(f"[ProductCatalogDAO] Error: {str(e)}")
             return False, "Системна помилка!"
 
 
@@ -1105,10 +1064,8 @@ class StorageDAO:
                 return True, "Склад успішно додано!", storage.id
 
         except IntegrityError as e:
-            print("[StorageDAO] IntegrityError: ", e)
             return False, "Системна помилка! Склад не може бути доданий!", -1
         except SQLAlchemyError as e:
-            print("[StorageDAO] Error: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -1135,10 +1092,8 @@ class StorageDAO:
                 return True, "Склад успішно змінено!", storage.id
 
         except IntegrityError as e:
-            print("[StorageDAO] IntegrityError: ", e)
             return False, "Системна помилка! Склад не може бути змінено!", -1
         except SQLAlchemyError as e:
-            print("[StorageDAO] Error: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -1155,10 +1110,8 @@ class StorageDAO:
                 return True, "Склад видалено!"
 
         except IntegrityError as e:
-            print("[StorageDAO] IntegrityError: ", e)
             return False, "Системна помилка! Склад не може бути видалено!"
         except Exception as e:
-            print("[StorageDAO] Error: ", e)
             return False, "Системна помилка!"
 
 
@@ -1228,10 +1181,8 @@ class OwnerDAO:
                 return True, "Власника успішно додано!", owner.id
 
         except IntegrityError as e:
-            print("[OwnerDAO] IntegrityError: ", e)
             return False, "Помилка! Власника не може бути додано!", -1
         except SQLAlchemyError as e:
-            print("[OwnerDAO] IntegrityError: ", e)
             return False, "Помилка!", -1
 
     @classmethod
@@ -1258,10 +1209,8 @@ class OwnerDAO:
                 return True, "Інформацію про власника успішно змінено!", owner.id
 
         except IntegrityError as e:
-            print("[OwnerDAO] IntegrityError: ", e)
             return False, "Помилка! Інформація про власника не може бути змінена!", -1
         except SQLAlchemyError as e:
-            print("[OwnerDAO] SQLAlchemyError: ", e)
             return False, "Помилка!", -1
 
     @classmethod
@@ -1278,13 +1227,10 @@ class OwnerDAO:
                 return True, "Інформація про власника видалена!"
 
         except IntegrityError as e:
-            print("[OwnerDAO] IntegrityError: ", e)
             return False, "Помилка! Інформація про власника не може бути видалена!"
         except SQLAlchemyError as e:
-            print("[OwnerDAO] SQLAlchemyError: ", e)
             return False, "Помилка!"
         except Exception as e:
-            print("[OwnerDAO] SQLAlchemyError: ", e)
             return False, "Помилка!"
 
 
@@ -1348,13 +1294,10 @@ class SupplierDAO:
                 return True, "Постачальника додано!", supplier.id
 
         except IntegrityError as e:
-            print("[SupplierDAO] IntegrityError: ", e)
             return False, "Помилка! Інформація про постачальника не може бути додана!", -1
         except SQLAlchemyError as e:
-            print("[SupplierDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
         except Exception as e:
-            print("[SupplierDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -1381,13 +1324,10 @@ class SupplierDAO:
                 return True, "Інформація про постачальника змінена!", supplier.id
 
         except IntegrityError as e:
-            print("[SupplierDAO] IntegrityError: ", e)
             return False, "Помилка! Інформація про постачальника не може бути змінена!", -1
         except SQLAlchemyError as e:
-            print("[SupplierDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
         except Exception as e:
-            print("[SupplierDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -1404,13 +1344,10 @@ class SupplierDAO:
                 return True, "Інформація про постачальника видалена!"
 
         except IntegrityError as e:
-            print("[SupplierDAO] IntegrityError: ", e)
             return False, "Помилка! Інформація про постачальника не може бути видалена!"
         except SQLAlchemyError as e:
-            print("[SupplierDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
         except Exception as e:
-            print("[SupplierDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
 
 
@@ -1441,13 +1378,16 @@ class ProductDAO:
     def get_by_owner_storage_with_product_catalog(
         cls, owner_id: int, storage_id: int
     ) -> List[Product]:
+        # owner_id == -1 — без фільтра за власником (напр. повернення з площадки:
+        # на місці лежить ТМЦ різних власників, кожна одиниця зберігає свого).
         statement = (
             select(Product)
             .options(joinedload(Product.product_catalog))
-            .where(Product.id_owner == owner_id)
             .where(Product.id_storage == storage_id)
             .where(Product.is_deleted == False)
         )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
 
         with rx.session() as session:
             products = session.exec(statement).all()
@@ -1490,7 +1430,6 @@ class ProductDAO:
                 return True, "Единица товара успешно добавлена", product.id
 
         except IntegrityError as e:
-            print("[ProductDAO] IntegrityError: ", e)
             return False, "Ошибка: Единица товара не может быть добавлена", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
@@ -1512,10 +1451,8 @@ class ProductDAO:
                 return True, "Единица товара успешно изменена", product.id
 
         except IntegrityError as e:
-            print("[ProductDAO] IntegrityError: ", e)
             return False, "Ошибка: Единица товара не может быть изменена", -1
         except SQLAlchemyError as e:
-            print("[ProductDAO] SQLAlchemyError: ", e)
             return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
@@ -1599,7 +1536,6 @@ class ProductDAO:
                 return True, "Одиницю товару розділено", child
 
         except SQLAlchemyError as e:
-            print("[ProductDAO] split_product: ", e)
             return False, f"Ошибка: {str(e)}", None
 
     @classmethod
@@ -1657,6 +1593,29 @@ class ProductDAO:
             if not flag:
                 return flag, text
         return True, "Единицы товара обработаны"
+
+    @classmethod
+    def update_storage(cls, id_list: List[int], new_storage_id: int) -> tuple[bool, str]:
+        """Оновлює лише місце зберігання одиниць, не чіпаючи власника
+        (повернення з площадки/відділу на склад — власник лишається той самий)."""
+        try:
+            with rx.session() as session:
+                statement = select(Product).where(Product.id.in_(id_list))
+                products = session.exec(statement).all()
+
+                for product in products:
+                    product.id_storage = new_storage_id
+                    session.add(product)
+
+                session.commit()
+                return True, "Единицы товара успешно перемещены"
+
+        except IntegrityError:
+            return False, "Ошибка: Единицы товара не могут быть перемещены"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
 
     @classmethod
     def update_serial_numbers(cls, serials: Dict[int, str]) -> tuple[bool, str]:
@@ -1882,7 +1841,6 @@ class MovementDAO:
                 return True, "Движение товара успешно добавлено", movement.id
 
         except IntegrityError as e:
-            print("[MovementDAO] IntegrityError: ", e)
             return False, "Ошибка: Движение товара не может быть добавлено", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
@@ -1904,10 +1862,8 @@ class MovementDAO:
                 return True, "Движение товара успешно изменено", movement.id
 
         except IntegrityError as e:
-            print("[MovementDAO] IntegrityError: ", e)
             return False, "Ошибка: Единица товара не может быть изменена", -1
         except SQLAlchemyError as e:
-            print("[MovementDAO] SQLAlchemyError: ", e)
             return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
@@ -2014,7 +1970,6 @@ class MovementDAO:
                 return True, "Единицы товара возвращены на предыдущее место"
 
         except SQLAlchemyError as e:
-            print("[MovementDAO] restore_products_to_previous_location: ", e)
             return False, f"Ошибка: {str(e)}"
 
 
@@ -2055,7 +2010,6 @@ class MovementProductsCatalogDAO:
                 return True, "Товар успешно добавлен", movement_products_catalog.id
 
         except IntegrityError as e:
-            print("[MovementProductsCatalogDAO] IntegrityError: ", e)
             return False, "Ошибка: Товар не может быть добавлен", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
@@ -2083,10 +2037,8 @@ class MovementProductsCatalogDAO:
                 )
 
         except IntegrityError as e:
-            print("[MovementProductsCatalogDAO] IntegrityError: ", e)
             return False, "Ошибка: Единица товара не может быть изменена", -1
         except SQLAlchemyError as e:
-            print("[MovementProductsCatalogDAO] SQLAlchemyError: ", e)
             return False, f"Ошибка: {str(e)}", -1
 
 
@@ -2140,10 +2092,8 @@ class PaymentTypeDAO:
                 return True, "Тип оплати додано!", payment_type.id
 
         except IntegrityError as e:
-            print("[PaymentTypeDAO] IntegrityError: ", e)
             return False, "Системна помилка! Тип оплати не може бути доданий!", -1
         except SQLAlchemyError as e:
-            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -2170,10 +2120,8 @@ class PaymentTypeDAO:
                 return True, "Тип оплати змінено!", payment_type.id
 
         except IntegrityError as e:
-            print("[PaymentTypeDAO] IntegrityError: ", e)
             return False, "Системна помилка! Тип оплати не може бути змінений!", -1
         except SQLAlchemyError as e:
-            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -2190,13 +2138,10 @@ class PaymentTypeDAO:
                 return True, "Тип оплати видалено!"
 
         except IntegrityError as e:
-            print("[PaymentTypeDAO] IntegrityError: ", e)
             return False, "Системна помилка! Тип оплати не може бути видалений!"
         except SQLAlchemyError as e:
-            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
             return False, "Системна помилка!", -1
         except Exception as e:
-            print(f"[PaymentTypeDAO] Ошибка: {str(e)}")
             return False, "Системна помилка!", -1
 
 
@@ -2250,10 +2195,8 @@ class NDSRateDAO:
                 return True, "Ставку ПДВ додано!", nds_rate.id
 
         except IntegrityError as e:
-            print("[NDSRateDAO] IntegrityError: ", e)
             return False, "Системна помилка! Ставка ПДВ не може бути додана!", -1
         except SQLAlchemyError as e:
-            print(f"[NDSRateDAO] SQLAlchemyError: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -2280,10 +2223,8 @@ class NDSRateDAO:
                 return True, "Ставку ПДВ змінено!", nds_rate.id
 
         except IntegrityError as e:
-            print("[NDSRateDAO] IntegrityError: ", e)
             return False, "Системна помилка! Ставка ПДВ не може бути змінена!", -1
         except SQLAlchemyError as e:
-            print(f"[NDSRateDAO] SQLAlchemyError: {str(e)}")
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -2300,13 +2241,10 @@ class NDSRateDAO:
                 return True, "Ставку ПДВ видалено!"
 
         except IntegrityError as e:
-            print("[NDSRateDAO] IntegrityError: ", e)
             return False, "Системна помилка! Ставка ПДВ не може бути видалена!"
         except SQLAlchemyError as e:
-            print(f"[NDSRateDAO] SQLAlchemyError: {str(e)}")
             return False, "Системна помилка!"
         except Exception as e:
-            print(f"[NDSRateDAO] Exception: {str(e)}")
             return False, "Системна помилка!"
 
 
@@ -2497,10 +2435,8 @@ class AdmissionDAO:
                 return True, "Постачання успішно додано!", movement.id
 
         except IntegrityError as e:
-            print("[AdmissionDAO] IntegrityError: ", e)
             return False, "Помилка! Постачання не може бути додано.", -1
         except SQLAlchemyError as e:
-            print("[AdmissionDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -2512,10 +2448,8 @@ class AdmissionDAO:
                 return True, "Постачання успішно змінено!", admission.id
 
         except IntegrityError as e:
-            print("[AdmissionDAO] IntegrityError: ", e)
             return False, "Помилка! Постачання не може бути змінено.", -1
         except SQLAlchemyError as e:
-            print("[AdmissionDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -2584,13 +2518,10 @@ class AdmissionDAO:
                 return True, "Постачання успішно видалено!"
 
         except IntegrityError as e:
-            print("[AdmissionDAO] IntegrityError: ", e)
             return False, "Помилка! Постачання не може бути видалено."
         except SQLAlchemyError as e:
-            print("[AdmissionDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
         except Exception as e:
-            print("[AdmissionDAO] Exception: ", e)
             return False, "Системна помилка!"
 
 
@@ -2752,7 +2683,6 @@ class IssueDAO:
                 return True, "Выдача успешно добавлена", issue.id
 
         except IntegrityError as e:
-            print("[IssueDAO] IntegrityError: ", e)
             return False, "Ошибка: Выдача не может быть добавлена", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
@@ -2767,10 +2697,8 @@ class IssueDAO:
                 return True, "Выдача успешно изменена", issue.id
 
         except IntegrityError as e:
-            print("[IssueDAO] IntegrityError: ", e)
             return False, "Ошибка: Выдача не может быть изменена", -1
         except SQLAlchemyError as e:
-            print("[IssueDAO] SQLAlchemyError: ", e)
             return False, f"Ошибка: {str(e)}", -1
 
 
@@ -2955,10 +2883,8 @@ class SaleDAO:
                 return True, "Продаж успішно додано", sale.id
 
         except IntegrityError as e:
-            print("[SaleDAO] IntegrityError: ", e)
             return False, "Помилка: Продаж не може бути додано", -1
         except SQLAlchemyError as e:
-            print("[SaleDAO] SQLAlchemyError: ", e)
             return False, f"Помилка: {str(e)}", -1
 
     @classmethod
@@ -2984,10 +2910,8 @@ class SaleDAO:
                 return True, "Продаж успішно змінено", sale.id
 
         except IntegrityError as e:
-            print("[SaleDAO] IntegrityError: ", e)
             return False, "Помилка: Продаж не може бути змінено", -1
         except SQLAlchemyError as e:
-            print("[SaleDAO] SQLAlchemyError: ", e)
             return False, f"Помилка: {str(e)}", -1
 
 
@@ -3092,10 +3016,8 @@ class RequestDAO:
                 return True, "Заявку успішно створено!", request.id
 
         except IntegrityError as e:
-            print("[RequestDAO] IntegrityError: ", e)
             return False, "Помилка! Заявка не може бути створена.", -1
         except SQLAlchemyError as e:
-            print("[RequestDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -3140,10 +3062,8 @@ class RequestDAO:
                 return True, "Заявку успішно змінено!", request.id
 
         except IntegrityError as e:
-            print("[RequestDAO] IntegrityError: ", e)
             return False, "Помилка! Заявка не може бути змінена.", -1
         except SQLAlchemyError as e:
-            print("[RequestDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!", -1
 
     @classmethod
@@ -3159,7 +3079,6 @@ class RequestDAO:
                 return True, "Заявку виконано"
 
         except SQLAlchemyError as e:
-            print("[RequestDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
 
     @classmethod
@@ -3179,7 +3098,6 @@ class RequestDAO:
                 return True, "Заявку повернуто у стан «Нова»"
 
         except SQLAlchemyError as e:
-            print("[RequestDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"
 
     @classmethod
@@ -3196,5 +3114,4 @@ class RequestDAO:
                 return True, "Заявку видалено"
 
         except SQLAlchemyError as e:
-            print("[RequestDAO] SQLAlchemyError: ", e)
             return False, "Системна помилка!"

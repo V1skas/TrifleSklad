@@ -8,6 +8,7 @@ from TrifleSklad.movement.write_off.backend import WriteOffState
 from TrifleSklad.movement.movements.backend import MovementsState
 from TrifleSklad.movement.issues.backend import IssueState
 from TrifleSklad.movement.sale.backend import SaleState
+from TrifleSklad.movement.returns.backend import ReturnsState
 
 class MovementState(AppState):
     class Tabs:
@@ -16,6 +17,7 @@ class MovementState(AppState):
         MOVEMENTS = "movements"
         ISSUES = "issues"
         SALES = "sales"
+        RETURNS = "returns"
 
     __tabs_events = {
         Tabs.ADMISSIONS: AdmissionState.on_load,
@@ -23,6 +25,7 @@ class MovementState(AppState):
         Tabs.MOVEMENTS: MovementsState.on_load,
         Tabs.ISSUES: IssueState.on_load,
         Tabs.SALES: SaleState.on_load,
+        Tabs.RETURNS: ReturnsState.on_load,
     }
 
     current_tab: str = ""
@@ -31,7 +34,7 @@ class MovementState(AppState):
         tab = self.router.page.params.get("tab", "")
 
         if tab != "":
-            if tab not in [self.Tabs.ADMISSIONS, self.Tabs.WRITE_OFFS, self.Tabs.MOVEMENTS, self.Tabs.ISSUES, self.Tabs.SALES]:
+            if tab not in [self.Tabs.ADMISSIONS, self.Tabs.WRITE_OFFS, self.Tabs.MOVEMENTS, self.Tabs.ISSUES, self.Tabs.SALES, self.Tabs.RETURNS]:
                 return rx.redirect(routes.WELCOME)
 
             self.current_tab = tab
@@ -43,10 +46,11 @@ class MovementState(AppState):
             and not self.has_section_access("write_offs")
             and not self.has_section_access("movements")
             and not self.has_section_access("issues")
-            and not self.has_section_access("sales")):
+            and not self.has_section_access("sales")
+            and not self.has_section_access("returns")):
             return rx.redirect(routes.WELCOME)
         self.current_tab = ""
         result = self._check_path()
         if result is not None:
             return result
-        return self.__tabs_events.get(self.current_tab, lambda: print("Not handled event"))()
+        return self.__tabs_events.get(self.current_tab, lambda: None)()

@@ -147,11 +147,6 @@ def index():
                 AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
                 sidebar_link("Ставки ПДВ", routes.CATALOG_NDS_RATES),
             ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST)
-                | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
-                sidebar_link("Заявки на видачу", routes.CATALOG_REQUESTS),
-            ),
         ),
         workspace(
             categories_tab(),

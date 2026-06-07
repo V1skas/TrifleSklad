@@ -53,12 +53,16 @@ def navbar() -> rx.Component:
                     navbar_link("Адміністрування", routes.ADMIN),
                 ),
                 rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST) | AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST) | AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST) | AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST) | AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST) | AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST) | AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
+                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST) | AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST) | AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST) | AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST) | AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST) | AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST) | AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
                     navbar_link("Каталог", routes.CATALOG),
                 ),
                 rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST) | AppState.get_user_actions.contains(ActionEnum.SALES_LIST),
+                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST) | AppState.get_user_actions.contains(ActionEnum.SALES_LIST) | AppState.get_user_actions.contains(ActionEnum.RETURNS_LIST),
                     navbar_link("Рух ТМЦ", routes.MOVEMENT),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
+                    navbar_link("Заявки", routes.CATALOG_REQUESTS),
                 ),
 
                 align_items="center",

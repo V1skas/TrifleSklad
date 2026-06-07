@@ -21,6 +21,11 @@ class ProductsMovementListState(rx.State):
     split_mode: Dict[int, bool] = {}
     split_amount: Dict[int, str] = {}
 
+    # Чи обов'язковий вибір власника для відкриття діалогу. Вимикається там, де
+    # власник не задається (напр. повернення з площадки — фільтр лише за складом,
+    # кожна одиниця зберігає свого власника).
+    require_owner: bool = True
+
     # Обов'язковість серійного номера (вмикається лише там, де він потрібен —
     # напр. при видачі/продажу ТМЦ із серійним номером).
     require_serial: bool = False
@@ -38,6 +43,7 @@ class ProductsMovementListState(rx.State):
         self.products_selector_state.clear()
         self.split_mode = {}
         self.split_amount = {}
+        self.require_owner = True
         self.require_serial = False
         self.require_price = False
         self.prices = {}
@@ -53,6 +59,9 @@ class ProductsMovementListState(rx.State):
 
     def set_require_serial(self, flag: bool):
         self.require_serial = flag
+
+    def set_require_owner(self, flag: bool):
+        self.require_owner = flag
 
     def set_require_price(self, flag: bool):
         self.require_price = flag
@@ -87,9 +96,10 @@ class ProductsMovementListState(rx.State):
 
     @rx.var
     def ability_open_dialog(self) -> bool:
-        return (
-            True if self.filter_by_owner > -1 and self.filter_by_storage > -1 else False
-        )
+        # Потрібен обраний склад; власник — лише якщо require_owner.
+        if self.filter_by_storage <= -1:
+            return False
+        return self.filter_by_owner > -1 or not self.require_owner
 
     @rx.var
     def get_items(self) -> List[Tuple[int, Product]]:
@@ -127,7 +137,9 @@ class ProductsMovementListState(rx.State):
         # Спершу показуємо скелетон, потім (після yield) довантажуємо ТМЦ —
         # щоб користувач бачив процес завантаження, а не порожній діалог.
         self.products_selector_state.is_loading = True
-        self.products_selector_state.items = []
+        # Скидаємо не лише items, а й службові індекси — інакше обчислювані
+        # get_(un)selected_items впадуть на застарілих індексах під час дельти.
+        self.products_selector_state.reset_items()
         self.dialog_open = True
         yield
         filter_products = [item.id for item in self.items]

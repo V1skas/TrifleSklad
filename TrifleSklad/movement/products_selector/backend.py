@@ -33,6 +33,17 @@ class ProductsSelectorState(rx.State):
         self.filter_by_products = []
         self.is_loading = False
 
+    def reset_items(self) -> None:
+        """Скидає перелік ТМЦ і службові індекси (без скидання фільтрів). Потрібно
+        перед перезавантаженням діалогу: інакше обчислювані get_selected_items/
+        get_unselected_items звертаються до застарілих індексів уже порожнього
+        self.items під час проміжної дельти-скелетону → IndexError."""
+        self.items = []
+        self.unselected_items = []
+        self.selected_items = []
+        self.unselected_items_filtered = []
+        self.selected_items_filtered = []
+
     @rx.var
     def has_items(self) -> bool:
         return len(self.items) > 0

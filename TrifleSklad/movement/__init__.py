@@ -1,4 +1,4 @@
-from TrifleSklad.movement import backend, frontend, admissions, write_off, issues, sale
+from TrifleSklad.movement import backend, frontend, admissions, write_off, issues, sale, returns
 
 __all__ = [
     "backend",
@@ -7,4 +7,5 @@ __all__ = [
     "write_off",
     "issues",
     "sale",
+    "returns",
 ]

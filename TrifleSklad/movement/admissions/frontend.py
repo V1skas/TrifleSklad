@@ -117,13 +117,16 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
         ),
         rx.hstack(
             rx.spacer(),
-            rx.button(
-                rx.icon("plus", size=14),
-                "Створити товар",
-                variant="ghost",
-                size="2",
-                type="button",
-                on_click=MovementProductCatalogAddEditFormState.open_create_product,
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.PRODUCTS_CREATE),
+                rx.button(
+                    rx.icon("plus", size=14),
+                    "Створити товар",
+                    variant="ghost",
+                    size="2",
+                    type="button",
+                    on_click=MovementProductCatalogAddEditFormState.open_create_product,
+                ),
             ),
             width="100%",
         ),
@@ -836,6 +839,7 @@ def add_form() -> rx.Component:
                             width="100%",
                         ),
                         rx.select.content(
+                            rx.select.item("Без ПДВ", value="None"),
                             rx.foreach(
                                 AddAdmissionState.list_nds_rates,
                                 lambda nr: rx.select.item(nr[0], value=nr[1])
@@ -1050,6 +1054,7 @@ def edit_form() -> rx.Component:
                             width="100%",
                         ),
                         rx.select.content(
+                            rx.select.item("Без ПДВ", value="None"),
                             rx.foreach(
                                 EditAdmissionState.list_nds_rates,
                                 lambda nr: rx.select.item(nr[0], value=nr[1])

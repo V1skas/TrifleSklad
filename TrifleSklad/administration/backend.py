@@ -41,4 +41,4 @@ class AdministrationState(AppState):
         result = self._check_path()
         if result is not None:
             return result
-        return self.__tabs_events.get(self.current_tab, lambda: print("Not handled event"))()
+        return self.__tabs_events.get(self.current_tab, lambda: None)()

@@ -445,8 +445,11 @@ def process_tab_content() -> rx.Component:
                 left=rx.button("Скасувати", variant="ghost", size="3",
                                on_click=rx.redirect(f"{routes.CATALOG_REQUESTS_VIEW_ID}{ProcessRequestsState.item.id}")),
                 actions=[
-                    rx.button("Сформувати рух", variant="ghost", size="3", color_scheme="green",
-                              on_click=ProcessRequestsState.process),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.REQUESTS_PROCESS),
+                        rx.button("Сформувати рух", variant="ghost", size="3", color_scheme="green",
+                                  on_click=ProcessRequestsState.process),
+                    ),
                 ],
             ),
             rx.card(

@@ -1,8 +1,32 @@
 import reflex as rx
 from sqlmodel import select
 
-from TrifleSklad.models import Action 
+from TrifleSklad.models import Action, Role
 from TrifleSklad.actions import Action as SystemAction
+
+# Роль, якій автоматично видаються всі права (створюється у deploy.py).
+SUPER_ADMIN_ROLE_TITLE = "Супер-Администратор"
+
+
+def grant_all_actions_to_super_admin(session: rx.session):
+    """Видає ролі «Супер-Администратор» усі наявні права. Викликається після
+    синхронізації дій, щоб нові права (додані в actions.py) одразу були доступні
+    супер-адміну без ручного призначення через UI."""
+    admin_role = session.exec(
+        select(Role).where(Role.title == SUPER_ADMIN_ROLE_TITLE)
+    ).first()
+    if admin_role is None:
+        return
+
+    all_actions = session.exec(select(Action)).all()
+    existing_codes = {act.code for act in admin_role.actions}
+    missing = [act for act in all_actions if act.code not in existing_codes]
+    if missing:
+        admin_role.actions = list(admin_role.actions) + missing
+        session.add(admin_role)
+        session.commit()
+        print(f"Супер-Администратору выдано новых прав: {len(missing)}")
+
 
 def sync_actions(session: rx.session):
     print("Начинаем синхронизацию действий (Actions)...")
@@ -40,6 +64,8 @@ def sync_actions(session: rx.session):
 
     session.commit()
     print(f"Готово! Добавлено: {added_count}, Обновлено текстов: {updated_count}")
+
+    grant_all_actions_to_super_admin(session)
 
 if __name__ == "__main__":
     with rx.session() as session:
