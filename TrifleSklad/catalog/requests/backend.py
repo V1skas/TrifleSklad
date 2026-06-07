@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 
@@ -20,6 +20,7 @@ from TrifleSklad.declared import (
     MovementsType,
     RequestStatus,
     StorageType,
+    format_request_qty,
     movements_type_list,
     request_status_list,
 )
@@ -159,11 +160,15 @@ class _RequestFormState(rx.State, mixin=True):
     list_workers: List[Tuple[str, str]] = []
     list_destinations: List[Tuple[str, str]] = []
     list_catalog: List[Tuple[str, str]] = []
+    # довідник характеристик каталогу: id -> (divisible, capacity, unit)
+    _catalog_info: Dict[int, Tuple[bool, int, str]] = {}
 
     new_position_catalog: str = ""
     new_position_count: str = "1"
-    # позиції: (id каталогу, назва, кількість)
-    positions: List[Tuple[int, str, int]] = []
+    new_position_part: str = ""
+    is_position_dialog_open: bool = False
+    # позиції: (id каталогу, назва, к-сть цілих, частина)
+    positions: List[Tuple[int, str, int, int]] = []
 
     def _load_form_lists(self):
         self.list_workers = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
@@ -171,7 +176,11 @@ class _RequestFormState(rx.State, mixin=True):
             StorageType.TECHNICAL_SITE
         ) + StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
         self.list_destinations = [(s.title, str(s.id)) for s in destinations]
-        self.list_catalog = [(p.title, str(p.id)) for p in ProductCatalogDAO.get_all()]
+        catalog = ProductCatalogDAO.get_all()
+        self.list_catalog = [(p.title, str(p.id)) for p in catalog]
+        self._catalog_info = {
+            p.id: (p.divisible, p.capacity, p.unit) for p in catalog
+        }
 
     @rx.var
     def is_issue_type(self) -> bool:
@@ -184,6 +193,37 @@ class _RequestFormState(rx.State, mixin=True):
     @rx.var
     def has_positions(self) -> bool:
         return len(self.positions) > 0
+
+    @rx.var
+    def new_position_is_divisible(self) -> bool:
+        if self.new_position_catalog == "":
+            return False
+        info = self._catalog_info.get(int(self.new_position_catalog))
+        return info[0] if info is not None else False
+
+    @rx.var
+    def new_position_capacity(self) -> int:
+        if self.new_position_catalog == "":
+            return 0
+        info = self._catalog_info.get(int(self.new_position_catalog))
+        return info[1] if info is not None else 0
+
+    @rx.var
+    def new_position_unit(self) -> str:
+        if self.new_position_catalog == "":
+            return ""
+        info = self._catalog_info.get(int(self.new_position_catalog))
+        return info[2] if info is not None else ""
+
+    @rx.var
+    def positions_rows(self) -> List[Tuple[int, str, str]]:
+        # (індекс, назва, опис кількості) для таблиці у формі.
+        result: List[Tuple[int, str, str]] = []
+        for index, (cid, title, count, part) in enumerate(self.positions):
+            info = self._catalog_info.get(cid)
+            unit = info[2] if info is not None else ""
+            result.append((index, title, format_request_qty(count, part, unit)))
+        return result
 
     @rx.event
     def on_change_type(self, value: str):
@@ -202,27 +242,71 @@ class _RequestFormState(rx.State, mixin=True):
         self.comment = value
 
     @rx.event
+    def open_position_dialog(self):
+        # Очищаємо поля та відкриваємо модальне вікно додавання позиції.
+        self.new_position_catalog = ""
+        self.new_position_count = "1"
+        self.new_position_part = ""
+        self.is_position_dialog_open = True
+
+    @rx.event
+    def set_position_dialog_open(self, value: bool):
+        self.is_position_dialog_open = value
+
+    @rx.event
     def on_change_new_position_catalog(self, value: str):
         self.new_position_catalog = value
+        # Скидаємо обсяги при зміні позиції (різна логіка для подільного/неподільного).
+        self.new_position_count = "1"
+        self.new_position_part = ""
 
     @rx.event
     def on_change_new_position_count(self, value: str):
         self.new_position_count = value
 
     @rx.event
+    def on_change_new_position_part(self, value: str):
+        self.new_position_part = value
+
+    @rx.event
     def add_position(self):
-        if self.new_position_catalog == "" or not self.new_position_count.isdigit():
-            return rx.toast.error("Оберіть позицію та вкажіть кількість!")
+        if self.new_position_catalog == "":
+            return rx.toast.error("Оберіть позицію!")
         catalog_id = int(self.new_position_catalog)
-        count = int(self.new_position_count)
-        if count <= 0:
-            return rx.toast.error("Кількість має бути більше нуля!")
         if any(p[0] == catalog_id for p in self.positions):
             return rx.toast.error("Цю позицію вже додано!")
-        title = next((t for cid, t in self.list_catalog if cid == str(catalog_id)), "")
-        self.positions = self.positions + [(catalog_id, title, count)]
+
+        info = self._catalog_info.get(catalog_id)
+        divisible = info[0] if info is not None else False
+        capacity = info[1] if info is not None else 0
+
+        count = int(self.new_position_count) if self.new_position_count.isdigit() else 0
+        part = int(self.new_position_part) if self.new_position_part.isdigit() else 0
+
+        if divisible:
+            if part != 0 and (part < 1 or (capacity > 0 and part >= capacity)):
+                return rx.toast.error(
+                    f"Частина має бути від 1 до {capacity - 1}!"
+                    if capacity > 0
+                    else "Невірний обсяг частини!"
+                )
+            if count <= 0 and part <= 0:
+                return rx.toast.error(
+                    "Вкажіть кількість цілих одиниць або частину!"
+                )
+            if count < 0:
+                return rx.toast.error("Невірна кількість цілих одиниць!")
+        else:
+            if count <= 0:
+                return rx.toast.error("Кількість має бути більше нуля!")
+            part = 0
+
+        title = next((t for t, cid in self.list_catalog if cid == str(catalog_id)), "")
+        self.positions = self.positions + [(catalog_id, title, count, part)]
         self.new_position_catalog = ""
         self.new_position_count = "1"
+        self.new_position_part = ""
+        self.is_position_dialog_open = False
 
     @rx.event
     def remove_position(self, index: int):
@@ -230,8 +314,10 @@ class _RequestFormState(rx.State, mixin=True):
 
     def _build_positions(self) -> List[RequestProductsCatalog]:
         return [
-            RequestProductsCatalog(id_product_catalog=cid, count=count)
-            for cid, _title, count in self.positions
+            RequestProductsCatalog(
+                id_product_catalog=cid, count=count, part_amount=(part or None)
+            )
+            for cid, _title, count, part in self.positions
         ]
 
     def _validate(self) -> Optional[str]:
@@ -257,6 +343,7 @@ class AddRequestsState(_RequestFormState, rx.State):
         self.comment = ""
         self.new_position_catalog = ""
         self.new_position_count = "1"
+        self.new_position_part = ""
         self.positions = []
         self._load_form_lists()
 
@@ -322,11 +409,12 @@ class EditRequestsState(_RequestFormState, rx.State):
         )
         self.comment = self.item.comment or ""
         self.positions = [
-            (pc.id_product_catalog, pc.product.title, pc.count)
+            (pc.id_product_catalog, pc.product.title, pc.count, pc.part_amount or 0)
             for pc in self.item.products_catalog
         ]
         self.new_position_catalog = ""
         self.new_position_count = "1"
+        self.new_position_part = ""
 
     @rx.event
     def edit_one(self):
@@ -349,7 +437,9 @@ class EditRequestsState(_RequestFormState, rx.State):
             if is_issue and self.id_destination_storage
             else None,
             "comment": self.comment or None,
-            "positions": [(cid, count) for cid, _title, count in self.positions],
+            "positions": [
+                (cid, count, part) for cid, _title, count, part in self.positions
+            ],
         }
         flag, text, id = RequestDAO.edit_one(form_data)
         if flag:
@@ -409,10 +499,16 @@ class ViewRequestsState(rx.State):
         )
 
     @rx.var
-    def positions_rows(self) -> List[Tuple[str, int]]:
+    def positions_rows(self) -> List[Tuple[str, str]]:
         if self.item is None:
             return []
-        return [(pc.product.title, pc.count) for pc in self.item.products_catalog]
+        return [
+            (
+                pc.product.title,
+                format_request_qty(pc.count, pc.part_amount, pc.product.unit),
+            )
+            for pc in self.item.products_catalog
+        ]
 
     @rx.var
     def movement_link(self) -> str:
@@ -489,10 +585,16 @@ class ProcessRequestsState(rx.State):
         )
 
     @rx.var
-    def required_rows(self) -> List[Tuple[str, int]]:
+    def required_rows(self) -> List[Tuple[str, str]]:
         if self.item is None:
             return []
-        return [(pc.product.title, pc.count) for pc in self.item.products_catalog]
+        return [
+            (
+                pc.product.title,
+                format_request_qty(pc.count, pc.part_amount, pc.product.unit),
+            )
+            for pc in self.item.products_catalog
+        ]
     # ======================
 
     @rx.event
@@ -549,28 +651,6 @@ class ProcessRequestsState(rx.State):
     def on_change_id_responsible(self, value: str):
         self.id_responsible = value
 
-    def _check_positions_match(self, products_list) -> Optional[str]:
-        # Кількість обраних одиниць за позицією каталогу має дорівнювати замовленій.
-        required = {pc.id_product_catalog: pc.count for pc in self.item.products_catalog}
-        selected = {}
-        for p in products_list:
-            selected[p.id_product_catalog] = selected.get(p.id_product_catalog, 0) + 1
-        for catalog_id, count in required.items():
-            if selected.get(catalog_id, 0) != count:
-                title = next(
-                    (pc.product.title for pc in self.item.products_catalog
-                     if pc.id_product_catalog == catalog_id),
-                    str(catalog_id),
-                )
-                return (
-                    f"За позицією «{title}» потрібно {count} од., "
-                    f"обрано {selected.get(catalog_id, 0)}."
-                )
-        for catalog_id in selected:
-            if catalog_id not in required:
-                return "Обрано ТМЦ, якого немає в заявці."
-        return None
-
     @rx.event
     async def process(self):
         if not self.app_state.has_permission(ActionEnum.REQUESTS_PROCESS):
@@ -588,9 +668,9 @@ class ProcessRequestsState(rx.State):
         if not ok:
             return rx.toast.error(msg)
 
-        mismatch = self._check_positions_match(products_list)
-        if mismatch is not None:
-            return rx.toast.error(mismatch)
+        # Заявка має рекомендаційний характер: відповідність обраних одиниць
+        # позиціям заявки не блокує формування руху (оператор видає фактично
+        # наявне). Перелік «Потрібно за заявкою» показано для довідки.
 
         login = self.app_state.user.login
         list_id_products = [p.id for p in products_list]
@@ -618,8 +698,10 @@ class ProcessRequestsState(rx.State):
                 return rx.toast.error(text)
             serials = {p.id: p.serial_number for p in products_list}
             ProductDAO.update_serial_numbers(serials)
-            ProductDAO.update_owner_storage(
-                list_id_products,
+            # Видача: подільний ТМЦ списується на місці (споживається),
+            # неподільний — переміщується на призначення (площадка/відділ).
+            ProductDAO.apply_issue_relocation(
+                products_list,
                 int(self.id_incoming_owner),
                 int(self.item.id_destination_storage),
             )

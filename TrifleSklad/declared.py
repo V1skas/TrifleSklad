@@ -39,6 +39,17 @@ class RequestStatus:
 
 request_status_list: List[str] = ["Нова", "Виконана"]
 
+def format_request_qty(count: int, part: Optional[int], unit: str = "") -> str:
+    """Людиночитний опис кількості позиції заявки: цілі одиниці та/або частина
+    (для подільного ТМЦ). Напр. «2 ціл. + 30 м», «1 ціл.», «30 м»."""
+    chunks: List[str] = []
+    if count and count > 0:
+        chunks.append(f"{count} ціл.")
+    if part:
+        chunks.append(f"{part} {unit}".strip())
+    return " + ".join(chunks) if chunks else "0"
+
+
 def get_status_by_text(text: str) -> Optional[int]:
     for index, status in enumerate(movements_status_list):
         if status == text:

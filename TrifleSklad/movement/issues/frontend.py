@@ -90,9 +90,51 @@ def list_tab_content() -> rx.Component:
     )
 
 
+def request_picker() -> rx.Component:
+    # Формування видачі на основі заявки (для тих, хто має право обробки заявок).
+    return rx.cond(
+        AppState.get_user_actions.contains(ActionEnum.REQUESTS_PROCESS)
+        & AddIssueState.has_requests,
+        rx.vstack(
+            rx.text("Заявка (необов'язково):"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Без заявки", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddIssueState.list_requests,
+                        lambda r: rx.select.item(r[0], value=r[1]),
+                    ),
+                    width="100%",
+                ),
+                value=AddIssueState.selected_request_id,
+                on_change=AddIssueState.on_change_request,
+                width="100%",
+            ),
+            rx.cond(
+                AddIssueState.has_request_positions,
+                rx.vstack(
+                    rx.text("Потрібно за заявкою:", weight="bold", size="2"),
+                    rx.foreach(
+                        AddIssueState.request_positions,
+                        lambda p: rx.text(f"• {p[0]} — {p[1]}", size="2"),
+                    ),
+                    spacing="1",
+                    align="stretch",
+                    width="100%",
+                ),
+            ),
+            rx.divider(),
+            spacing="2",
+            align="stretch",
+            width="100%",
+        ),
+    )
+
+
 def add_form() -> rx.Component:
     return rx.card(
         rx.vstack(
+            request_picker(),
             rx.text("Дата:"),
             rx.input(
                 name="date",

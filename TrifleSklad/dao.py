@@ -1611,6 +1611,32 @@ class ProductDAO:
             return False, f"Ошибка: {str(e)}"
 
     @classmethod
+    def apply_issue_relocation(
+        cls, products: List[Product], new_owner_id: int, new_storage_id: int
+    ) -> tuple[bool, str]:
+        """Фіналізує одиниці ТМЦ при видачі на площадку/відділ: подільні одиниці
+        списуються (is_deleted) — вони вважаються спожитими на місці, решта
+        переміщується на призначення. `products` — перелік Product із завантаженим
+        зв'язком product_catalog (для перевірки divisible)."""
+        divisible_ids = [
+            p.id
+            for p in products
+            if p.product_catalog is not None and p.product_catalog.divisible
+        ]
+        movable_ids = [p.id for p in products if p.id not in divisible_ids]
+        if divisible_ids:
+            flag, text = cls.delete_list(divisible_ids)
+            if not flag:
+                return flag, text
+        if movable_ids:
+            flag, text = cls.update_owner_storage(
+                movable_ids, new_owner_id, new_storage_id
+            )
+            if not flag:
+                return flag, text
+        return True, "Единицы товара обработаны"
+
+    @classmethod
     def update_serial_numbers(cls, serials: Dict[int, str]) -> tuple[bool, str]:
         if not serials:
             return True, ""
@@ -2985,6 +3011,33 @@ class RequestDAO:
             return total_pages, list(requests)
 
     @classmethod
+    def get_open_by_type(cls, type: int) -> List[Request]:
+        """Невиконані заявки заданого типу (для формування руху на їх основі):
+        статус «Нова», не видалені, ще не зв'язані з рухом. З завантаженими
+        отримувачем, призначенням та позиціями каталогу."""
+        statement = (
+            select(Request)
+            .options(
+                joinedload(Request.responsible),
+                joinedload(Request.destination_storage),
+                selectinload(Request.products_catalog).joinedload(
+                    RequestProductsCatalog.product
+                ),
+            )
+            .where(Request.is_deleted == False)
+            .where(Request.type == type)
+            .where(Request.status == RequestStatus.NEW)
+            .where(Request.id_movement == None)  # noqa: E711
+            .order_by(Request.id.desc())
+        )
+
+        with rx.session() as session:
+            requests = session.exec(statement).unique().all()
+            if len(requests) > 0:
+                session.expunge_all()
+            return list(requests)
+
+    @classmethod
     def get_by_id_with_relationships(cls, id: int) -> Optional[Request]:
         statement = (
             select(Request)
@@ -3051,12 +3104,13 @@ class RequestDAO:
                         )
                     ).all():
                         session.delete(old)
-                    for catalog_id, count in form_data["positions"]:
+                    for catalog_id, count, part in form_data["positions"]:
                         session.add(
                             RequestProductsCatalog(
                                 id_request=request.id,
                                 id_product_catalog=catalog_id,
                                 count=count,
+                                part_amount=(part or None),
                             )
                         )
 
@@ -3087,12 +3141,34 @@ class RequestDAO:
             return False, "Системна помилка!"
 
     @classmethod
+    def revert_completion_by_movement(cls, id_movement: int) -> tuple[bool, str]:
+        """Повертає заявку, сформовану в рух `id_movement`, у стан «Нова»
+        (та відв'язує від руху) — викликається при скасуванні цього руху."""
+        try:
+            with rx.session() as session:
+                request = session.exec(
+                    select(Request).where(Request.id_movement == id_movement)
+                ).first()
+                if request is None:
+                    return True, "Заявку для руху не знайдено"
+                request.status = RequestStatus.NEW
+                request.id_movement = None
+                session.commit()
+                return True, "Заявку повернуто у стан «Нова»"
+
+        except SQLAlchemyError as e:
+            print("[RequestDAO] SQLAlchemyError: ", e)
+            return False, "Системна помилка!"
+
+    @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 request = session.get(Request, id)
                 if request is None:
                     return False, "Помилка: заявку не знайдено"
+                if request.status == RequestStatus.COMPLETED:
+                    return False, "Помилка: виконану заявку не можна видалити"
                 request.is_deleted = True
                 session.commit()
                 return True, "Заявку видалено"

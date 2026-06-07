@@ -134,28 +134,80 @@ def list_tab_content() -> rx.Component:
 
 
 # ----- ADD / EDIT (спільна форма) -----
-def positions_editor(State) -> rx.Component:
-    return rx.vstack(
-        rx.text("Позиції ТМЦ:", weight="bold"),
-        rx.hstack(
-            rx.select.root(
-                rx.select.trigger(placeholder="Оберіть позицію", width="100%"),
-                rx.select.content(
-                    rx.foreach(State.list_catalog, lambda c: rx.select.item(c[0], value=c[1])),
+def position_dialog(State) -> rx.Component:
+    # Модальне вікно додавання позиції ТМЦ до заявки.
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Додавання позиції"),
+            rx.vstack(
+                rx.text("Найменування з каталогу:", size="2"),
+                rx.select.root(
+                    rx.select.trigger(placeholder="Оберіть позицію", width="100%"),
+                    rx.select.content(
+                        rx.foreach(State.list_catalog, lambda c: rx.select.item(c[0], value=c[1])),
+                        width="100%",
+                    ),
+                    value=State.new_position_catalog,
+                    on_change=State.on_change_new_position_catalog,
                     width="100%",
                 ),
-                value=State.new_position_catalog,
-                on_change=State.on_change_new_position_catalog,
+                rx.text("Кількість цілих одиниць:", size="2"),
+                rx.input(
+                    type="number", min="0", placeholder="Цілих", width="100%",
+                    value=State.new_position_count,
+                    on_change=State.on_change_new_position_count,
+                ),
+                # Для подільного ТМЦ — додаткове поле частини від однієї одиниці.
+                rx.cond(
+                    State.new_position_is_divisible,
+                    rx.vstack(
+                        rx.text(
+                            f"Частина (1..{State.new_position_capacity - 1} {State.new_position_unit}):",
+                            size="2",
+                        ),
+                        rx.input(
+                            type="number", min="1", placeholder="Частина", width="100%",
+                            value=State.new_position_part,
+                            on_change=State.on_change_new_position_part,
+                        ),
+                        rx.text(
+                            f"Ємність однієї одиниці: {State.new_position_capacity} {State.new_position_unit}.",
+                            size="1", color="gray",
+                        ),
+                        spacing="1", width="100%", align="stretch",
+                    ),
+                ),
+                rx.hstack(
+                    rx.button("Скасувати", variant="outline", type="button",
+                              on_click=State.set_position_dialog_open(False)),
+                    rx.spacer(),
+                    rx.button("Додати", type="button", on_click=State.add_position),
+                    width="100%",
+                    padding_top="0.5em",
+                ),
+                spacing="2",
                 width="100%",
             ),
-            rx.input(
-                type="number", min="1", placeholder="К-сть", width="7em",
-                value=State.new_position_count,
-                on_change=State.on_change_new_position_count,
-            ),
-            rx.button("Додати", type="button", on_click=State.add_position),
-            width="100%",
+            width="28em",
         ),
+        open=State.is_position_dialog_open,
+        on_open_change=State.set_position_dialog_open,
+    )
+
+
+def positions_editor(State) -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+            rx.text("Позиції ТМЦ:", weight="bold"),
+            rx.spacer(),
+            rx.button(
+                rx.icon("plus", size=16), "Додати позицію",
+                type="button", variant="soft", size="2",
+                on_click=State.open_position_dialog,
+            ),
+            width="100%", align="center",
+        ),
+        position_dialog(State),
         rx.cond(
             State.has_positions,
             rx.table.root(
@@ -169,13 +221,13 @@ def positions_editor(State) -> rx.Component:
                 ),
                 rx.table.body(
                     rx.foreach(
-                        State.positions,
-                        lambda p, i: rx.table.row(
+                        State.positions_rows,
+                        lambda p: rx.table.row(
                             rx.table.cell(p[1]),
                             rx.table.cell(p[2]),
                             rx.table.cell(
                                 rx.button("Видалити", color_scheme="red", size="1",
-                                          on_click=State.remove_position(i)),
+                                          on_click=State.remove_position(p[0])),
                                 width="1%", white_space="nowrap",
                             ),
                         ),

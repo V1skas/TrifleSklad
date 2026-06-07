@@ -356,7 +356,11 @@ class RequestProductsCatalog(rx.Model, table=True):
     id: int = Field(primary_key=True)
     id_request: int = Field(foreign_key="requests.id", nullable=False)
     id_product_catalog: int = Field(foreign_key="products_catalog.id", nullable=False)
+    # Для подільного ТМЦ: count — кількість цілих одиниць (повна ємність),
+    # part_amount — обсяг частини від однієї додаткової одиниці (1..ємність-1) або NULL.
+    # Для неподільного: count — кількість одиниць, part_amount завжди NULL.
     count: int = Field(default=0, nullable=False)
+    part_amount: Optional[int] = Field(default=None, nullable=True)
 
     # Relationship
     product: Optional['ProductCatalog'] = Relationship()

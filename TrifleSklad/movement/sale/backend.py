@@ -9,13 +9,16 @@ from TrifleSklad.dao import (
     MovementDAO,
     OwnerDAO,
     ProductDAO,
+    RequestDAO,
     SaleDAO,
     StorageDAO,
     WorkerDAO,
 )
 from TrifleSklad.declared import (
     MovementsStatus,
+    MovementsType,
     StorageType,
+    format_request_qty,
     movements_status_list,
     movements_type_list,
 )
@@ -234,6 +237,12 @@ class AddSaleState(rx.State):
     list_owners: List[Tuple[str, str]] = []
     list_workers: List[Tuple[str, str]] = []
 
+    # Формування продажу на основі заявки
+    list_requests: List[Tuple[str, str]] = []
+    selected_request_id: str = ""
+    # позиції заявки для відображення (довідково): (назва, опис к-сті)
+    request_positions: List[Tuple[str, str]] = []
+
     products_movement_list_state: Optional[ProductsMovementListState] = None
     app_state: Optional[AppState] = None
 
@@ -245,6 +254,12 @@ class AddSaleState(rx.State):
             for item in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)
             if self.search_name_incoming_storage == ""
             or self.search_name_incoming_storage.lower() in item.title.lower()
+        ]
+
+    def _load_requests(self):
+        self.list_requests = [
+            (f"№{r.id} від {r.date}", str(r.id))
+            for r in RequestDAO.get_open_by_type(MovementsType.SALE)
         ]
 
     def _load_list_owners(self):
@@ -274,6 +289,14 @@ class AddSaleState(rx.State):
             for index, status in enumerate(movements_status_list)
             if index != MovementsStatus.CANCELED
         ]
+
+    @rx.var
+    def has_requests(self) -> bool:
+        return len(self.list_requests) > 0
+
+    @rx.var
+    def has_request_positions(self) -> bool:
+        return len(self.request_positions) > 0
     # ======================
 
     # Action handlers
@@ -287,10 +310,13 @@ class AddSaleState(rx.State):
         self.search_name_incoming_storage = ""
         self.status = ""
         self.comment = ""
+        self.selected_request_id = ""
+        self.request_positions = []
 
         self._load_list_storages()
         self._load_list_owners()
         self._load_list_workers()
+        self._load_requests()
 
         self.products_movement_list_state = await self.get_state(
             ProductsMovementListState
@@ -326,6 +352,28 @@ class AddSaleState(rx.State):
     @rx.event
     def on_change_id_responsible(self, value: str):
         self.id_responsible = value
+
+    @rx.event
+    def on_change_request(self, value: str):
+        self.selected_request_id = value
+        if value == "":
+            self.request_positions = []
+            return
+        request = RequestDAO.get_by_id_with_relationships(int(value))
+        if request is None:
+            self.selected_request_id = ""
+            return rx.toast.error("Заявку не знайдено!")
+        # Коментар заявки переносимо у продаж; перелік позицій — довідково
+        # (заявка має рекомендаційний характер).
+        if request.comment:
+            self.comment = request.comment
+        self.request_positions = [
+            (
+                pc.product.title,
+                format_request_qty(pc.count, pc.part_amount, pc.product.unit),
+            )
+            for pc in request.products_catalog
+        ]
 
     @rx.event
     def on_change_search_name_incoming_storage(self, value: str):
@@ -400,6 +448,9 @@ class AddSaleState(rx.State):
             ProductDAO.update_serial_numbers(serials)
             # Проданий ТМЦ виводиться із залишків.
             ProductDAO.delete_list(list_id_products)
+            # Якщо продаж формується на основі заявки — позначаємо її виконаною.
+            if self.selected_request_id != "":
+                RequestDAO.mark_completed(int(self.selected_request_id), id)
             return [
                 rx.toast.success("Продаж проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}"),
@@ -624,6 +675,8 @@ class SaleState(rx.State):
 
         # Скасування продажу повертає товари у залишки (їх було виведено при продажу).
         ProductDAO.undelete_list(list_id_products)
+        # Якщо продаж був сформований за заявкою — повертаємо заявку у стан «Нова».
+        RequestDAO.revert_completion_by_movement(view_state.item.id)
         return [
             rx.toast.success("Продаж скасовано!"),
             rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{view_state.item.id}"),

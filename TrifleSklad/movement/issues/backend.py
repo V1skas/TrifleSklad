@@ -10,6 +10,7 @@ from TrifleSklad.dao import (
     MovementDAO,
     OwnerDAO,
     ProductDAO,
+    RequestDAO,
     StorageDAO,
     WorkerDAO,
 )
@@ -17,6 +18,7 @@ from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
     StorageType,
+    format_request_qty,
     movements_status_list,
     movements_type_list,
 )
@@ -194,6 +196,14 @@ class AddIssueState(rx.State):
     products_selector_state: Optional[ProductsMovementListState] = None
     # ======================
 
+    # Формування видачі на основі заявки
+    # ======================
+    list_requests: List[Tuple[str, str]] = []
+    selected_request_id: str = ""
+    # позиції заявки для відображення (довідково): (назва, опис к-сті)
+    request_positions: List[Tuple[str, str]] = []
+    # ======================
+
     app_state: Optional[AppState] = None
 
     # Backend only
@@ -205,9 +215,13 @@ class AddIssueState(rx.State):
         ]
 
     def _load_destination_storages(self):
+        # Призначення видачі — площадка або відділ.
+        destinations = StorageDAO.get_all_by_type(
+            StorageType.TECHNICAL_SITE
+        ) + StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
         self.list_destination_storages = [
             (item.title, str(item.id))
-            for item in StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE)
+            for item in destinations
             if self.search_name_destination_storage == ""
             or self.search_name_destination_storage.lower() in item.title.lower()
         ]
@@ -217,6 +231,16 @@ class AddIssueState(rx.State):
 
     def _load_workers(self):
         self.list_workers = [(item.fio, str(item.id)) for item in WorkerDAO.get_all()]
+
+    def _load_requests(self):
+        self.list_requests = [
+            (
+                f"№{r.id} від {r.date}"
+                + (f" — {r.responsible.fio}" if r.responsible is not None else ""),
+                str(r.id),
+            )
+            for r in RequestDAO.get_open_by_type(MovementsType.ISSUE)
+        ]
 
     @rx.event
     async def on_load(self):
@@ -236,11 +260,14 @@ class AddIssueState(rx.State):
             ),
         )
         self.is_open_product_dialog = False
+        self.selected_request_id = ""
+        self.request_positions = []
 
         self._load_incoming_storages()
         self._load_destination_storages()
         self._load_owners()
         self._load_workers()
+        self._load_requests()
 
         self.products_selector_state = await self.get_state(ProductsMovementListState)
         await self.products_selector_state.on_load()
@@ -251,6 +278,41 @@ class AddIssueState(rx.State):
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 
+    # ======================
+
+    # Формування на основі заявки
+    # ======================
+    @rx.var
+    def has_requests(self) -> bool:
+        return len(self.list_requests) > 0
+
+    @rx.var
+    def has_request_positions(self) -> bool:
+        return len(self.request_positions) > 0
+
+    @rx.event
+    def on_change_request(self, value: str):
+        self.selected_request_id = value
+        if value == "":
+            self.request_positions = []
+            return
+        request = RequestDAO.get_by_id_with_relationships(int(value))
+        if request is None:
+            self.selected_request_id = ""
+            return rx.toast.error("Заявку не знайдено!")
+        # Предзаповнюємо отримувача та призначення із заявки.
+        if request.id_responsible is not None:
+            self.item.id_recipient = request.id_responsible
+        if request.id_destination_storage is not None:
+            self.item.movement.id_destination_storage = request.id_destination_storage
+        # Перелік позицій заявки — довідково (заявка має рекомендаційний характер).
+        self.request_positions = [
+            (
+                pc.product.title,
+                format_request_qty(pc.count, pc.part_amount, pc.product.unit),
+            )
+            for pc in request.products_catalog
+        ]
     # ======================
 
     # Getters for form fields
@@ -418,12 +480,16 @@ class AddIssueState(rx.State):
                 if p.product_catalog is not None and p.product_catalog.uniq
             }
             ProductDAO.update_serial_numbers(serials)
-            # Видача переміщує ТМЦ на майданчик призначення (власник лишається той самий).
-            ProductDAO.update_owner_storage(
-                list_id_products,
+            # Видача: подільний ТМЦ списується на місці (споживається на площадці/
+            # відділі), неподільний — переміщується на призначення (власник той самий).
+            ProductDAO.apply_issue_relocation(
+                products_list,
                 int(self.item.movement.id_destination_owner),
                 int(self.item.movement.id_destination_storage),
             )
+            # Якщо видача формується на основі заявки — позначаємо її виконаною.
+            if self.selected_request_id != "":
+                RequestDAO.mark_completed(int(self.selected_request_id), id)
             return [
                 rx.toast.success(text),
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),
@@ -470,9 +536,13 @@ class EditIssueState(rx.State):
         ]
 
     def _load_destination_storages(self):
+        # Призначення видачі — площадка або відділ.
+        destinations = StorageDAO.get_all_by_type(
+            StorageType.TECHNICAL_SITE
+        ) + StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
         self.list_destination_storages = [
             (item.title, str(item.id))
-            for item in StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE)
+            for item in destinations
             if self.search_name_destination_storage == ""
             or self.search_name_destination_storage.lower() in item.title.lower()
         ]
@@ -737,11 +807,15 @@ class IssueState(rx.State):
         if not flag:
             return rx.toast.error(text)
 
+        # Подільний ТМЦ при видачі списується (is_deleted) — повертаємо його в обіг.
+        ProductDAO.undelete_list(list_id_products)
         # Скасування видачі повертає кожну одиницю ТМЦ туди, куди її привів
         # попередній рух (за наскрізним номером), а не просто на склад відправлення.
         MovementDAO.restore_products_to_previous_location(
             list_id_products, view_state.item.id
         )
+        # Якщо видача була сформована за заявкою — повертаємо заявку у стан «Нова».
+        RequestDAO.revert_completion_by_movement(view_state.item.id)
         return [
             rx.toast.success("Видачу скасовано!"),
             rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{view_state.item.id}"),
