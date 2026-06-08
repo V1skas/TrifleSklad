@@ -105,6 +105,8 @@ class Action(StrEnum):
     PRODUCTS_LIST = ("products:list", "Перегляд каталогу товарів", "Дозволяє перегляд каталогу товарів")
     PRODUCTS_VIEW = ("products:view", "Деталізований перегляд каталогу товарів", "Дозволяє деталізований перегляд позицій каталогу товарів")
 
+    REPORTS_STOCK = ("reports:stock", "Звіт «Наявність ТМЦ»", "Дозволяє переглядати звіт про наявність ТМЦ на місцях зберігання")
+
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
         obj._value_ = code

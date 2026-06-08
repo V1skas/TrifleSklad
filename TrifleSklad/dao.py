@@ -1618,6 +1618,88 @@ class ProductDAO:
             return False, f"Ошибка: {str(e)}"
 
     @classmethod
+    def get_stock_grouped(
+        cls,
+        catalog_id: Optional[int] = None,
+        storage_id: Optional[int] = None,
+        owner_id: Optional[int] = None,
+        exclude_types: Optional[List[int]] = None,
+    ) -> List[tuple]:
+        """Звіт «Наявність ТМЦ»: позиції каталогу, що зараз лежать на місцях
+        зберігання, із сумарною кількістю та числом одиниць. Фільтри —
+        за позицією каталогу, місцем зберігання, власником; exclude_types —
+        типи сховищ (склад/площадка/відділ), які треба виключити.
+        Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
+        exclude_types = exclude_types or []
+        statement = (
+            select(
+                ProductCatalog.id,
+                ProductCatalog.title,
+                ProductCatalog.unit,
+                func.coalesce(func.sum(Product.count), 0),
+                func.count(Product.id),
+            )
+            .join(Product, Product.id_product_catalog == ProductCatalog.id)
+            .join(Storage, Storage.id == Product.id_storage)
+            .where(Product.is_deleted == False)
+            .where(Storage.is_deleted == False)
+            .group_by(ProductCatalog.id, ProductCatalog.title, ProductCatalog.unit)
+            .order_by(ProductCatalog.title)
+        )
+        if catalog_id is not None:
+            statement = statement.where(ProductCatalog.id == catalog_id)
+        if storage_id is not None:
+            statement = statement.where(Product.id_storage == storage_id)
+        if owner_id is not None:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_types:
+            statement = statement.where(Storage.type.not_in(exclude_types))
+
+        with rx.session() as session:
+            rows = session.exec(statement).all()
+            return [
+                (row[0], row[1], row[2], int(row[3] or 0), int(row[4] or 0))
+                for row in rows
+            ]
+
+    @classmethod
+    def get_stock_units(
+        cls,
+        catalog_id: int,
+        storage_id: Optional[int] = None,
+        owner_id: Optional[int] = None,
+        exclude_types: Optional[List[int]] = None,
+    ) -> List[Product]:
+        """Окремі одиниці ТМЦ для модалки звіту: всі живі одиниці позиції каталогу
+        на місцях зберігання з тими ж фільтрами, що й у згрупованому звіті."""
+        exclude_types = exclude_types or []
+        statement = (
+            select(Product)
+            .options(
+                joinedload(Product.product_catalog),
+                joinedload(Product.storage),
+                joinedload(Product.owner),
+            )
+            .join(Storage, Storage.id == Product.id_storage)
+            .where(Product.is_deleted == False)
+            .where(Storage.is_deleted == False)
+            .where(Product.id_product_catalog == catalog_id)
+            .order_by(Product.id)
+        )
+        if storage_id is not None:
+            statement = statement.where(Product.id_storage == storage_id)
+        if owner_id is not None:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_types:
+            statement = statement.where(Storage.type.not_in(exclude_types))
+
+        with rx.session() as session:
+            products = session.exec(statement).all()
+            if len(products) > 0:
+                session.expunge_all()
+            return list(products)
+
+    @classmethod
     def update_serial_numbers(cls, serials: Dict[int, str]) -> tuple[bool, str]:
         if not serials:
             return True, ""

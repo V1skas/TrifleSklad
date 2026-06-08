@@ -3,7 +3,7 @@
 import reflex as rx
 
 from rxconfig import config
-from TrifleSklad import frontend, routes, state, administration, catalog, movement
+from TrifleSklad import frontend, routes, state, administration, catalog, movement, reports
 
 app = rx.App(
     theme=rx.theme(
@@ -31,3 +31,8 @@ app.add_page(frontend.movement_page, route=routes.MOVEMENT_TAB_PAGE_ID, on_load=
 app.add_page(frontend.movement_page, route=routes.MOVEMENT_TAB_PAGE, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
 app.add_page(frontend.movement_page, route=routes.MOVEMENT_TAB, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
 app.add_page(frontend.movement_page, route=routes.MOVEMENT, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
+
+app.add_page(frontend.reports_page, route=routes.REPORTS_TAB_PAGE_ID, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
+app.add_page(frontend.reports_page, route=routes.REPORTS_TAB_PAGE, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
+app.add_page(frontend.reports_page, route=routes.REPORTS_TAB, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
+app.add_page(frontend.reports_page, route=routes.REPORTS, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])

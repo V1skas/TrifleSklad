@@ -106,6 +106,14 @@ MOVEMENT_RETURNS_VIEW_ID = "/movement/returns/view/"
 MOVEMENT_RETURNS_EDIT_ID = "/movement/returns/edit/"
 MOVEMENT_RETURNS_ADD = "/movement/returns/add/"
 
+REPORTS_TAB = "/reports/[tab]/"
+REPORTS_TAB_PAGE = "/reports/[tab]/[page]/"
+REPORTS_TAB_PAGE_ID = "/reports/[tab]/[page]/[id]/"
+
+REPORTS = "/reports"
+
+REPORTS_STOCK = "/reports/stock/"
+
 
 # Нумерація рухів наскрізна, але кожен тип живе у власній підсекції.
 # Хелпер будує посилання на перегляд руху з потрібного розділу за його типом.

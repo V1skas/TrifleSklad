@@ -4,7 +4,7 @@ from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.state import AppState
 
 from components import decor
-from TrifleSklad import authorithation, administration, routes, catalog, movement
+from TrifleSklad import authorithation, administration, routes, catalog, movement, reports
 
 from TrifleSklad.authorithation.frontend import require_login
 
@@ -63,6 +63,10 @@ def navbar() -> rx.Component:
                 rx.cond(
                     AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
                     navbar_link("Заявки", routes.CATALOG_REQUESTS),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.REPORTS_STOCK),
+                    navbar_link("Звіти", routes.REPORTS_STOCK),
                 ),
 
                 align_items="center",
@@ -194,6 +198,15 @@ def movement_page() -> rx.Component:
     return rx.vstack(
         navbar(),
         movement.frontend.index(),
+
+        width="100%",
+    )
+
+@require_login
+def reports_page() -> rx.Component:
+    return rx.vstack(
+        navbar(),
+        reports.frontend.index(),
 
         width="100%",
     )
