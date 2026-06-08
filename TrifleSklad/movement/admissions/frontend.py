@@ -14,6 +14,47 @@ from TrifleSklad.models import Admission
 from TrifleSklad.declared import MovementsStatus
 from TrifleSklad.state import AppState
 
+def create_category_dialog() -> rx.Component:
+    # Вкладений діалог створення нової категорії з діалогу створення товару.
+    State = MovementProductCatalogAddEditFormState
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Створення категорії"),
+            rx.vstack(
+                rx.text("*Назва:", size="2"),
+                rx.input(
+                    value=State.new_category_title,
+                    on_change=State.on_change_new_category_title,
+                    width="100%",
+                ),
+                rx.text("Опис:", size="2"),
+                rx.text_area(
+                    value=State.new_category_description,
+                    on_change=State.on_change_new_category_description,
+                    width="100%",
+                ),
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="outline",
+                        type="button",
+                        on_click=State.set_create_category_open(False),
+                    ),
+                    rx.spacer(),
+                    rx.button("Створити", type="button", on_click=State.create_category),
+                    width="100%",
+                    padding_top="0.5em",
+                ),
+                spacing="2",
+                width="100%",
+            ),
+            width="28em",
+        ),
+        open=State.is_create_category_open,
+        on_open_change=State.set_create_category_open,
+    )
+
+
 def create_product_dialog() -> rx.Component:
     # Вкладений діалог створення нового товару каталогу прямо з поставки.
     State = MovementProductCatalogAddEditFormState
@@ -39,6 +80,22 @@ def create_product_dialog() -> rx.Component:
                     on_change=State.on_change_new_category,
                     width="100%",
                 ),
+                rx.hstack(
+                    rx.spacer(),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.CATEGORIES_CREATE),
+                        rx.button(
+                            rx.icon("plus", size=14),
+                            "Створити категорію",
+                            variant="ghost",
+                            size="2",
+                            type="button",
+                            on_click=State.open_create_category,
+                        ),
+                    ),
+                    width="100%",
+                ),
+                create_category_dialog(),
                 rx.text("Одиниця виміру:", size="2"),
                 rx.input(
                     value=State.new_unit,

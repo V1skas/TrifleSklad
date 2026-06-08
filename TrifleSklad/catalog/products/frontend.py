@@ -10,6 +10,93 @@ from TrifleSklad.catalog.products.backend import AddProductsState, EditProductsS
 
 from TrifleSklad.models import ProductCatalog
 
+
+def create_category_dialog(State) -> rx.Component:
+    # Вкладений діалог створення нової категорії прямо з форми товару.
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Створення категорії"),
+            rx.vstack(
+                rx.text("*Назва:", size="2"),
+                rx.input(
+                    value=State.new_category_title,
+                    on_change=State.on_change_new_category_title,
+                    width="100%",
+                ),
+                rx.text("Опис:", size="2"),
+                rx.text_area(
+                    value=State.new_category_description,
+                    on_change=State.on_change_new_category_description,
+                    width="100%",
+                ),
+                rx.hstack(
+                    rx.button(
+                        "Скасувати",
+                        variant="outline",
+                        type="button",
+                        on_click=State.set_create_category_open(False),
+                    ),
+                    rx.spacer(),
+                    rx.button("Створити", type="button", on_click=State.create_category),
+                    width="100%",
+                    padding_top="0.5em",
+                ),
+                spacing="2",
+                width="100%",
+            ),
+            width="28em",
+        ),
+        open=State.is_create_category_open,
+        on_open_change=State.set_create_category_open,
+    )
+
+
+def category_select_row(State) -> rx.Component:
+    # Селект категорії + кнопка створення нової категорії на льоту.
+    return rx.vstack(
+        rx.select.root(
+            rx.select.trigger(
+                placeholder="Оберіть зі списку",
+                width="100%",
+            ),
+            rx.select.content(
+                rx.foreach(
+                    State.list_categories,
+                    lambda category: rx.select.item(
+                        category[1],
+                        value=category[0],
+                    ),
+                ),
+                width="100%",
+            ),
+            name="id_category",
+            required=True,
+            value=State.category_id,
+            on_change=State.on_change_category,
+            size="3",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.spacer(),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.CATEGORIES_CREATE),
+                rx.button(
+                    rx.icon("plus", size=14),
+                    "Створити категорію",
+                    variant="ghost",
+                    size="2",
+                    type="button",
+                    on_click=State.open_create_category,
+                ),
+            ),
+            width="100%",
+        ),
+        create_category_dialog(State),
+        spacing="1",
+        width="100%",
+    )
+
+
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewProductsState.title, size="7", width="100%"),
@@ -236,30 +323,7 @@ def add_form() -> rx.Component:
             rx.text("Опис", size="3", width="100%"),
             rx.text_area(id="description", size="3", width="100%", value=AddProductsState.description, on_change=AddProductsState.on_change_description),
             rx.text("*Категорія", size="3", width="100%"),
-            rx.select.root(
-                rx.select.trigger(
-                    placeholder="Оберіть зі списку",
-                    width="100%",
-                ),
-                rx.select.content(
-                    rx.foreach(
-                        AddProductsState.list_categories,
-                        lambda category: rx.select.item(
-                            category[1],
-                            value=category[0],
-                        )),
-
-                    width="100%",
-                ),
-
-                name="id_category",
-                required=True,
-                value=AddProductsState.category_id,
-                on_change=AddProductsState.on_change_category,
-
-                size="3",
-                width="100%"
-            ),
+            category_select_row(AddProductsState),
             rx.text("Одиниця виміру", size="3", width="100%"),
             rx.input(id="unit", required=True, size="3", width="100%", list="units-datalist", value=AddProductsState.unit, on_change=AddProductsState.on_change_unit
             ),
@@ -348,30 +412,7 @@ def edit_form() -> rx.Component:
             rx.text("Опис", size="3", width="100%"),
             rx.text_area(id="description", size="3", width="100%", value=EditProductsState.description, on_change=EditProductsState.on_change_description),
             rx.text("*Категорія", size="3", width="100%"),
-            rx.select.root(
-                rx.select.trigger(
-                    placeholder="Оберіть зі списку",
-                    width="100%",
-                ),
-                rx.select.content(
-                    rx.foreach(
-                        EditProductsState.list_categories,
-                        lambda category: rx.select.item(
-                            rx.text(category[1]),
-                            value=category[0],
-                        )),
-
-                    width="100%",
-                ),
-
-                name="id_category",
-                required=True,
-                value=EditProductsState.category_id,
-                on_change=EditProductsState.on_change_category,
-
-                size="3",
-                width="100%"
-            ),
+            category_select_row(EditProductsState),
             rx.text("Одиниця виміру", size="3", width="100%"),
             rx.input(id="unit", required=True, size="3", width="100%", list="units-datalist", value=EditProductsState.unit, on_change=EditProductsState.on_change_unit),
             rx.el.datalist(

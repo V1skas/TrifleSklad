@@ -29,6 +29,7 @@ from TrifleSklad.models import (
     MovementProductsCatalog,
     Product,
     ProductCatalog,
+    ProductCategory,
 )
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.state import AppState
@@ -360,6 +361,60 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.is_create_open = False
         self._reset_new_product()
         return rx.toast.success("Товар створено та обрано!")
+    # ======================
+
+    # Створення нової категорії прямо з діалогу створення товару
+    # ======================
+    is_create_category_open: bool = False
+    new_category_title: str = ""
+    new_category_description: str = ""
+
+    def _reset_new_category(self):
+        self.new_category_title = ""
+        self.new_category_description = ""
+
+    @rx.event
+    def open_create_category(self):
+        self._reset_new_category()
+        self.is_create_category_open = True
+
+    @rx.event
+    def set_create_category_open(self, value: bool):
+        self.is_create_category_open = value
+
+    @rx.event
+    def on_change_new_category_title(self, value: str):
+        self.new_category_title = value
+
+    @rx.event
+    def on_change_new_category_description(self, value: str):
+        self.new_category_description = value
+
+    @rx.event
+    async def create_category(self):
+        if not (await self.get_state(AppState)).has_permission(ActionEnum.CATEGORIES_CREATE):
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+
+        title = self.new_category_title.strip()
+        if title == "":
+            return rx.toast.error("Вкажіть назву категорії!")
+
+        category = ProductCategory(
+            title=title,
+            description=self.new_category_description.strip() or None,
+        )
+        flag, text, new_id = ProductCategoryDAO.add_one(category)
+        if not flag:
+            return rx.toast.error(text)
+
+        # Перезавантажуємо список і одразу обираємо нову категорію в новому товарі.
+        self.list_categories = [
+            (str(item.id), item.title) for item in ProductCategoryDAO.get_all()
+        ]
+        self.new_id_category = str(new_id)
+        self.is_create_category_open = False
+        self._reset_new_category()
+        return rx.toast.success("Категорію створено та обрано!")
     # ======================
 
 

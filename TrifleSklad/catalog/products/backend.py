@@ -67,7 +67,64 @@ class ViewProductsState(rx.State):
     # ===============
 
 
-class AddProductsState(rx.State):
+class CategoryCreateMixin(rx.State, mixin=True):
+    """Створення нової категорії прямо з форми товару.
+
+    Підмішується в Add/Edit стани товару — обидва мають `item`, `app_state`,
+    `list_categories` та метод `_load_categories`, на які спирається міксин.
+    """
+
+    is_create_category_open: bool = False
+    new_category_title: str = ""
+    new_category_description: str = ""
+
+    def _reset_new_category(self):
+        self.new_category_title = ""
+        self.new_category_description = ""
+
+    @rx.event
+    def open_create_category(self):
+        self._reset_new_category()
+        self.is_create_category_open = True
+
+    @rx.event
+    def set_create_category_open(self, value: bool):
+        self.is_create_category_open = value
+
+    @rx.event
+    def on_change_new_category_title(self, value: str):
+        self.new_category_title = value
+
+    @rx.event
+    def on_change_new_category_description(self, value: str):
+        self.new_category_description = value
+
+    @rx.event
+    def create_category(self):
+        if not self.app_state.has_permission(ActionEnum.CATEGORIES_CREATE):
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+
+        title = self.new_category_title.strip()
+        if title == "":
+            return rx.toast.error("Вкажіть назву категорії!")
+
+        category = ProductCategory(
+            title=title,
+            description=self.new_category_description.strip() or None,
+        )
+        flag, text, new_id = ProductCategoryDAO.add_one(category)
+        if not flag:
+            return rx.toast.error(text)
+
+        # Перезавантажуємо список і одразу обираємо нову категорію в товарі.
+        self._load_categories()
+        self.item.id_category = new_id
+        self.is_create_category_open = False
+        self._reset_new_category()
+        return rx.toast.success("Категорію створено та обрано!")
+
+
+class AddProductsState(CategoryCreateMixin, rx.State):
     item: Optional[ProductCatalog] = None
     app_state: Optional[AppState] = None
     list_categories: List[Tuple[str, str]] = []
@@ -188,7 +245,7 @@ class AddProductsState(rx.State):
     # ===============
 
 
-class EditProductsState(rx.State):
+class EditProductsState(CategoryCreateMixin, rx.State):
     item: Optional[ProductCatalog] = None
     app_state: Optional[AppState] = None
     list_categories: List[Tuple[str, str]] = []
