@@ -226,7 +226,7 @@ def list_tab_content() -> rx.Component:
 def add_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=AddWriteOffState.current_date,
                 on_change=AddWriteOffState.on_change_date,
@@ -235,7 +235,7 @@ def add_form() -> rx.Component:
                 size="3",
                 width="100%",
             ),
-            rx.text("Склад:"),
+            rx.text("*Склад:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -269,7 +269,7 @@ def add_form() -> rx.Component:
                 value=AddWriteOffState.id_incoming_storage,
                 on_change=AddWriteOffState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник:"),
+            rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -288,7 +288,7 @@ def add_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     AddWriteOffState.editable_statuses,
                     placeholder="Оберіть зі списку",
@@ -313,7 +313,7 @@ def add_form() -> rx.Component:
 def edit_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=EditWriteOffState.item.date,
                 type="date",
@@ -322,7 +322,7 @@ def edit_form() -> rx.Component:
                 disabled=True,
                 width="100%",
             ),
-            rx.text("Склад:"),
+            rx.text("*Склад:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -340,7 +340,7 @@ def edit_form() -> rx.Component:
                 value=EditWriteOffState.id_incoming_storage,
                 on_change=EditWriteOffState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник:"),
+            rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -360,7 +360,7 @@ def edit_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     EditWriteOffState.editable_statuses,
                     placeholder="Оберіть зі списку",

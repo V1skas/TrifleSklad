@@ -190,7 +190,7 @@ def add_form() -> rx.Component:
     return rx.card(
         rx.vstack(
             request_picker(),
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=AddSaleState.current_date,
                 on_change=AddSaleState.on_change_date,
@@ -199,7 +199,7 @@ def add_form() -> rx.Component:
                 size="3",
                 width="100%",
             ),
-            rx.text("Склад:"),
+            rx.text("*Склад:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -235,7 +235,7 @@ def add_form() -> rx.Component:
                 value=AddSaleState.id_incoming_storage,
                 on_change=AddSaleState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник:"),
+            rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -252,7 +252,7 @@ def add_form() -> rx.Component:
                 value=AddSaleState.id_incoming_owner,
                 on_change=AddSaleState.on_change_id_incoming_owner,
             ),
-            rx.text("Відповідальний:"),
+            rx.text("*Відповідальний:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -271,7 +271,7 @@ def add_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     AddSaleState.editable_statuses,
                     placeholder="Оберіть зі списку",
@@ -328,7 +328,7 @@ def add_tab_content() -> rx.Component:
 def edit_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=EditSaleState.item.movement.date,
                 type="date",
@@ -337,7 +337,7 @@ def edit_form() -> rx.Component:
                 disabled=True,
                 width="100%",
             ),
-            rx.text("Склад:"),
+            rx.text("*Склад:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
@@ -353,7 +353,7 @@ def edit_form() -> rx.Component:
                 disabled=True,
                 value=EditSaleState.id_incoming_storage,
             ),
-            rx.text("Власник:"),
+            rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
@@ -367,7 +367,7 @@ def edit_form() -> rx.Component:
                 disabled=True,
                 value=EditSaleState.id_incoming_owner,
             ),
-            rx.text("Відповідальний:"),
+            rx.text("*Відповідальний:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
@@ -383,7 +383,7 @@ def edit_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     EditSaleState.editable_statuses,
                     placeholder="Оберіть зі списку",

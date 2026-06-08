@@ -135,7 +135,7 @@ def add_form() -> rx.Component:
     return rx.card(
         rx.vstack(
             request_picker(),
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 name="date",
                 type="date",
@@ -145,7 +145,7 @@ def add_form() -> rx.Component:
                 width="100%",
                 on_change=AddIssueState.on_change_date,
             ),
-            rx.text("Склад:"),
+            rx.text("*Склад:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -163,7 +163,7 @@ def add_form() -> rx.Component:
                 value=AddIssueState.id_incoming_storage,
                 on_change=AddIssueState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник:"),
+            rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -181,7 +181,7 @@ def add_form() -> rx.Component:
                 value=AddIssueState.id_incoming_owner,
                 on_change=AddIssueState.on_change_id_incoming_owner,
             ),
-            rx.text("Місце призначення:"),
+            rx.text("*Місце призначення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -218,7 +218,7 @@ def add_form() -> rx.Component:
                 value=AddIssueState.id_destination_storage,
                 on_change=AddIssueState.on_change_id_destination_storage,
             ),
-            rx.text("Одержувач:"),
+            rx.text("*Одержувач:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -238,7 +238,7 @@ def add_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     AddIssueState.editable_statuses,
                     name="status",
@@ -298,7 +298,7 @@ def add_tab_content() -> rx.Component:
 def edit_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 name="date",
                 type="date",
@@ -309,7 +309,7 @@ def edit_form() -> rx.Component:
                 width="100%",
                 on_change=EditIssueState.on_change_date,
             ),
-            rx.text("Склад:"),
+            rx.text("*Склад:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -328,7 +328,7 @@ def edit_form() -> rx.Component:
                 value=EditIssueState.id_incoming_storage,
                 on_change=EditIssueState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник:"),
+            rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -347,7 +347,7 @@ def edit_form() -> rx.Component:
                 value=EditIssueState.id_incoming_owner,
                 on_change=EditIssueState.on_change_id_incoming_owner,
             ),
-            rx.text("Місце призначення:"),
+            rx.text("*Місце призначення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -385,7 +385,7 @@ def edit_form() -> rx.Component:
                 value=EditIssueState.id_destination_storage,
                 on_change=EditIssueState.on_change_id_destination_storage,
             ),
-            rx.text("Одержувач:"),
+            rx.text("*Одержувач:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -406,7 +406,7 @@ def edit_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     EditIssueState.editable_statuses,
                     name="status",

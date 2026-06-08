@@ -242,7 +242,7 @@ def list_tab_content() -> rx.Component:
 def add_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=AddMovementsState.current_date,
                 on_change=AddMovementsState.on_change_date,
@@ -250,7 +250,7 @@ def add_form() -> rx.Component:
                 required=True,
                 size="3",
             ),
-            rx.text("Склад відправлення:"),
+            rx.text("*Склад відправлення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -284,7 +284,7 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_incoming_storage,
                 on_change=AddMovementsState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник відправлення:"),
+            rx.text("*Власник відправлення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -301,7 +301,7 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_incoming_owner,
                 on_change=AddMovementsState.on_change_id_incoming_owner,
             ),
-            rx.text("Склад призначення:"),
+            rx.text("*Склад призначення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -335,7 +335,7 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_destination_storage,
                 on_change=AddMovementsState.on_change_id_destination_storage,
             ),
-            rx.text("Власник призначення:"),
+            rx.text("*Власник призначення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -354,7 +354,7 @@ def add_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     AddMovementsState.editable_statuses,
                     placeholder="Оберіть зі списку",
@@ -409,7 +409,7 @@ def add_tab_content() -> rx.Component:
 def edit_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=EditMovementsState.item.date,
                 type="date",
@@ -417,7 +417,7 @@ def edit_form() -> rx.Component:
                 size="3",
                 disabled=True,
             ),
-            rx.text("Склад відправлення:"),
+            rx.text("*Склад відправлення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -435,7 +435,7 @@ def edit_form() -> rx.Component:
                 value=EditMovementsState.id_incoming_storage,
                 on_change=EditMovementsState.on_change_id_incoming_storage,
             ),
-            rx.text("Власник відправлення:"),
+            rx.text("*Власник відправлення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -453,7 +453,7 @@ def edit_form() -> rx.Component:
                 value=EditMovementsState.id_incoming_owner,
                 on_change=EditMovementsState.on_change_id_incoming_owner,
             ),
-            rx.text("Склад призначення:"),
+            rx.text("*Склад призначення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -471,7 +471,7 @@ def edit_form() -> rx.Component:
                 value=EditMovementsState.id_destination_storage,
                 on_change=EditMovementsState.on_change_id_destination_storage,
             ),
-            rx.text("Власник призначення:"),
+            rx.text("*Власник призначення:"),
             rx.select.root(
                 rx.select.trigger(
                     placeholder="Оберіть зі списку",
@@ -491,7 +491,7 @@ def edit_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     EditMovementsState.editable_statuses,
                     placeholder="Оберіть зі списку",

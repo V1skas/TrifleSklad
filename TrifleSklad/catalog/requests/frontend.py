@@ -140,7 +140,7 @@ def position_dialog(State) -> rx.Component:
         rx.dialog.content(
             rx.dialog.title("Додавання позиції"),
             rx.vstack(
-                rx.text("Найменування з каталогу:", size="2"),
+                rx.text("*Найменування з каталогу:", size="2"),
                 rx.select.root(
                     rx.select.trigger(placeholder="Оберіть позицію", width="100%"),
                     rx.select.content(
@@ -244,7 +244,7 @@ def positions_editor(State) -> rx.Component:
 def request_form(State) -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Тип заявки:"),
+            rx.text("*Тип заявки:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть тип", width="100%"),
                 rx.select.content(
@@ -258,7 +258,7 @@ def request_form(State) -> rx.Component:
             rx.cond(
                 State.is_issue_type,
                 rx.vstack(
-                    rx.text("Отримувач:"),
+                    rx.text("*Отримувач:"),
                     rx.select.root(
                         rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                         rx.select.content(
@@ -269,7 +269,7 @@ def request_form(State) -> rx.Component:
                         on_change=State.on_change_responsible,
                         width="100%",
                     ),
-                    rx.text("Призначення (площадка/відділ):"),
+                    rx.text("*Призначення (площадка/відділ):"),
                     rx.select.root(
                         rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                         rx.select.content(

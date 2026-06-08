@@ -763,9 +763,9 @@ def list_tab_content() -> rx.Component:
 def add_form() -> rx.Component:
     return rx.card(
             rx.vstack(
-                rx.text("Дата:"),
+                rx.text("*Дата:"),
                 rx.input(name="date", type="date", required=True, size="3", default_value=AddAdmissionState.item.movement.date, width="100%", on_change=AddAdmissionState.on_change_date),
-                rx.text("Постачальник:"),
+                rx.text("*Постачальник:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -786,7 +786,7 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_supplier
                 ),
-                rx.text("Склад:"),
+                rx.text("*Склад:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -830,7 +830,7 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_storage
                 ),
-                rx.text("Одержувач:"),
+                rx.text("*Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -851,7 +851,7 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_owner
                 ),
-                rx.text("Товари з каталогу:"),
+                rx.text("*Товари з каталогу:"),
                 add_admission_products_catalog_dialog(),
                 rx.cond(AddAdmissionState.has_item_movement_products_catalog,
                         add_admission_products_catalog_table(),
@@ -861,7 +861,7 @@ def add_form() -> rx.Component:
 
                     on_click=AddAdmissionState.add_product_catalog_dialog_open
                 ),
-                rx.text("Спосіб оплати:"),
+                rx.text("*Спосіб оплати:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -938,7 +938,7 @@ def add_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text("Курс долара:"),
+                    rx.text("*Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -949,7 +949,7 @@ def add_form() -> rx.Component:
                     )
                 ),
                 rx.hstack(
-                    rx.text("Статус:"),
+                    rx.text("*Статус:"),
                     rx.select(
                         AddAdmissionState.editable_statuses,
 
@@ -977,9 +977,9 @@ def add_form() -> rx.Component:
 def edit_form() -> rx.Component:
     return rx.card(
             rx.vstack(
-                rx.text("Дата:"),
+                rx.text("*Дата:"),
                 rx.input(name="date", type="date", required=True, size="3", default_value=EditAdmissionState.item.movement.date, disabled=True),
-                rx.text("Постачальник:"),
+                rx.text("*Постачальник:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -1002,7 +1002,7 @@ def edit_form() -> rx.Component:
 
                     on_change=EditAdmissionState.on_change_id_supplier
                 ),
-                rx.text("Склад:"),
+                rx.text("*Склад:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -1048,7 +1048,7 @@ def edit_form() -> rx.Component:
 
                     on_change=EditAdmissionState.on_change_id_destination_storage
                 ),
-                rx.text("Одержувач:"),
+                rx.text("*Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -1070,12 +1070,12 @@ def edit_form() -> rx.Component:
 
                     on_change=EditAdmissionState.on_change_id_destination_owner
                 ),
-                rx.text("Товари з каталогу:"),
+                rx.text("*Товари з каталогу:"),
                 add_admission_products_catalog_dialog(),
                 rx.cond(EditAdmissionState.has_item_movement_products_catalog,
                         add_admission_products_catalog_table(),
                         rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
-                rx.text("Спосіб оплати:"),
+                rx.text("*Спосіб оплати:"),
                 rx.select.root(
                     rx.select.trigger(
                         placeholder="Оберіть зі списку",
@@ -1154,7 +1154,7 @@ def edit_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text("Курс долара:"),
+                    rx.text("*Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -1166,7 +1166,7 @@ def edit_form() -> rx.Component:
                     )
                 ),
                 rx.hstack(
-                    rx.text("Статус:"),
+                    rx.text("*Статус:"),
                     rx.select(
                         EditAdmissionState.get_movement_statuses,
 

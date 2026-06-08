@@ -206,7 +206,7 @@ def list_tab_content() -> rx.Component:
 def add_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=AddReturnsState.current_date,
                 on_change=AddReturnsState.on_change_date,
@@ -215,7 +215,7 @@ def add_form() -> rx.Component:
                 size="3",
                 width="100%",
             ),
-            rx.text("Звідки (площадка/відділ):"),
+            rx.text("*Звідки (площадка/відділ):"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
@@ -229,7 +229,7 @@ def add_form() -> rx.Component:
                 value=AddReturnsState.id_incoming_storage,
                 on_change=AddReturnsState.on_change_id_incoming_storage,
             ),
-            rx.text("Склад призначення:"),
+            rx.text("*Склад призначення:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
@@ -245,7 +245,7 @@ def add_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     AddReturnsState.editable_statuses,
                     placeholder="Оберіть зі списку",
@@ -302,7 +302,7 @@ def add_tab_content() -> rx.Component:
 def edit_form() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.text("Дата:"),
+            rx.text("*Дата:"),
             rx.input(
                 value=EditReturnsState.item.date,
                 type="date",
@@ -324,7 +324,7 @@ def edit_form() -> rx.Component:
             ),
             products(width="100%"),
             rx.hstack(
-                rx.text("Статус:"),
+                rx.text("*Статус:"),
                 rx.select(
                     EditReturnsState.editable_statuses,
                     placeholder="Оберіть зі списку",
