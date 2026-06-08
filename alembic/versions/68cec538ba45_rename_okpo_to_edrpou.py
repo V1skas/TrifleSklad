@@ -23,7 +23,7 @@ def upgrade() -> None:
         batch_op.alter_column(
             'okpo',
             new_column_name='edrpou',
-            existing_type=sa.String(),
+            existing_type=sqlmodel.sql.sqltypes.AutoString(),
             existing_nullable=False,
         )
 
@@ -33,6 +33,6 @@ def downgrade() -> None:
         batch_op.alter_column(
             'edrpou',
             new_column_name='okpo',
-            existing_type=sa.String(),
+            existing_type=sqlmodel.sql.sqltypes.AutoString(),
             existing_nullable=False,
         )
