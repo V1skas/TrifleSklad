@@ -1,0 +1,60 @@
+from typing import Dict, List, Optional
+
+class MovementsType:
+    ADMISSION = 1
+    WRITE_OFF = 2
+    MOVEMENT = 3
+    ISSUE = 4
+    SALE = 5
+    RETURN = 6
+
+movements_type_list: Dict[int, str] = {
+    MovementsType.ADMISSION: "Постачання",
+    MovementsType.WRITE_OFF: "Списання",
+    MovementsType.MOVEMENT: "Переміщення",
+    MovementsType.ISSUE: "Видача",
+    MovementsType.SALE: "Продаж",
+    MovementsType.RETURN: "Повернення",
+}
+
+class StorageType:
+    WAREHOUSE = 1
+    TECHNICAL_SITE = 2
+    DEPARTMENT = 3
+
+storage_type_list: Dict[int, str] = {StorageType.WAREHOUSE: "Склад",
+                     StorageType.TECHNICAL_SITE: "Тех. площадка",
+                     StorageType.DEPARTMENT: "Відділ"}
+
+class MovementsStatus:
+    CREATED = 0
+    IN_PROGRESS = 1
+    CLOSED = 2
+    CANCELED = 3
+
+movements_status_list: List[str] = ["Створено", "В роботі", "Закрито", "Скасовано"]
+
+
+class RequestStatus:
+    NEW = 0
+    COMPLETED = 1
+
+request_status_list: List[str] = ["Нова", "Виконана"]
+
+def format_request_qty(count: int, part: Optional[int], unit: str = "") -> str:
+    """Людиночитний опис кількості позиції заявки: цілі одиниці та/або частина
+    (для подільного ТМЦ). Напр. «2 ціл. + 30 м», «1 ціл.», «30 м»."""
+    chunks: List[str] = []
+    if count and count > 0:
+        chunks.append(f"{count} ціл.")
+    if part:
+        chunks.append(f"{part} {unit}".strip())
+    return " + ".join(chunks) if chunks else "0"
+
+
+def get_status_by_text(text: str) -> Optional[int]:
+    for index, status in enumerate(movements_status_list):
+        if status == text:
+            return index
+    else:
+        return None

@@ -15,9 +15,9 @@ dist/
 /node_modules
 
 # Alembic
-alembic.ini
-versions/
-alembic/
+# alembic.ini
+# versions/
+# aembic/
 
 # Логи
 *.log
@@ -25,6 +25,13 @@ alembic/
 # Данные
 *.sqlite
 *.csv
+
+# Claude Code
+CLAUDE.md
+.claude/
+
+# Документация (ТЗ не коммитим)
+doc/ТЗ TrifleSklad.md
 
 # Разное
 .idea/

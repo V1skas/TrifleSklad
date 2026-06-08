@@ -1,0 +1,38 @@
+"""Welcome to Reflex! This file outlines the steps to create a basic app."""
+
+import reflex as rx
+
+from rxconfig import config
+from TrifleSklad import frontend, routes, state, administration, catalog, movement, reports
+
+app = rx.App(
+    theme=rx.theme(
+            appearance="light",
+            has_background=True,
+            radius="large",
+            accent_color="blue",
+        )
+)
+
+app.add_page(frontend.welcome_page, route=routes.WELCOME)
+app.add_page(frontend.auth_page, route=routes.LOGIN, on_load=state.AppState.check_params)
+
+app.add_page(frontend.administration_page, route=routes.ADMIN_TAB_PAGE_ID, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
+app.add_page(frontend.administration_page, route=routes.ADMIN_TAB_PAGE, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
+app.add_page(frontend.administration_page, route=routes.ADMIN_TAB, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
+app.add_page(frontend.administration_page, route=routes.ADMIN, on_load=[state.AppState.check_params, administration.backend.AdministrationState.on_load])
+
+app.add_page(frontend.catalog_page, route=routes.CATALOG_TAB_PAGE_ID, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+app.add_page(frontend.catalog_page, route=routes.CATALOG_TAB_PAGE, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+app.add_page(frontend.catalog_page, route=routes.CATALOG_TAB, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+app.add_page(frontend.catalog_page, route=routes.CATALOG, on_load=[state.AppState.check_params, catalog.backend.CatalogState.on_load])
+
+app.add_page(frontend.movement_page, route=routes.MOVEMENT_TAB_PAGE_ID, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
+app.add_page(frontend.movement_page, route=routes.MOVEMENT_TAB_PAGE, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
+app.add_page(frontend.movement_page, route=routes.MOVEMENT_TAB, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
+app.add_page(frontend.movement_page, route=routes.MOVEMENT, on_load=[state.AppState.check_params, movement.backend.MovementState.on_load])
+
+app.add_page(frontend.reports_page, route=routes.REPORTS_TAB_PAGE_ID, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
+app.add_page(frontend.reports_page, route=routes.REPORTS_TAB_PAGE, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
+app.add_page(frontend.reports_page, route=routes.REPORTS_TAB, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
+app.add_page(frontend.reports_page, route=routes.REPORTS, on_load=[state.AppState.check_params, reports.backend.ReportsState.on_load])
