@@ -18,18 +18,24 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_table(name: str) -> bool:
+    return name in sa.inspect(op.get_bind()).get_table_names()
+
+
 def upgrade() -> None:
-    op.create_table(
-        'nds_rates',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('title', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('rate', sa.Float(), nullable=False),
-        sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('is_deleted', sa.Boolean(), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('title'),
-    )
+    if not _has_table('nds_rates'):
+        op.create_table(
+            'nds_rates',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('title', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+            sa.Column('rate', sa.Float(), nullable=False),
+            sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+            sa.Column('is_deleted', sa.Boolean(), nullable=False),
+            sa.PrimaryKeyConstraint('id'),
+            sa.UniqueConstraint('title'),
+        )
 
 
 def downgrade() -> None:
-    op.drop_table('nds_rates')
+    if _has_table('nds_rates'):
+        op.drop_table('nds_rates')
