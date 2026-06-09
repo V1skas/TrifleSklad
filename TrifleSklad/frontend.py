@@ -66,7 +66,7 @@ def navbar() -> rx.Component:
                 ),
                 rx.cond(
                     AppState.get_user_actions.contains(ActionEnum.REPORTS_STOCK),
-                    navbar_link("Звіти", routes.REPORTS_STOCK),
+                    navbar_link("Звіти", routes.REPORTS),
                 ),
 
                 align_items="center",

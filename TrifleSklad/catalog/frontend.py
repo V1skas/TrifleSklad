@@ -118,34 +118,37 @@ def requests_tab() -> rx.Component:
 
 def index():
     return rx.hstack(
-        sidebar(
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST),
-                sidebar_link("Категорії ТМЦ", routes.CATALOG_CATEGORIES),
+        rx.cond(
+            CatalogState.current_tab != CatalogState.Tabs.REQUESTS,
+            sidebar(
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST),
+                    sidebar_link("Категорії ТМЦ", routes.CATALOG_CATEGORIES),
+                    ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST),
+                    sidebar_link("Каталог ТМЦ", routes.CATALOG_PRODUCTS),
                 ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST),
-                sidebar_link("Каталог ТМЦ", routes.CATALOG_PRODUCTS),
-            ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST),
-                sidebar_link("Власники ТМЦ", routes.CATALOG_OWNERS),
-            ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST),
-                sidebar_link("Об'єкти підприємства", routes.CATALOG_STORAGES),
-            ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST),
-                sidebar_link("Постачальники", routes.CATALOG_SUPPLIERS),
-            ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST),
-                sidebar_link("Типи оплат", routes.CATALOG_PAYMENT_TYPES),
-            ),
-            rx.cond(
-                AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
-                sidebar_link("Ставки ПДВ", routes.CATALOG_NDS_RATES),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST),
+                    sidebar_link("Власники ТМЦ", routes.CATALOG_OWNERS),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST),
+                    sidebar_link("Об'єкти підприємства", routes.CATALOG_STORAGES),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST),
+                    sidebar_link("Постачальники", routes.CATALOG_SUPPLIERS),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST),
+                    sidebar_link("Типи оплат", routes.CATALOG_PAYMENT_TYPES),
+                ),
+                rx.cond(
+                    AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
+                    sidebar_link("Ставки ПДВ", routes.CATALOG_NDS_RATES),
+                ),
             ),
         ),
         workspace(
