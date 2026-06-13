@@ -2,8 +2,9 @@ from typing import Tuple
 
 import reflex as rx
 
+from components.infinite_scroll import infinite_scroll
 from TrifleSklad.models import Product
-from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
+from TrifleSklad.movement.products_selector.backend import ALL, ProductsSelectorState
 
 
 def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
@@ -82,15 +83,15 @@ def selector_item_selected(item: Tuple[int, Product]) -> rx.Component:
             "border_width": "3px",
             "padding": "0.7em",
         },
-        on_click=ProductsSelectorState.select_item(item[0]),
+        on_click=ProductsSelectorState.deselect_item(item[0]),
     )
 
 
 def selector_skeleton() -> rx.Component:
-    # Скелетон на час завантаження доступного ТМЦ.
+    # Скелетон на час первинного завантаження / після застосування фільтра.
     return rx.vstack(
         rx.foreach(
-            [0, 1, 2, 3, 4],
+            [0, 1, 2, 3, 4, 5],
             lambda _: rx.skeleton(height="3.5em", width="100%", border_radius="0.5em"),
         ),
         spacing="2",
@@ -100,61 +101,164 @@ def selector_skeleton() -> rx.Component:
 
 
 def selector_list() -> rx.Component:
-    return rx.scroll_area(
+    # Список: спершу обрані (лишаються при фільтрації), далі доступні; внизу —
+    # міні-скелетон під час довантаження наступної порції. Прокрутка контейнера
+    # підтягує дані за вимогою (infinite_scroll → load_more).
+    return infinite_scroll(
         rx.vstack(
             rx.foreach(
                 ProductsSelectorState.get_selected_items, selector_item_selected
             ),
-            rx.foreach(ProductsSelectorState.get_unselected_items, selector_item),
+            rx.foreach(ProductsSelectorState.get_available_items, selector_item),
+            rx.cond(
+                ProductsSelectorState.is_loading_more,
+                rx.vstack(
+                    rx.skeleton(height="3.5em", width="100%", border_radius="0.5em"),
+                    width="100%",
+                ),
+            ),
             spacing="1",
             width="100%",
         ),
+        on_load_more=ProductsSelectorState.load_more,
         width="100%",
         height="100%",
+        padding_right="0.5em",
+    )
+
+
+def filters_panel() -> rx.Component:
+    return rx.vstack(
+        rx.heading("Фільтри", size="4", width="100%"),
+        rx.text("Пошук (назва / s/n / ID):", size="2"),
+        rx.debounce_input(
+            rx.input(
+                rx.input.slot(rx.icon("search")),
+                placeholder="Введіть текст",
+                width="100%",
+                size="2",
+                value=ProductsSelectorState.filter_search,
+                on_change=ProductsSelectorState.change_filter_search,
+            ),
+            debounce_timeout=400,
+        ),
+        rx.text("Позиція каталогу:", size="2"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Усі позиції", width="100%"),
+            rx.select.content(
+                rx.select.item("Усі позиції", value=ALL),
+                rx.foreach(
+                    ProductsSelectorState.catalog_options,
+                    lambda o: rx.select.item(o[0], value=o[1]),
+                ),
+            ),
+            value=ProductsSelectorState.filter_catalog,
+            on_change=ProductsSelectorState.change_filter_catalog,
+            width="100%",
+            size="2",
+        ),
+        rx.text("Залишок від ємності (≥):", size="2"),
+        rx.debounce_input(
+            rx.input(
+                type="number",
+                min=0,
+                placeholder="Будь-який",
+                width="100%",
+                size="2",
+                value=ProductsSelectorState.filter_min_remaining,
+                on_change=ProductsSelectorState.change_filter_min_remaining,
+            ),
+            debounce_timeout=400,
+        ),
+        rx.text("Заповненість:", size="2"),
+        rx.select.root(
+            rx.select.trigger(width="100%"),
+            rx.select.content(
+                rx.select.item("Усі", value=ALL),
+                rx.select.item("Повні", value="full"),
+                rx.select.item("Неповні", value="partial"),
+            ),
+            value=ProductsSelectorState.filter_fullness,
+            on_change=ProductsSelectorState.change_filter_fullness,
+            width="100%",
+            size="2",
+        ),
+        rx.button(
+            "Скинути фільтри",
+            type="button",
+            variant="soft",
+            color_scheme="gray",
+            on_click=ProductsSelectorState.reset_filters,
+            width="100%",
+        ),
+        spacing="2",
+        width="100%",
+        height="100%",
+        align="stretch",
     )
 
 
 def selector(*child, **prop) -> rx.Component:
+    prop.setdefault("width", "100%")
+    prop.setdefault("height", "100%")
+    # Сам діалог не повинен прокручуватися — прокрутка лише всередині списку ліворуч.
+    prop.setdefault("min_height", "0")
+    prop.setdefault("overflow", "hidden")
     return rx.vstack(
         rx.heading(
             "Вибір ТМЦ:",
-            size="8",
+            size="7",
             color=rx.color("accent", 2),
             background_color=rx.color("accent", 9),
             border_radius="0.5em",
             width="100%",
             padding="0.5em",
+            flex_shrink="0",
         ),
-        rx.input(
-            rx.input.slot(rx.icon("search")),
-            placeholder="Пошук",
-            value=ProductsSelectorState.filter_many,
-            width="100%",
-            size="3",
-            on_change=ProductsSelectorState.change_filter_many,
-        ),
-        rx.card(
-            rx.cond(
-                ProductsSelectorState.is_loading,
-                selector_skeleton(),
+        rx.hstack(
+            # Ліворуч — список одиниць ТМЦ.
+            rx.card(
                 rx.cond(
-                    ProductsSelectorState.has_items,
-                    selector_list(),
-                    rx.center(
-                        rx.text(
-                            "ТМЦ не знайдено",
-                            color=rx.color("accent", 8),
-                            user_select="none",
-                            size="3",
+                    ProductsSelectorState.is_loading,
+                    selector_skeleton(),
+                    rx.cond(
+                        ProductsSelectorState.has_items,
+                        selector_list(),
+                        rx.center(
+                            rx.text(
+                                "ТМЦ не знайдено",
+                                color=rx.color("accent", 8),
+                                user_select="none",
+                                size="3",
+                            ),
+                            width="100%",
+                            height="100%",
                         ),
-                        width="100%",
-                        height="100%",
                     ),
                 ),
+                padding="1em",
+                flex="2",
+                height="100%",
+                min_width="0",
+                min_height="0",
             ),
-            padding="1em",
+            # Праворуч — параметри фільтрації.
+            rx.card(
+                filters_panel(),
+                padding="1em",
+                flex="1",
+                height="100%",
+                min_width="14em",
+                min_height="0",
+                overflow_y="auto",
+            ),
+            # Середній ряд забирає лишню висоту (flex=1) і дозволяє внутрішню
+            # прокрутку (min_height=0), а не розпирає діалог.
+            spacing="3",
             width="100%",
-            height="100%",
+            flex="1",
+            min_height="0",
+            align="stretch",
         ),
         *child,
         **prop,

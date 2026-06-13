@@ -6,7 +6,7 @@ import math
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import select, func
+from sqlmodel import select, func, or_
 
 from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus
 from TrifleSklad.models import (
@@ -1395,6 +1395,94 @@ class ProductDAO:
             if len(products) > 0:
                 session.expunge_all()
             return list(products)
+
+    @classmethod
+    def get_filtered_paginated_by_owner_storage(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        exclude_ids: List[int],
+        search: str = "",
+        catalog_id: int = -1,
+        min_remaining: Optional[int] = None,
+        fullness: str = "all",
+        offset: int = 0,
+        limit: int = 30,
+    ) -> tuple[List[Product], bool]:
+        """Порція доступного ТМЦ для діалогу вибору (нескінченний скрол).
+
+        Фільтри:
+        - owner_id == -1 — без фільтра за власником (на місці лежить ТМЦ різних
+          власників, напр. повернення з площадки);
+        - exclude_ids — одиниці, які вже додані до руху або вже обрані в діалозі;
+        - search — за назвою каталогу / серійним номером / id;
+        - catalog_id — конкретна позиція каталогу;
+        - min_remaining — залишок (Product.count) >= значення;
+        - fullness — "full" (count == capacity) / "partial" (count < capacity) / "all".
+
+        Повертає (порція, чи_є_ще): тягнемо limit+1 рядків, щоб дізнатися, чи
+        лишилися ще дані, не роблячи окремий COUNT.
+        """
+        statement = (
+            select(Product)
+            .join(ProductCatalog, Product.id_product_catalog == ProductCatalog.id)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+        if catalog_id != -1:
+            statement = statement.where(Product.id_product_catalog == catalog_id)
+        if min_remaining is not None:
+            statement = statement.where(Product.count >= min_remaining)
+        if fullness == "full":
+            statement = statement.where(Product.count == ProductCatalog.capacity)
+        elif fullness == "partial":
+            statement = statement.where(Product.count < ProductCatalog.capacity)
+        if search:
+            term = search.strip()
+            if term:
+                like = f"%{term.lower()}%"
+                conditions = [
+                    func.lower(ProductCatalog.title).like(like),
+                    func.lower(func.coalesce(Product.serial_number, "")).like(like),
+                ]
+                if term.isdigit():
+                    conditions.append(Product.id == int(term))
+                statement = statement.where(or_(*conditions))
+
+        statement = statement.order_by(Product.id).offset(offset).limit(limit + 1)
+
+        with rx.session() as session:
+            products = list(session.exec(statement).all())
+            has_more = len(products) > limit
+            if has_more:
+                products = products[:limit]
+            if len(products) > 0:
+                session.expunge_all()
+            return products, has_more
+
+    @classmethod
+    def get_catalog_options_by_owner_storage(
+        cls, owner_id: int, storage_id: int
+    ) -> List[tuple[int, str]]:
+        """Перелік позицій каталогу (id, назва), у яких є доступні одиниці на
+        вказаному місці/власнику — для випадаючого фільтра в діалозі вибору."""
+        statement = (
+            select(ProductCatalog.id, ProductCatalog.title)
+            .join(Product, Product.id_product_catalog == ProductCatalog.id)
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        statement = statement.distinct().order_by(ProductCatalog.title)
+
+        with rx.session() as session:
+            return [(row[0], row[1]) for row in session.exec(statement).all()]
 
     @classmethod
     def count_by_storage(cls, storage_id: int) -> int:

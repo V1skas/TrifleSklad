@@ -19,8 +19,13 @@ def dialog():
                 height="100%"
             ),
 
-            width="29em",
-            height="35em"
+            width="min(56em, 95vw)",
+            height="min(40em, 90vh)",
+            max_width="56em",
+            # Прокрутка лише всередині списку ТМЦ, а не всього діалогу.
+            overflow="hidden",
+            display="flex",
+            flex_direction="column",
         ),
 
         open=ProductsMovementListState.dialog_open,
