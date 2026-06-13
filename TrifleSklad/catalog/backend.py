@@ -36,6 +36,10 @@ class CatalogState(AppState):
 
     current_tab: str = ""
 
+    @rx.var
+    def show_catalog_sidebar(self) -> bool:
+        return self.router.page.params.get("tab", "") != "requests"
+
     def _check_path(self):
         tab = self.router.page.params.get("tab", "")
 

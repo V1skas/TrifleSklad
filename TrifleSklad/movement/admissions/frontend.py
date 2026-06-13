@@ -402,6 +402,79 @@ def add_admission_products_catalog_dialog() -> rx.Component:
         on_open_change=AddAdmissionState.on_close_product_catalog_dialog,
     )
 
+def edit_admission_products_catalog_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Інформація про товар"),
+            rx.tabs.root(
+                rx.tabs.content(
+                    movement_product_catalog_add_edit_form(),
+                    value=EditAdmissionState.ProductCatalogDialogPages.EDIT,
+
+                    width="100%",
+                    height="100%"
+                ),
+                rx.tabs.content(
+                    movement_product_catalog_detailed_view_form(),
+                    value=EditAdmissionState.ProductCatalogDialogPages.VIEW,
+
+                    width="100%",
+                    height="100%"
+                ),
+
+                default_value=EditAdmissionState.ProductCatalogDialogPages.EMPTY,
+                value=EditAdmissionState.product_catalog_dialog_page,
+            ),
+            rx.hstack(
+                rx.spacer(),
+                rx.button("Закрити", variant="outline", on_click=EditAdmissionState.on_close_product_catalog_dialog),
+
+                padding_top="1em",
+
+                width="100%",
+            ),
+
+            width="30em"
+        ),
+
+        open=EditAdmissionState.is_open_product_catalog_dialog,
+        on_open_change=EditAdmissionState.on_close_product_catalog_dialog,
+    )
+
+def edit_admission_products_catalog_table() -> rx.Component:
+    return rx.vstack(
+        rx.table.root(
+            rx.table.header(
+                rx.table.row(
+                    rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                ),
+
+                background_color=rx.color("accent", 9)
+            ),
+            rx.table.body(
+                rx.foreach(
+                    EditAdmissionState.item_movement_products_catalog_list,
+                    lambda item: rx.table.row(
+                        rx.table.cell(rx.link(item[1].product.title, on_click=EditAdmissionState.view_product_catalog_dialog(item[0]))),
+                        rx.table.cell(item[1].count),
+                        rx.table.cell(item[1].price)
+                    )
+                ),
+
+                height="100%",
+                width="100%"
+            ),
+
+            variant="surface",
+            height="100%",
+            width="100%"
+        ),
+
+        width="100%",
+    )
+
 def product_catalog_table_row(item: Tuple[int, MovementProductsCatalog]):
     return rx.table.row(
         rx.table.cell(rx.link(item[1].product.title, on_click=AddAdmissionState.view_product_catalog_dialog(item[0]))),
@@ -1071,9 +1144,9 @@ def edit_form() -> rx.Component:
                     on_change=EditAdmissionState.on_change_id_destination_owner
                 ),
                 rx.text("*Товари з каталогу:"),
-                add_admission_products_catalog_dialog(),
+                edit_admission_products_catalog_dialog(),
                 rx.cond(EditAdmissionState.has_item_movement_products_catalog,
-                        add_admission_products_catalog_table(),
+                        edit_admission_products_catalog_table(),
                         rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
                 rx.text("*Спосіб оплати:"),
                 rx.select.root(

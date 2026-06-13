@@ -9,6 +9,7 @@ from TrifleSklad.dao import MovementDAO, OwnerDAO, ProductDAO, StorageDAO
 from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
+    StorageType,
     movements_status_list,
     movements_type_list,
 )
@@ -148,7 +149,11 @@ class AddMovementsState(rx.State):
     # Backend only
     # ======================
     def _load_list_storages(self):
-        self.list_storages = [(item.title, str(item.id)) for item in StorageDAO.get_all()]
+        # Переміщення можливе лише між складами — у списках лише сховища типу WAREHOUSE.
+        self.list_storages = [
+            (item.title, str(item.id))
+            for item in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)
+        ]
 
     def _load_list_owners(self):
         self.list_owners = [(item.title, str(item.id)) for item in OwnerDAO.get_all()]
@@ -271,8 +276,14 @@ class AddMovementsState(rx.State):
     async def add_one(self):
         if not self.app_state.has_permission(ActionEnum.MOVEMENTS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+        if self.id_incoming_owner == "" or self.id_incoming_storage == "":
+            return rx.toast.error("Не обрано власника або склад відправлення!")
         if self.id_destination_owner == "" or self.id_destination_storage == "":
             return rx.toast.error("Не обрано власника або склад призначення!")
+        # Переміщення дозволено лише зі складу на склад (не на площадку/відділ).
+        if not StorageDAO.is_type(int(self.id_incoming_storage), StorageType.WAREHOUSE) \
+                or not StorageDAO.is_type(int(self.id_destination_storage), StorageType.WAREHOUSE):
+            return rx.toast.error("Переміщення можливе лише між складами!")
         if self.products_movement_list_state is None or len(self.products_movement_list_state.items) == 0:
             return rx.toast.error("Список товарів для переміщення порожній!")
 

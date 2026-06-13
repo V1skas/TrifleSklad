@@ -119,7 +119,7 @@ def requests_tab() -> rx.Component:
 def index():
     return rx.hstack(
         rx.cond(
-            CatalogState.current_tab != CatalogState.Tabs.REQUESTS,
+            CatalogState.show_catalog_sidebar,
             sidebar(
                 rx.cond(
                     AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST),
