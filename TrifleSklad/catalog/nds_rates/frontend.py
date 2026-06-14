@@ -17,8 +17,8 @@ from TrifleSklad.models import NDSRate
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewNdsRateState.title, size="7", width="100%"),
-        rx.text(f"Ставка: {ViewNdsRateState.rate}%", width="100%"),
-        rx.text(ViewNdsRateState.description, is_optional=True, width="100%"),
+        rx.hstack(rx.text("Ставка:"), rx.text(f"{ViewNdsRateState.rate}%"), width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewNdsRateState.description, is_optional=True), width="100%"),
 
         spacing="3",
 
@@ -164,7 +164,7 @@ def list_tab_content() -> rx.Component:
 
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=AddNdsRateState.title, on_change=AddNdsRateState.on_change_title),
@@ -182,7 +182,7 @@ def add_form() -> rx.Component:
 
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", value=EditNdsRateState.title, required=True, size="3", on_change=EditNdsRateState.on_change_title),

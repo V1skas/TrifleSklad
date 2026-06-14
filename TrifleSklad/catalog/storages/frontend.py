@@ -11,12 +11,12 @@ from TrifleSklad.catalog.storages.backend import ViewStorageState, AddStorageSta
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewStorageState.title, size="7", width="100%"),
-        rx.text(ViewStorageState.storage_type, width="100%"),
-        rx.text(ViewStorageState.description, is_optional=True, width="100%"),
-        rx.text(ViewStorageState.address, width="100%"),
-        rx.text(ViewStorageState.responsible, width="100%"),
+        rx.hstack(rx.text("Тип:"), rx.text(ViewStorageState.storage_type), width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewStorageState.description, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Адреса:"), rx.text(ViewStorageState.address), width="100%"),
+        rx.hstack(rx.text("Відповідальний:"), rx.text(ViewStorageState.responsible), width="100%"),
 
-        spasing="3",
+        spacing="3",
         height="100%",
         width="100%",
     )
@@ -156,7 +156,7 @@ def table_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва", size="4", width="100%"),
             rx.input(
@@ -232,7 +232,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва", size="4", width="100%"),
             rx.input(

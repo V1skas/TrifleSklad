@@ -187,7 +187,7 @@ def request_picker() -> rx.Component:
 
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             request_picker(),
             rx.text("*Дата:"),
@@ -326,7 +326,7 @@ def add_tab_content() -> rx.Component:
 
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(

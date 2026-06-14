@@ -32,6 +32,7 @@ def item_preview() -> rx.Component:
 
             spacing="1",
             width="100%",
+            max_height="16em",
         ),
 
         justify="end",
@@ -187,35 +188,21 @@ def list_action_item(item: Action) -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=AddRoleState.item.title, on_change=AddRoleState.change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", size="3", value=AddRoleState.item.description, on_change=AddRoleState.change_description),
-            rx.text("*Права:"),
-            rx.scroll_area(
-                rx.vstack(
-                    rx.cond(
-                        AddRoleState.has_selected_actions,
-                        rx.foreach(AddRoleState.item.actions, list_action_item),
-                        rx.center(rx.text("Нічого не обрано"), width="100%", size="3")
-                    ),
-
-                    spacing="1",
-
-                    width="100%",
-                    height="100%",
-                ),
-
-
-                spacing="1",
-                width="100%",
-                max_height="90%",
-            ),
             rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button("Вибрати права", size="2", width="12em",)
+                rx.hstack(
+                    rx.text("*Права:"),
+                    rx.spacer(),
+                    rx.dialog.trigger(
+                        rx.button("Вибрати права", size="2"),
+                    ),
+                    align="center",
+                    width="100%",
                 ),
                 rx.dialog.content(
                     actions.frontend.index(
@@ -237,27 +224,11 @@ def add_form() -> rx.Component:
                     on_open_auto_focus=AddRoleState.open_actions
                 ),
             ),
-
-            align="stretch"
-        ),
-
-        height="100%",
-        width="100%"
-    )
-
-def edit_form() -> rx.Component:
-    return rx.card(
-        rx.vstack(
-            rx.text("*Назва:"),
-            rx.input(id="title", required=True, size="3", value=EditRoleState.item.title, on_change=EditRoleState.change_title),
-            rx.text("Опис:"),
-            rx.text_area(id="description", size="3", value=EditRoleState.item.description, on_change=EditRoleState.change_description),
-            rx.text("*Права:"),
             rx.scroll_area(
                 rx.vstack(
                     rx.cond(
-                        EditRoleState.has_selected_actions,
-                        rx.foreach(EditRoleState.item.actions, list_action_item),
+                        AddRoleState.has_selected_actions,
+                        rx.foreach(AddRoleState.item.actions, list_action_item),
                         rx.center(rx.text("Нічого не обрано"), width="100%", size="3")
                     ),
 
@@ -270,10 +241,32 @@ def edit_form() -> rx.Component:
 
                 spacing="1",
                 width="100%",
+                max_height="16em",
             ),
+
+            align="stretch"
+        ),
+
+        height="100%",
+        width="100%"
+    )
+
+def edit_form() -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.text("*Назва:"),
+            rx.input(id="title", required=True, size="3", value=EditRoleState.item.title, on_change=EditRoleState.change_title),
+            rx.text("Опис:"),
+            rx.text_area(id="description", size="3", value=EditRoleState.item.description, on_change=EditRoleState.change_description),
             rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button("Вибрати права", size="2", width="12em",)
+                rx.hstack(
+                    rx.text("*Права:"),
+                    rx.spacer(),
+                    rx.dialog.trigger(
+                        rx.button("Вибрати права", size="2"),
+                    ),
+                    align="center",
+                    width="100%",
                 ),
                 rx.dialog.content(
                     actions.frontend.index(
@@ -294,6 +287,25 @@ def edit_form() -> rx.Component:
 
                     on_open_auto_focus=EditRoleState.open_actions
                 ),
+            ),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        EditRoleState.has_selected_actions,
+                        rx.foreach(EditRoleState.item.actions, list_action_item),
+                        rx.center(rx.text("Нічого не обрано"), width="100%", size="3")
+                    ),
+
+                    spacing="1",
+
+                    width="100%",
+                    height="100%",
+                ),
+
+
+                spacing="1",
+                width="100%",
+                max_height="16em",
             ),
 
             align="stretch"

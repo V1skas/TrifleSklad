@@ -12,7 +12,7 @@ from TrifleSklad.models import ProductCategory
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewCategoriesState.item.title, size="7", width="100%"),
-        rx.text(ViewCategoriesState.item.description, is_optional=True, width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewCategoriesState.item.description, is_optional=True), width="100%"),
 
         spacing="3",
 
@@ -151,7 +151,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=AddCategoriesState.item.title, on_change=AddCategoriesState.on_change_title),
@@ -166,7 +166,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=EditCategoriesState.item.title, on_change=EditCategoriesState.on_change_title),

@@ -52,9 +52,9 @@ def item_preview() -> rx.Component:
         ),
         
         rx.heading(ViewWorkerState.item.fio, size="7", width="100%"),
-        rx.text(ViewWorkerState.item.position, width="100%"),
-        rx.text(ViewWorkerState.item.phone_number, width="100%"),
-        rx.text(ViewWorkerState.item.email, width="100%"),
+        rx.hstack(rx.text("Посада:"), rx.text(ViewWorkerState.item.position), width="100%"),
+        rx.hstack(rx.text("Телефон:"), rx.text(ViewWorkerState.item.phone_number), width="100%"),
+        rx.hstack(rx.text("Ел. пошта:"), rx.text(ViewWorkerState.item.email), width="100%"),
         rx.spacer(),
 
         spacing="3",
@@ -156,7 +156,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Прізвище І.Б.:"),
             rx.input(
@@ -201,7 +201,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
             rx.vstack(
                 rx.text("*Прізвище І.Б.:"),
                 rx.input(

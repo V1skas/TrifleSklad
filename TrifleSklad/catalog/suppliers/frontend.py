@@ -10,12 +10,12 @@ from TrifleSklad.models import Supplier
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewSupplierState.title, size="7", width="100%"),
-        rx.text(ViewSupplierState.edrpou, width="100%"),
-        rx.text(ViewSupplierState.description, is_optional=True, width="100%"),
-        rx.text(ViewSupplierState.address, is_optional=True, width="100%"),
-        rx.text(ViewSupplierState.email, is_optional=True, width="100%"),
-        rx.text(ViewSupplierState.contact_person, width="100%"),
-        rx.text(ViewSupplierState.contact_phone, width="100%"),
+        rx.hstack(rx.text("ЄДРПОУ:"), rx.text(ViewSupplierState.edrpou), width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewSupplierState.description, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Адреса:"), rx.text(ViewSupplierState.address, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Ел. пошта:"), rx.text(ViewSupplierState.email, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Контактна особа:"), rx.text(ViewSupplierState.contact_person), width="100%"),
+        rx.hstack(rx.text("Контактний телефон:"), rx.text(ViewSupplierState.contact_phone), width="100%"),
 
         spacing="3",
         height="100%",
@@ -177,7 +177,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:", size="3", width="100%"),
             rx.input(
@@ -242,7 +242,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:", size="3", width="100%"),
             rx.input(

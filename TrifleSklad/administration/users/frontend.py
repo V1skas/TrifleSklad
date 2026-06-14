@@ -50,7 +50,7 @@ def list_action_item(item: Action) -> rx.Component:
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewUserState.item.login, size="7", width="100%"),
-        rx.text(ViewUserState.item.worker.fio, width="100%"),
+        rx.hstack(rx.text("Співробітник:"), rx.text(ViewUserState.item.worker.fio), width="100%"),
         rx.heading("Призначені ролі:", size="3", width="100%"),
         rx.scroll_area(
             rx.vstack(
@@ -68,6 +68,7 @@ def item_preview() -> rx.Component:
 
             spacing="1",
             width="100%",
+            max_height="16em",
         ),
         rx.heading("Персональні дозволи:", size="3", width="100%"),
         rx.scroll_area(
@@ -87,6 +88,7 @@ def item_preview() -> rx.Component:
 
             spacing="1",
             width="100%",
+            max_height="16em",
         ),
 
         spacing="3",
@@ -235,7 +237,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Логін:"),
             rx.input(id="login", required=True, size="3", is_disabled=True, value=AddUserState.item.login, on_change=AddUserState.on_change_login),
@@ -261,29 +263,15 @@ def add_form() -> rx.Component:
                 value=AddUserState.id_worker,
                 on_change=AddUserState.on_change_worker,
             ),
-            rx.heading("Надані ролі:", size="3", width="100%"),
-            rx.scroll_area(
-                rx.vstack(
-                    rx.cond(
-                        AddUserState.has_roles,
-                        rx.foreach(AddUserState.item.roles, list_role_item),
-                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")
-                    ),
-
-                    spacing="1",
-
-                    width="100%",
-                    height="100%",
-                ),
-
-
-                spacing="1",
-                width="100%",
-                max_height="90%",
-            ),
             rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button("Надані ролі", size="2", width="12em",)
+                rx.hstack(
+                    rx.heading("Надані ролі:", size="3"),
+                    rx.spacer(),
+                    rx.dialog.trigger(
+                        rx.button("Обрати ролі", size="2"),
+                    ),
+                    align="center",
+                    width="100%",
                 ),
                 rx.dialog.content(
                     roles.frontend.selector(
@@ -305,7 +293,55 @@ def add_form() -> rx.Component:
                     on_open_auto_focus=AddUserState.on_open_roles
                 ),
             ),
-            rx.heading("Персональні дозволи:", size="3", width="100%"),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        AddUserState.has_roles,
+                        rx.foreach(AddUserState.item.roles, list_role_item),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")
+                    ),
+
+                    spacing="1",
+
+                    width="100%",
+                    height="100%",
+                ),
+
+
+                spacing="1",
+                width="100%",
+                max_height="16em",
+            ),
+            rx.dialog.root(
+                rx.hstack(
+                    rx.heading("Персональні дозволи:", size="3"),
+                    rx.spacer(),
+                    rx.dialog.trigger(
+                        rx.button("Обрати дозволи", size="2"),
+                    ),
+                    align="center",
+                    width="100%",
+                ),
+                rx.dialog.content(
+                    actions.frontend.index(
+                        rx.hstack(
+                            rx.dialog.close(rx.button("Скасувати", variant="surface", size="3"),),
+                            rx.spacer(),
+                            rx.dialog.close(rx.button("Зберегти",
+                                                    size="3",
+                                                    on_click=AddUserState.on_change_actions)),
+
+                            width="100%",
+                        ),
+
+                        height="90vh",
+                    ),
+
+                    padding="0",
+
+                    on_open_auto_focus=AddUserState.on_open_actions
+                ),
+            ),
             rx.scroll_area(
                 rx.vstack(
                     rx.cond(
@@ -323,31 +359,7 @@ def add_form() -> rx.Component:
 
                 spacing="1",
                 width="100%",
-                max_height="90%",
-            ),
-            rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button("Обрати дозволи", size="2", width="12em",)
-                ),
-                rx.dialog.content(
-                    actions.frontend.index(
-                        rx.hstack(
-                            rx.dialog.close(rx.button("Скасуквати", variant="surface", size="3"),),
-                            rx.spacer(),
-                            rx.dialog.close(rx.button("Зберегти",
-                                                    size="3",
-                                                    on_click=AddUserState.on_change_actions)),
-
-                            width="100%",
-                        ),
-
-                        height="90vh",
-                    ),
-
-                    padding="0",
-
-                    on_open_auto_focus=AddUserState.on_open_actions
-                ),
+                max_height="16em",
             ),
 
             align="stretch"
@@ -358,7 +370,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("Логін:"),
             rx.input(id="login", required=True, size="3", value=EditUserState.item.login),
@@ -384,28 +396,15 @@ def edit_form() -> rx.Component:
                 value=EditUserState.id_worker,
                 on_change=EditUserState.on_change_worker,
             ),
-            rx.heading("Призначені ролі:", size="3", width="100%"),
-            rx.scroll_area(
-                rx.vstack(
-                    rx.cond(
-                        EditUserState.has_roles,
-                        rx.foreach(EditUserState.item.roles, list_role_item),
-                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")
-                    ),
-
-                    spacing="1",
-
-                    width="100%",
-                    height="100%",
-                ),
-
-
-                spacing="1",
-                width="100%",
-            ),
             rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button("Обрати ролі", size="2", width="12em",)
+                rx.hstack(
+                    rx.heading("Призначені ролі:", size="3"),
+                    rx.spacer(),
+                    rx.dialog.trigger(
+                        rx.button("Обрати ролі", size="2"),
+                    ),
+                    align="center",
+                    width="100%",
                 ),
                 rx.dialog.content(
                     roles.frontend.selector(
@@ -427,12 +426,11 @@ def edit_form() -> rx.Component:
                     on_open_auto_focus=EditUserState.on_open_roles
                 ),
             ),
-            rx.heading("Персональні дозволи:", size="3", width="100%"),
             rx.scroll_area(
                 rx.vstack(
                     rx.cond(
-                        EditUserState.has_actions,
-                        rx.foreach(EditUserState.item.actions, list_action_item),
+                        EditUserState.has_roles,
+                        rx.foreach(EditUserState.item.roles, list_role_item),
                         rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")
                     ),
 
@@ -445,10 +443,17 @@ def edit_form() -> rx.Component:
 
                 spacing="1",
                 width="100%",
+                max_height="16em",
             ),
             rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button("Обрати дозволи", size="2", width="12em",)
+                rx.hstack(
+                    rx.heading("Персональні дозволи:", size="3"),
+                    rx.spacer(),
+                    rx.dialog.trigger(
+                        rx.button("Обрати дозволи", size="2"),
+                    ),
+                    align="center",
+                    width="100%",
                 ),
                 rx.dialog.content(
                     actions.frontend.index(
@@ -469,6 +474,25 @@ def edit_form() -> rx.Component:
 
                     on_open_auto_focus=EditUserState.on_open_actions
                 ),
+            ),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        EditUserState.has_actions,
+                        rx.foreach(EditUserState.item.actions, list_action_item),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")
+                    ),
+
+                    spacing="1",
+
+                    width="100%",
+                    height="100%",
+                ),
+
+
+                spacing="1",
+                width="100%",
+                max_height="16em",
             ),
 
             align="stretch"

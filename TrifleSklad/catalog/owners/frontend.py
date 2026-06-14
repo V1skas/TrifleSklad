@@ -10,7 +10,7 @@ from TrifleSklad.models import Owner
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewOwnerState.item.title, size="7", width="100%"),
-        rx.text(ViewOwnerState.description, is_optional=True, width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewOwnerState.description, is_optional=True), width="100%"),
 
         spacing="3",
 
@@ -149,7 +149,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=AddOwnerState.item.title, on_change=AddOwnerState.on_change_title),
@@ -164,7 +164,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=EditOwnerState.item.title, on_change=EditOwnerState.on_change_title),
