@@ -73,11 +73,7 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: Tuple[int, Worker]) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item[1].fio,
-                href=f"{routes.ADMIN_WORKERS_VIEW_ID}{item[1].id}",
-            ),
-
+            item[1].fio,
             align="left"
         ),
         rx.table.cell(
@@ -92,6 +88,9 @@ def table_row(item: Tuple[int, Worker]) -> rx.Component:
             item[1].email,
             align="left"
         ),
+        on_click=rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:

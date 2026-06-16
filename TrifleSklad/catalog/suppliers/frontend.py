@@ -83,10 +83,7 @@ def table_row(item: Supplier) -> rx.Component:
             align="left"
         ),
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{item.id}"
-            ),
+            item.title,
             align="left"
         ),
         rx.table.cell(
@@ -104,7 +101,10 @@ def table_row(item: Supplier) -> rx.Component:
         rx.table.cell(
             item.contact_phone,
             align="left"
-        )
+        ),
+        on_click=rx.redirect(f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:

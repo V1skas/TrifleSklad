@@ -295,6 +295,38 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
         ),
     )
 
+def detailed_unit_table_row(item: Tuple[int, Product]) -> rx.Component:
+    # Рядок таблиці одиниць ТМЦ позиції постачання. uniq/divisible — на рівні
+    # позиції каталогу (item.product), бо на in-memory одиницях (режим додавання)
+    # зв'язок product_catalog може бути не завантажений.
+    State = MovementProductCatalogDetailedViewState
+    return rx.table.row(
+        rx.table.cell(
+            rx.cond(
+                item[1].id,
+                rx.link(item[1].id, href=f"{routes.REPORTS_UNITS_VIEW_ID}{item[1].id}"),
+                rx.text(item[1].id),
+            ),
+            width="1%", white_space="nowrap",
+        ),
+        rx.table.cell(
+            rx.cond(
+                State.item.product.uniq,
+                rx.text(rx.cond(item[1].serial_number, item[1].serial_number, "—")),
+                rx.text("—", color="gray"),
+            ),
+        ),
+        rx.table.cell(
+            rx.cond(
+                State.item.product.divisible,
+                rx.text(item[1].count),
+                rx.text("—", color="gray"),
+            ),
+            width="1%", white_space="nowrap",
+        ),
+    )
+
+
 def movement_product_catalog_detailed_view_form() -> rx.Component:
     return rx.vstack(
         rx.text("Товари з каталогу:", width="100%"),
@@ -322,39 +354,28 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
                 width="100%"
             )
         ),
-        rx.cond(MovementProductCatalogDetailedViewState.item.product.uniq,
-            rx.accordion.root(
-                rx.accordion.item(
-                    header=rx.text("Серійні номери"),
-                    content=rx.scroll_area(
-                        rx.vstack(
-                            rx.foreach(
-                                MovementProductCatalogDetailedViewState.item_products_list,
-                                lambda item: rx.hstack(
-                                    rx.text(
-                                        rx.cond(item[1].serial_number, item[1].serial_number, "-"),
-                                        text_align="center",
-                                        width="100%"
-                                    ),
-                                    width="100%"
-                                ),
-                            ),
-
-                            width="100%",
-                            height="100%",
-                        ),
-
-                        padding="0.5em",
-                        width="100%",
-                        height="8em",
-                    )
+        rx.text("Одиниці ТМЦ:", width="100%"),
+        rx.scroll_area(
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("ID", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                        rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
+                        rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                    ),
+                    background_color=rx.color("accent", 9),
                 ),
-
-                collapsible=True,
-                variant="outline",
-
-                width="100%"
+                rx.table.body(
+                    rx.foreach(
+                        MovementProductCatalogDetailedViewState.item_products_list,
+                        detailed_unit_table_row,
+                    ),
+                ),
+                variant="surface",
+                width="100%",
             ),
+            max_height="14em",
+            width="100%",
         ),
     )
 
@@ -465,9 +486,12 @@ def edit_admission_products_catalog_table() -> rx.Component:
                 rx.foreach(
                     EditAdmissionState.item_movement_products_catalog_list,
                     lambda item: rx.table.row(
-                        rx.table.cell(rx.link(item[1].product.title, on_click=EditAdmissionState.view_product_catalog_dialog(item[0]))),
+                        rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(item[1].price)
+                        rx.table.cell(item[1].price),
+                        on_click=EditAdmissionState.view_product_catalog_dialog(item[0]),
+                        cursor="pointer",
+                        _hover={"background_color": rx.color("accent", 3)},
                     )
                 ),
 
@@ -485,9 +509,12 @@ def edit_admission_products_catalog_table() -> rx.Component:
 
 def product_catalog_table_row(item: Tuple[int, MovementProductsCatalog]):
     return rx.table.row(
-        rx.table.cell(rx.link(item[1].product.title, on_click=AddAdmissionState.view_product_catalog_dialog(item[0]))),
+        rx.table.cell(item[1].product.title),
         rx.table.cell(item[1].count),
-        rx.table.cell(item[1].price)
+        rx.table.cell(item[1].price),
+        on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def product_catalog_table():
@@ -532,9 +559,12 @@ def add_admission_products_catalog_table() -> rx.Component:
                 rx.foreach(
                     AddAdmissionState.item_movement_products_catalog_list,
                     lambda item: rx.table.row(
-                        rx.table.cell(rx.link(item[1].product.title, on_click=AddAdmissionState.view_product_catalog_dialog(item[0]))),
+                        rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(item[1].price)
+                        rx.table.cell(item[1].price),
+                        on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
+                        cursor="pointer",
+                        _hover={"background_color": rx.color("accent", 3)},
                     )
                 ),
 
@@ -566,9 +596,12 @@ def view_admission_products_catalog_table() -> rx.Component:
                 rx.foreach(
                     ViewAdmissionState.item_movement_products_catalog_list,
                     lambda item: rx.table.row(
-                        rx.table.cell(rx.link(item[1].product.title, on_click=ViewAdmissionState.on_change_dialog_open(item[0]))),
+                        rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(item[1].price)
+                        rx.table.cell(item[1].price),
+                        on_click=ViewAdmissionState.on_change_dialog_open(item[0]),
+                        cursor="pointer",
+                        _hover={"background_color": rx.color("accent", 3)},
                     )
                 ),
 
@@ -607,14 +640,11 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(
-                                rx.link(
-                                    row[2],
-                                    on_click=rx.redirect(row[4]),
-                                    cursor="pointer",
-                                ),
-                            ),
+                            rx.table.cell(row[2]),
                             rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),
@@ -764,11 +794,7 @@ def table_row(item: Tuple[int, Admission]) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item[1].id)),
         rx.table.row_header_cell(
-            rx.link(
-                item[1].movement.date,
-                href=f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{item[1].id}"
-            ),
-
+            item[1].movement.date,
             align="left"
         ),
         rx.table.cell(rx.text(item[1].supplier.title)),
@@ -777,7 +803,10 @@ def table_row(item: Tuple[int, Admission]) -> rx.Component:
         rx.table.cell(rx.text(item[1].payment_type.title)),
         rx.table.cell(rx.text(item[1].movement.total_cost)),
         rx.table.cell(rx.text(rx.cond(item[1].flag_nds, "Так", "Ні"))),
-        rx.table.cell(rx.text(ListAdmissionState.get_movement_statuses[item[1].movement.status]))
+        rx.table.cell(rx.text(ListAdmissionState.get_movement_statuses[item[1].movement.status])),
+        on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:

@@ -154,11 +154,7 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: User) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item.login,
-                href=f"{routes.ADMIN_USERS_VIEW_ID}{item.login}",
-            ),
-
+            item.login,
             align="left"
         ),
         rx.table.cell(
@@ -169,6 +165,9 @@ def table_row(item: User) -> rx.Component:
             item.worker.position,
             align="left"
         ),
+        on_click=rx.redirect(f"{routes.ADMIN_USERS_VIEW_ID}{item.login}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:

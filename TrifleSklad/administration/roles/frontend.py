@@ -100,13 +100,12 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: Role) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.ADMIN_ROLES_VIEW_ID}{item.id}",
-            ),
-
+            item.title,
             align="left"
         ),
+        on_click=rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:

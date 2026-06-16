@@ -41,14 +41,11 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(
-                                rx.link(
-                                    row[2],
-                                    on_click=rx.redirect(row[4]),
-                                    cursor="pointer",
-                                ),
-                            ),
+                            rx.table.cell(row[2]),
                             rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),
@@ -162,11 +159,7 @@ def table_row(item: Movement) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item.id)),
         rx.table.row_header_cell(
-            rx.link(
-                item.date,
-                href=f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{item.id}"
-            ),
-
+            item.date,
             align="left"
         ),
         rx.table.cell(rx.text(item.incoming_storage.title)),
@@ -174,6 +167,9 @@ def table_row(item: Movement) -> rx.Component:
         rx.table.cell(rx.text(item.destination_storage.title)),
         rx.table.cell(rx.text(item.destination_owner.title)),
         rx.table.cell(rx.text(ListMovementsState.get_movement_statuses[item.status])),
+        on_click=rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 

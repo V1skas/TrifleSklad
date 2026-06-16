@@ -1791,6 +1791,99 @@ class ProductDAO:
             return list(products)
 
     @classmethod
+    def get_by_id_with_relationships(cls, id: int) -> Optional[Product]:
+        """Одиниця ТМЦ з підвантаженими каталогом/місцем/власником — для детальної
+        сторінки одиниці. На відміну від get_stock_units не фільтрує is_deleted:
+        спожита одиниця теж має історію (доступна за прямим id з діалогу поставки)."""
+        statement = (
+            select(Product)
+            .options(
+                joinedload(Product.product_catalog),
+                joinedload(Product.storage),
+                joinedload(Product.owner),
+            )
+            .where(Product.id == id)
+        )
+
+        with rx.session() as session:
+            product = session.exec(statement).one_or_none()
+
+            if product:
+                session.expunge(product)
+            return product
+
+    @classmethod
+    def get_units_count(
+        cls, search: Optional[str] = None, catalog_id: Optional[int] = None
+    ) -> int:
+        """Кількість живих одиниць ТМЦ для пагінації переліку одиниць.
+        search — за назвою каталогу / серійним номером / id."""
+        statement = (
+            select(func.count(Product.id))
+            .join(ProductCatalog, Product.id_product_catalog == ProductCatalog.id)
+            .where(Product.is_deleted == False)
+        )
+        if catalog_id is not None:
+            statement = statement.where(Product.id_product_catalog == catalog_id)
+        if search is not None and search.strip():
+            term = search.strip()
+            like = f"%{term.lower()}%"
+            conditions = [
+                func.lower(ProductCatalog.title).like(like),
+                func.lower(func.coalesce(Product.serial_number, "")).like(like),
+            ]
+            if term.isdigit():
+                conditions.append(Product.id == int(term))
+            statement = statement.where(or_(*conditions))
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+
+    @classmethod
+    def get_units_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        count_items: int = 0,
+        search: Optional[str] = None,
+        catalog_id: Optional[int] = None,
+    ) -> tuple[int, List[Product]]:
+        """Сторінка живих одиниць ТМЦ (із каталогом/місцем/власником) для переліку
+        одиниць у звіті. Сортування — за id (новіші зверху)."""
+        total_pages = max(1, math.ceil(count_items / limit))
+        skip = (max(1, page) - 1) * limit
+
+        statement = (
+            select(Product)
+            .join(ProductCatalog, Product.id_product_catalog == ProductCatalog.id)
+            .options(
+                joinedload(Product.product_catalog),
+                joinedload(Product.storage),
+                joinedload(Product.owner),
+            )
+            .where(Product.is_deleted == False)
+        )
+        if catalog_id is not None:
+            statement = statement.where(Product.id_product_catalog == catalog_id)
+        if search is not None and search.strip():
+            term = search.strip()
+            like = f"%{term.lower()}%"
+            conditions = [
+                func.lower(ProductCatalog.title).like(like),
+                func.lower(func.coalesce(Product.serial_number, "")).like(like),
+            ]
+            if term.isdigit():
+                conditions.append(Product.id == int(term))
+            statement = statement.where(or_(*conditions))
+
+        statement = statement.order_by(Product.id.desc()).offset(skip).limit(limit)
+
+        with rx.session() as session:
+            items = session.exec(statement).all()
+            session.expunge_all()
+            return total_pages, list(items)
+
+    @classmethod
     def update_serial_numbers(cls, serials: Dict[int, str]) -> tuple[bool, str]:
         if not serials:
             return True, ""
@@ -2106,6 +2199,39 @@ class MovementDAO:
             )
             .where(MovementProducts.id_product.in_(product_ids))
             .where(Movement.id >= from_movement_id)
+            .distinct()
+            .order_by(Movement.id)
+        )
+
+        with rx.session() as session:
+            movements = session.exec(statement).all()
+
+            if len(movements) > 0:
+                session.expunge_all()
+            return list(movements)
+
+    @classmethod
+    def get_history_by_product_id(cls, product_id: int) -> List[Movement]:
+        """Історія руху однієї одиниці ТМЦ: усі рухи, до яких вона входить
+        (через MovementProducts), із підвантаженими місцями/власниками, у порядку
+        створення (id за зростанням). Для детальної сторінки одиниці."""
+        statement = (
+            select(Movement)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .join(
+                MovementProducts,
+                MovementProducts.id_movement_product == MovementProductsCatalog.id,
+            )
+            .options(
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.destination_storage),
+                joinedload(Movement.incoming_owner),
+                joinedload(Movement.destination_owner),
+            )
+            .where(MovementProducts.id_product == product_id)
             .distinct()
             .order_by(Movement.id)
         )

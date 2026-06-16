@@ -198,10 +198,7 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: ProductCatalog) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.CATALOG_PRODUCTS_VIEW_ID}{item.id}"
-            ),
+            item.title,
             align="left"
         ),
         rx.table.cell(
@@ -230,6 +227,9 @@ def table_row(item: ProductCatalog) -> rx.Component:
                 rx.text("Ні")
             )
         ),
+        on_click=rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:

@@ -73,7 +73,7 @@ def list_row(item: Tuple[int, Request]) -> rx.Component:
     return rx.table.row(
         rx.table.cell(item[1].id),
         rx.table.row_header_cell(
-            rx.link(item[1].date, href=f"{routes.CATALOG_REQUESTS_VIEW_ID}{item[1].id}"),
+            item[1].date,
             align="left",
         ),
         rx.table.cell(ListRequestsState.type_titles[item[1].type]),
@@ -85,6 +85,9 @@ def list_row(item: Tuple[int, Request]) -> rx.Component:
             )
         ),
         rx.table.cell(ListRequestsState.status_titles[item[1].status]),
+        on_click=rx.redirect(f"{routes.CATALOG_REQUESTS_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 

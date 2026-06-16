@@ -77,16 +77,15 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: Storage) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.CATALOG_STORAGES_VIEW_ID}{item.id}"
-            ),
-
+            item.title,
             align="left"
         ),
         rx.table.cell(StorageState.get_titles_type_storages_dict_as_dict[item.type]),
         rx.table.cell(item.address),
         rx.table.cell(item.responsible.fio),
+        on_click=rx.redirect(f"{routes.CATALOG_STORAGES_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:
