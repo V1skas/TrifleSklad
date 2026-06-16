@@ -103,7 +103,7 @@ def table() -> rx.Component:
         ),
         rx.table.body(
             rx.foreach(
-                ListStorageState.items,
+                ListStorageState.filtered_items,
                 table_row
             )
         ),
@@ -142,6 +142,39 @@ def table_tab_content() -> rx.Component:
                 style={
                     "border_bottom": f"1px solid {rx.color('accent', 9)}",
                 }
+            ),
+            rx.hstack(
+                rx.input(
+                    placeholder="Пошук за назвою",
+                    value=ListStorageState.filter_title,
+                    on_change=ListStorageState.on_change_filter_title,
+                    flex="1",
+                    min_width="0",
+                ),
+                rx.input(
+                    placeholder="Пошук за адресою",
+                    value=ListStorageState.filter_address,
+                    on_change=ListStorageState.on_change_filter_address,
+                    flex="1",
+                    min_width="0",
+                ),
+                rx.select.root(
+                    rx.select.trigger(placeholder="Усі типи"),
+                    rx.select.content(
+                        rx.select.item("Усі типи", value="all"),
+                        rx.foreach(
+                            ListStorageState.storage_type_options,
+                            lambda o: rx.select.item(o[0], value=o[1]),
+                        ),
+                    ),
+                    value=ListStorageState.filter_type,
+                    on_change=ListStorageState.on_change_filter_type,
+                    width="14em",
+                    flex_shrink="0",
+                ),
+                spacing="3",
+                width="100%",
+                align="center",
             ),
             rx.cond(ListStorageState.has_items,
                 table(),

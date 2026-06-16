@@ -8,6 +8,7 @@ from TrifleSklad.actions import Action as ActionEnum
 
 from TrifleSklad.catalog.products.backend import AddProductsState, EditProductsState, ViewProductsState, ListProductsState, ProductsState
 from TrifleSklad.movement.list_components import pagination
+from TrifleSklad.movement.list_mixin import ALL
 
 from TrifleSklad.models import ProductCatalog
 
@@ -289,12 +290,30 @@ def table_tab_content() -> rx.Component:
             ),
             rx.hstack(
                 rx.input(
+                    placeholder="Пошук за назвою",
                     value=ListProductsState.get_search_str,
-                    on_change=ListProductsState.on_change_search_str
+                    on_change=ListProductsState.on_change_search_str,
+                    flex="1",
+                    min_width="0",
                 ),
-                rx.button("Пошук", on_click=ListProductsState.on_click_search),
-
-                width="100%"
+                rx.button("Пошук", on_click=ListProductsState.on_click_search, flex_shrink="0"),
+                rx.select.root(
+                    rx.select.trigger(placeholder="Усі категорії"),
+                    rx.select.content(
+                        rx.select.item("Усі категорії", value=ALL),
+                        rx.foreach(
+                            ListProductsState.list_categories,
+                            lambda c: rx.select.item(c[0], value=c[1]),
+                        ),
+                    ),
+                    value=ListProductsState.filter_category_id,
+                    on_change=ListProductsState.on_change_filter_category,
+                    width="16em",
+                    flex_shrink="0",
+                ),
+                width="100%",
+                spacing="3",
+                align="center",
             ),
             rx.cond(ListProductsState.has_items,
                 table(),

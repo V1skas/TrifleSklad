@@ -254,18 +254,33 @@ class EditSupplierState(rx.State):
 class ListSupplierState(rx.State):
     items: List[Supplier] = []
 
+    # Фільтр (клієнтський — список завантажується цілком).
+    filter_title: str = ""
+
     # Frontend vars
     # =============
     @rx.var
+    def filtered_items(self) -> List[Supplier]:
+        term = self.filter_title.strip().lower()
+        if term == "":
+            return self.items
+        return [s for s in self.items if term in (s.title or "").lower()]
+
+    @rx.var
     def has_items(self) -> bool:
-        return len(self.items) > 0
+        return len(self.filtered_items) > 0
     # =============
 
     # Action handlers
     # ===============
     @rx.event
     def on_load(self):
+        self.filter_title = ""
         self.items = SupplierDAO.get_all()
+
+    @rx.event
+    def on_change_filter_title(self, value: str):
+        self.filter_title = value
     # ===============
 
 

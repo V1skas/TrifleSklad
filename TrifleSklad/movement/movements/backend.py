@@ -27,9 +27,13 @@ class ListMovementsState(MovementListFilterMixin, rx.State):
             MovementsType.MOVEMENT,
             self._current_page,
             self._limit,
-            self.filter_date_from,
-            self.filter_date_to,
+            self._date_from_eff(),
+            self._date_to_eff(),
             self.selected_statuses,
+            incoming_storage=self.filter_incoming_storage,
+            destination_storage=self.filter_destination_storage,
+            incoming_owner=self.filter_incoming_owner,
+            destination_owner=self.filter_destination_owner,
         )
 
     # Dynamic variables

@@ -12,7 +12,7 @@ from TrifleSklad.movement.write_off.backend import (
     WriteOffState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -282,7 +282,21 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListWriteOffState),
+            filter_card(
+                ListWriteOffState,
+                filter_select(
+                    "Склад",
+                    ListWriteOffState.filter_incoming_storage,
+                    ListWriteOffState.list_warehouses,
+                    ListWriteOffState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник",
+                    ListWriteOffState.filter_incoming_owner,
+                    ListWriteOffState.list_owners,
+                    ListWriteOffState.on_change_filter_incoming_owner,
+                ),
+            ),
             rx.cond(
                 ListWriteOffState.has_items,
                 table(),

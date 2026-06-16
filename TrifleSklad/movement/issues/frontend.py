@@ -16,7 +16,7 @@ from TrifleSklad.movement.issues.backend import (
     ViewIssueState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 
 def issues_table_row(item: Tuple[int, Issue]) -> rx.Component:
@@ -80,7 +80,33 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListIssueState),
+            filter_card(
+                ListIssueState,
+                filter_select(
+                    "Склад відправлення",
+                    ListIssueState.filter_incoming_storage,
+                    ListIssueState.list_warehouses,
+                    ListIssueState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник відправлення",
+                    ListIssueState.filter_incoming_owner,
+                    ListIssueState.list_owners,
+                    ListIssueState.on_change_filter_incoming_owner,
+                ),
+                filter_select(
+                    "Відповідальний",
+                    ListIssueState.filter_recipient,
+                    ListIssueState.list_recipients,
+                    ListIssueState.on_change_filter_recipient,
+                ),
+                filter_select(
+                    "Площадка/Відділ",
+                    ListIssueState.filter_site,
+                    ListIssueState.list_sites,
+                    ListIssueState.on_change_filter_site,
+                ),
+            ),
             rx.cond(ListIssueState.has_items, issues_table(), rx.text("Записів немає.")),
             pagination(ListIssueState),
             width="100%",

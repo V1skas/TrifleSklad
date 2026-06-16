@@ -122,7 +122,7 @@ def table() -> rx.Component:
             background_color=rx.color("accent", 9)
         ),
         rx.table.body(
-            rx.foreach(ListSupplierState.items, table_row),
+            rx.foreach(ListSupplierState.filtered_items, table_row),
 
             height="100%",
             width="100%"
@@ -163,6 +163,13 @@ def list_tab_content() -> rx.Component:
                 style={
                     "border_bottom": f"1px solid {rx.color('accent', 9)}",
                 }
+            ),
+            rx.input(
+                rx.input.slot(rx.icon("search")),
+                placeholder="Пошук за назвою",
+                value=ListSupplierState.filter_title,
+                on_change=ListSupplierState.on_change_filter_title,
+                width="100%",
             ),
             rx.cond(ListSupplierState.has_items,
                 table(),

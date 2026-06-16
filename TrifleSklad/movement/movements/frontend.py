@@ -12,7 +12,7 @@ from TrifleSklad.movement.movements.backend import (
     ViewMovementsState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -223,7 +223,33 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListMovementsState),
+            filter_card(
+                ListMovementsState,
+                filter_select(
+                    "Склад відправлення",
+                    ListMovementsState.filter_incoming_storage,
+                    ListMovementsState.list_warehouses,
+                    ListMovementsState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник відправлення",
+                    ListMovementsState.filter_incoming_owner,
+                    ListMovementsState.list_owners,
+                    ListMovementsState.on_change_filter_incoming_owner,
+                ),
+                filter_select(
+                    "Склад призначення",
+                    ListMovementsState.filter_destination_storage,
+                    ListMovementsState.list_warehouses,
+                    ListMovementsState.on_change_filter_destination_storage,
+                ),
+                filter_select(
+                    "Власник призначення",
+                    ListMovementsState.filter_destination_owner,
+                    ListMovementsState.list_owners,
+                    ListMovementsState.on_change_filter_destination_owner,
+                ),
+            ),
             rx.cond(
                 ListMovementsState.has_items,
                 table(),

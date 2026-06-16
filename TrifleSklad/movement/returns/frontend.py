@@ -12,7 +12,7 @@ from TrifleSklad.movement.returns.backend import (
     ViewReturnsState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -193,7 +193,21 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListReturnsState),
+            filter_card(
+                ListReturnsState,
+                filter_select(
+                    "Об'єкт відправлення",
+                    ListReturnsState.filter_incoming_storage,
+                    ListReturnsState.list_sites,
+                    ListReturnsState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Склад призначення",
+                    ListReturnsState.filter_destination_storage,
+                    ListReturnsState.list_warehouses,
+                    ListReturnsState.on_change_filter_destination_storage,
+                ),
+            ),
             rx.cond(ListReturnsState.has_items, table(), rx.text("Записів немає.")),
             pagination(ListReturnsState),
             width="100%",

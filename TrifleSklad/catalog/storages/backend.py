@@ -253,18 +253,58 @@ class EditStorageState(rx.State):
 class ListStorageState(rx.State):
     items: List[Storage] = []
 
+    # Фільтр (клієнтський — список завантажується цілком).
+    filter_title: str = ""
+    filter_address: str = ""
+    filter_type: str = "all"
+
     # Frontend vars
     # =============
     @rx.var
+    def filtered_items(self) -> List[Storage]:
+        title = self.filter_title.strip().lower()
+        address = self.filter_address.strip().lower()
+        type_filter = self.filter_type
+        result = []
+        for s in self.items:
+            if title and title not in (s.title or "").lower():
+                continue
+            if address and address not in (s.address or "").lower():
+                continue
+            if type_filter != "all" and str(s.type) != type_filter:
+                continue
+            result.append(s)
+        return result
+
+    @rx.var
     def has_items(self) -> bool:
-        return len(self.items) > 0
+        return len(self.filtered_items) > 0
+
+    @rx.var
+    def storage_type_options(self) -> List[Tuple[str, str]]:
+        return [(title, str(t)) for t, title in declared.storage_type_list.items()]
     # =============
 
     # Action handlers
     # ===============
     @rx.event
     def on_load(self):
+        self.filter_title = ""
+        self.filter_address = ""
+        self.filter_type = "all"
         self.items = StorageDAO.get_all_with_relationships()
+
+    @rx.event
+    def on_change_filter_title(self, value: str):
+        self.filter_title = value
+
+    @rx.event
+    def on_change_filter_address(self, value: str):
+        self.filter_address = value
+
+    @rx.event
+    def on_change_filter_type(self, value: str):
+        self.filter_type = value
     # ===============
 
 

@@ -1,7 +1,7 @@
 import reflex as rx
 
 from components.elements import subpage_header
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import movements_status_list
@@ -156,6 +156,14 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
                 width="100%",
             ),
             rx.select.content(
+                rx.input(
+                    rx.input.slot(rx.icon("search")),
+                    placeholder="Пошук за назвою",
+                    value=MovementProductCatalogAddEditFormState.search_catalog,
+                    on_change=MovementProductCatalogAddEditFormState.on_change_search_catalog,
+                    width="100%",
+                    margin_bottom="0.5em",
+                ),
                 rx.foreach(
                     MovementProductCatalogAddEditFormState.products_catalog_list,
                     lambda product_catalog: rx.select.item(product_catalog[0], value=product_catalog[1])
@@ -819,7 +827,27 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListAdmissionState),
+            filter_card(
+                ListAdmissionState,
+                filter_select(
+                    "Постачальник",
+                    ListAdmissionState.filter_supplier,
+                    ListAdmissionState.list_suppliers,
+                    ListAdmissionState.on_change_filter_supplier,
+                ),
+                filter_select(
+                    "Склад призначення",
+                    ListAdmissionState.filter_destination_storage,
+                    ListAdmissionState.list_warehouses,
+                    ListAdmissionState.on_change_filter_destination_storage,
+                ),
+                filter_select(
+                    "Власник призначення",
+                    ListAdmissionState.filter_destination_owner,
+                    ListAdmissionState.list_owners,
+                    ListAdmissionState.on_change_filter_destination_owner,
+                ),
+            ),
             rx.cond(ListAdmissionState.has_items,
                 table(),
                 rx.text("Записів немає.")

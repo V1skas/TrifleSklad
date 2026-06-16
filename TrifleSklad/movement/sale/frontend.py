@@ -16,7 +16,7 @@ from TrifleSklad.movement.sale.backend import (
     ViewSaleState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 
 def cancel_conflict_dialog() -> rx.Component:
@@ -135,7 +135,27 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListSaleState),
+            filter_card(
+                ListSaleState,
+                filter_select(
+                    "Склад",
+                    ListSaleState.filter_incoming_storage,
+                    ListSaleState.list_warehouses,
+                    ListSaleState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник",
+                    ListSaleState.filter_incoming_owner,
+                    ListSaleState.list_owners,
+                    ListSaleState.on_change_filter_incoming_owner,
+                ),
+                filter_select(
+                    "Відповідальний",
+                    ListSaleState.filter_responsible,
+                    ListSaleState.list_responsibles,
+                    ListSaleState.on_change_filter_responsible,
+                ),
+            ),
             rx.cond(ListSaleState.has_items, table(), rx.text("Записів немає.")),
             pagination(ListSaleState),
             width="100%",
@@ -259,8 +279,16 @@ def add_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.select.content(
+                    rx.input(
+                        rx.input.slot(rx.icon("search")),
+                        placeholder="Пошук за ПІБ",
+                        value=AddSaleState.search_responsible,
+                        on_change=AddSaleState.on_change_search_responsible,
+                        width="100%",
+                        margin_bottom="0.5em",
+                    ),
                     rx.foreach(
-                        AddSaleState.list_workers,
+                        AddSaleState.filtered_list_workers,
                         lambda worker: rx.select.item(worker[0], value=worker[1]),
                     ),
                     width="100%",

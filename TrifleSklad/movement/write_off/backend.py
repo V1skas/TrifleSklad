@@ -27,9 +27,11 @@ class ListWriteOffState(MovementListFilterMixin, rx.State):
             MovementsType.WRITE_OFF,
             self._current_page,
             self._limit,
-            self.filter_date_from,
-            self.filter_date_to,
+            self._date_from_eff(),
+            self._date_to_eff(),
             self.selected_statuses,
+            incoming_storage=self.filter_incoming_storage,
+            incoming_owner=self.filter_incoming_owner,
         )
 
     # Dynamic variables

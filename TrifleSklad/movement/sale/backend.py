@@ -23,7 +23,7 @@ from TrifleSklad.declared import (
     movements_type_list,
 )
 from TrifleSklad.models import Movement, Product, Sale
-from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -31,17 +31,34 @@ from TrifleSklad.state import AppState
 class ListSaleState(MovementListFilterMixin, rx.State):
     items: List[Sale] = []
 
+    # Фільтр, специфічний для продажів: відповідальний.
+    filter_responsible: str = ALL
+    list_responsibles: List[Tuple[str, str]] = []
+
     def _reload(self):
         self._all_pages, self.items = SaleDAO.get_paginated(
             self._current_page,
             self._limit,
-            self.filter_date_from,
-            self.filter_date_to,
+            self._date_from_eff(),
+            self._date_to_eff(),
             self.selected_statuses,
+            incoming_storage=self.filter_incoming_storage,
+            incoming_owner=self.filter_incoming_owner,
+            responsible=self.filter_responsible,
         )
 
     # Dynamic variables
     # ======================
+    @rx.var
+    def has_active_filters(self) -> bool:
+        return bool(
+            self.filter_date_enabled
+            or self.selected_statuses
+            or self.filter_incoming_storage != ALL
+            or self.filter_incoming_owner != ALL
+            or self.filter_responsible != ALL
+        )
+
     @rx.var
     def has_items(self) -> bool:
         return len(self.items) > 0
@@ -60,6 +77,27 @@ class ListSaleState(MovementListFilterMixin, rx.State):
     @rx.event
     def on_load(self):
         self._reset_list_state()
+        self.filter_responsible = ALL
+        self.list_responsibles = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
+        self._reload()
+
+    @rx.event
+    def on_change_filter_responsible(self, value: str):
+        self.filter_responsible = value
+
+    @rx.event
+    def reset_filters(self):
+        today = date.today().isoformat()
+        self.filter_date_enabled = False
+        self.filter_date_from = today
+        self.filter_date_to = today
+        self.selected_statuses = []
+        self.filter_incoming_storage = ALL
+        self.filter_destination_storage = ALL
+        self.filter_incoming_owner = ALL
+        self.filter_destination_owner = ALL
+        self.filter_responsible = ALL
+        self._current_page = 1
         self._reload()
     # ======================
 
@@ -230,6 +268,7 @@ class AddSaleState(rx.State):
     id_incoming_owner: str = ""
     id_responsible: str = ""
     search_name_incoming_storage: str = ""
+    search_responsible: str = ""
     status: str = ""
     comment: str = ""
 
@@ -278,6 +317,14 @@ class AddSaleState(rx.State):
     # Dynamic variables
     # ======================
     @rx.var
+    def filtered_list_workers(self) -> List[Tuple[str, str]]:
+        # Живий пошук відповідального за продаж (підрядок у ПІБ).
+        term = self.search_responsible.strip().lower()
+        if term == "":
+            return self.list_workers
+        return [w for w in self.list_workers if term in w[0].lower()]
+
+    @rx.var
     def get_movement_statuses(self) -> List[str]:
         return movements_status_list
 
@@ -289,6 +336,10 @@ class AddSaleState(rx.State):
             for index, status in enumerate(movements_status_list)
             if index != MovementsStatus.CANCELED
         ]
+
+    @rx.event
+    def on_change_search_responsible(self, value: str):
+        self.search_responsible = value
 
     @rx.var
     def has_requests(self) -> bool:
@@ -308,6 +359,7 @@ class AddSaleState(rx.State):
         self.id_incoming_owner = ""
         self.id_responsible = ""
         self.search_name_incoming_storage = ""
+        self.search_responsible = ""
         self.status = ""
         self.comment = ""
         self.selected_request_id = ""

@@ -35,6 +35,10 @@ class StockReportState(rx.State):
     exclude_site: bool = False
     exclude_department: bool = False
 
+    # Живий пошук усередині селектів позиції каталогу та місця зберігання.
+    search_catalog: str = ""
+    search_storage: str = ""
+
     # Модалка одиниць позиції: (id, serial, storage, owner, count)
     is_units_open: bool = False
     selected_title: str = ""
@@ -97,6 +101,26 @@ class StockReportState(rx.State):
         ]
 
     @rx.var
+    def filtered_list_catalog(self) -> List[Tuple[str, str]]:
+        term = self.search_catalog.strip().lower()
+        if term == "":
+            return self.list_catalog
+        return [c for c in self.list_catalog if term in c[1].lower()]
+
+    @rx.var
+    def filtered_list_storages(self) -> List[Tuple[str, str]]:
+        excluded = self._excluded_types()
+        base = [
+            (sid, title)
+            for sid, title, stype in self._storages_cache
+            if stype not in excluded
+        ]
+        term = self.search_storage.strip().lower()
+        if term == "":
+            return base
+        return [s for s in base if term in s[1].lower()]
+
+    @rx.var
     def filter_catalog_value(self) -> str:
         return self.filter_catalog if self.filter_catalog != "" else ALL
 
@@ -129,6 +153,14 @@ class StockReportState(rx.State):
 
         self._load_filter_options()
         self._reload()
+
+    @rx.event
+    def on_change_search_catalog(self, value: str):
+        self.search_catalog = value
+
+    @rx.event
+    def on_change_search_storage(self, value: str):
+        self.search_storage = value
 
     @rx.event
     def on_change_catalog(self, value: str):

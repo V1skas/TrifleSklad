@@ -5,19 +5,30 @@ from components.elements import subpage_header
 from TrifleSklad.reports.stock.backend import StockReportState, ALL
 
 
-def _filter_select(label: str, value, options, on_change) -> rx.Component:
+def _filter_select(label: str, value, options, on_change, search_value=None, on_search=None) -> rx.Component:
+    # Якщо передано search_value/on_search — у випадаючому списку з'являється
+    # поле живого пошуку (фільтрує options під час набору).
+    content = []
+    if on_search is not None:
+        content.append(
+            rx.input(
+                rx.input.slot(rx.icon("search")),
+                placeholder="Пошук",
+                value=search_value,
+                on_change=on_search,
+                width="100%",
+                margin_bottom="0.5em",
+            )
+        )
+    content.append(rx.select.item("Усі", value=ALL))
+    content.append(
+        rx.foreach(options, lambda opt: rx.select.item(opt[1], value=opt[0]))
+    )
     return rx.vstack(
         rx.text(label, size="2"),
         rx.select.root(
             rx.select.trigger(placeholder="Усі", width="100%"),
-            rx.select.content(
-                rx.select.item("Усі", value=ALL),
-                rx.foreach(
-                    options,
-                    lambda opt: rx.select.item(opt[1], value=opt[0]),
-                ),
-                width="100%",
-            ),
+            rx.select.content(*content, width="100%"),
             value=value,
             on_change=on_change,
             width="100%",
@@ -34,14 +45,18 @@ def filter_card() -> rx.Component:
                 _filter_select(
                     "Позиція каталогу",
                     StockReportState.filter_catalog_value,
-                    StockReportState.list_catalog,
+                    StockReportState.filtered_list_catalog,
                     StockReportState.on_change_catalog,
+                    search_value=StockReportState.search_catalog,
+                    on_search=StockReportState.on_change_search_catalog,
                 ),
                 _filter_select(
                     "Місце зберігання",
                     StockReportState.filter_storage_value,
-                    StockReportState.list_storages,
+                    StockReportState.filtered_list_storages,
                     StockReportState.on_change_storage,
+                    search_value=StockReportState.search_storage,
+                    on_search=StockReportState.on_change_search_storage,
                 ),
                 _filter_select(
                     "Власник",
