@@ -12,7 +12,7 @@ from TrifleSklad.movement.movements.backend import (
     ViewMovementsState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -41,14 +41,11 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(
-                                rx.link(
-                                    row[2],
-                                    on_click=rx.redirect(row[4]),
-                                    cursor="pointer",
-                                ),
-                            ),
+                            rx.table.cell(row[2]),
                             rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),
@@ -162,11 +159,7 @@ def table_row(item: Movement) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item.id)),
         rx.table.row_header_cell(
-            rx.link(
-                item.date,
-                href=f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{item.id}"
-            ),
-
+            item.date,
             align="left"
         ),
         rx.table.cell(rx.text(item.incoming_storage.title)),
@@ -174,6 +167,9 @@ def table_row(item: Movement) -> rx.Component:
         rx.table.cell(rx.text(item.destination_storage.title)),
         rx.table.cell(rx.text(item.destination_owner.title)),
         rx.table.cell(rx.text(ListMovementsState.get_movement_statuses[item.status])),
+        on_click=rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 
@@ -223,7 +219,33 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListMovementsState),
+            filter_card(
+                ListMovementsState,
+                filter_select(
+                    "Склад відправлення",
+                    ListMovementsState.filter_incoming_storage,
+                    ListMovementsState.list_warehouses,
+                    ListMovementsState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник відправлення",
+                    ListMovementsState.filter_incoming_owner,
+                    ListMovementsState.list_owners,
+                    ListMovementsState.on_change_filter_incoming_owner,
+                ),
+                filter_select(
+                    "Склад призначення",
+                    ListMovementsState.filter_destination_storage,
+                    ListMovementsState.list_warehouses,
+                    ListMovementsState.on_change_filter_destination_storage,
+                ),
+                filter_select(
+                    "Власник призначення",
+                    ListMovementsState.filter_destination_owner,
+                    ListMovementsState.list_owners,
+                    ListMovementsState.on_change_filter_destination_owner,
+                ),
+            ),
             rx.cond(
                 ListMovementsState.has_items,
                 table(),
@@ -240,7 +262,7 @@ def list_tab_content() -> rx.Component:
 
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(
@@ -407,7 +429,7 @@ def add_tab_content() -> rx.Component:
 
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(

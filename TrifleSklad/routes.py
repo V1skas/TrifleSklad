@@ -114,6 +114,9 @@ REPORTS = "/reports"
 
 REPORTS_STOCK = "/reports/stock/"
 
+REPORTS_UNITS = "/reports/units/"
+REPORTS_UNITS_VIEW_ID = "/reports/units/view/"
+
 
 # Нумерація рухів наскрізна, але кожен тип живе у власній підсекції.
 # Хелпер будує посилання на перегляд руху з потрібного розділу за його типом.

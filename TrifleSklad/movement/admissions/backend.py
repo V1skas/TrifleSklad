@@ -31,7 +31,7 @@ from TrifleSklad.models import (
     ProductCatalog,
     ProductCategory,
 )
-from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.state import AppState
 
 
@@ -49,6 +49,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
     id_product_catalog_in_cache: str = ""
     is_product_uniq: bool = False
 
+    # Живий пошук позиції каталогу в селекті (підрядок у назві).
+    search_catalog: str = ""
+
     # Сире (як ввів користувач) значення ціни — щоб поле не переформатувалося
     # у float-представлення на кожне натискання (інакше заважає вводити).
     price_input: str = "0"
@@ -61,12 +64,16 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # ======================
     @rx.var
     def products_catalog_list(self) -> List[Tuple[str, str]]:
+        # Кеш — повний перелік (для пошуку за id у on_change); у вивід потрапляють
+        # лише позиції, що містять пошуковий підрядок. Value = id позиції каталогу.
         self.cache_products_catalog_list = ProductCatalogDAO.get_all_exclude_ids(
             self.exclude_products_catalog_list
         )
+        term = self.search_catalog.strip().lower()
         return [
-            (item[1].title, str(item[0]))
-            for item in enumerate(self.cache_products_catalog_list)
+            (catalog.title, str(catalog.id))
+            for catalog in self.cache_products_catalog_list
+            if term == "" or term in catalog.title.lower()
         ]
 
     @rx.var
@@ -142,9 +149,20 @@ class MovementProductCatalogAddEditFormState(rx.State):
         return 1
 
     @rx.event
+    def on_change_search_catalog(self, value: str):
+        self.search_catalog = value
+
+    @rx.event
     def on_change_id_product_catalog(self, value: str):
+        # value — id позиції каталогу; шукаємо її в кеші.
         self.id_product_catalog_in_cache = value
-        self.item.product = self.cache_products_catalog_list[int(value)]
+        selected = next(
+            (c for c in self.cache_products_catalog_list if str(c.id) == value),
+            None,
+        )
+        if selected is None:
+            return
+        self.item.product = selected
         self.item.id_product_catalog = self.item.product.id
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
@@ -220,6 +238,11 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
         self.is_product_uniq = item.product.uniq
         self.id_product_catalog_entered = True
+        # Value селекта = id позиції каталогу (щоб селект показав поточну позицію).
+        self.id_product_catalog_in_cache = (
+            str(item.product.id) if item.product is not None else ""
+        )
+        self.search_catalog = ""
         self.price_input = str(item.price)
 
     @rx.event
@@ -231,6 +254,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.is_product_uniq = False
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
+        self.search_catalog = ""
         self.price_input = "0"
         self.error_count = False
         self.error_price = False
@@ -346,9 +370,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
         # Новий товар одразу обираємо в поточному рядку поставки.
         self._load_products_catalog_list()
-        for index, catalog in enumerate(self.cache_products_catalog_list):
+        self.search_catalog = ""
+        for catalog in self.cache_products_catalog_list:
             if catalog.id == new_id:
-                self.id_product_catalog_in_cache = str(index)
+                self.id_product_catalog_in_cache = str(catalog.id)
                 self.item.product = catalog
                 self.item.id_product_catalog = catalog.id
                 self.is_product_uniq = catalog.uniq
@@ -445,17 +470,34 @@ class MovementProductCatalogDetailedViewState(rx.State):
 class ListAdmissionState(MovementListFilterMixin, rx.State):
     items: List[Admission] = []
 
+    # Фільтр, специфічний для поставок: постачальник.
+    filter_supplier: str = ALL
+    list_suppliers: List[Tuple[str, str]] = []
+
     def _reload(self):
         self._all_pages, self.items = AdmissionDAO.get_paginated(
             self._current_page,
             self._limit,
-            self.filter_date_from,
-            self.filter_date_to,
+            self._date_from_eff(),
+            self._date_to_eff(),
             self.selected_statuses,
+            destination_storage=self.filter_destination_storage,
+            destination_owner=self.filter_destination_owner,
+            supplier=self.filter_supplier,
         )
 
     # Dynamic variables
     # ======================
+    @rx.var
+    def has_active_filters(self) -> bool:
+        return bool(
+            self.filter_date_enabled
+            or self.selected_statuses
+            or self.filter_destination_storage != ALL
+            or self.filter_destination_owner != ALL
+            or self.filter_supplier != ALL
+        )
+
     @rx.var
     def has_items(self) -> bool:
         return len(self.items) > 0
@@ -475,6 +517,27 @@ class ListAdmissionState(MovementListFilterMixin, rx.State):
     @rx.event
     def on_load(self):
         self._reset_list_state()
+        self.filter_supplier = ALL
+        self.list_suppliers = [(s.title, str(s.id)) for s in SupplierDAO.get_all()]
+        self._reload()
+
+    @rx.event
+    def on_change_filter_supplier(self, value: str):
+        self.filter_supplier = value
+
+    @rx.event
+    def reset_filters(self):
+        today = date.today().isoformat()
+        self.filter_date_enabled = False
+        self.filter_date_from = today
+        self.filter_date_to = today
+        self.selected_statuses = []
+        self.filter_incoming_storage = ALL
+        self.filter_destination_storage = ALL
+        self.filter_incoming_owner = ALL
+        self.filter_destination_owner = ALL
+        self.filter_supplier = ALL
+        self._current_page = 1
         self._reload()
 
     # ======================

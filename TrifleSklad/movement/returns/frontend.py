@@ -12,7 +12,7 @@ from TrifleSklad.movement.returns.backend import (
     ViewReturnsState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -41,14 +41,11 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(
-                                rx.link(
-                                    row[2],
-                                    on_click=rx.redirect(row[4]),
-                                    cursor="pointer",
-                                ),
-                            ),
+                            rx.table.cell(row[2]),
                             rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),
@@ -143,12 +140,15 @@ def table_row(item: Movement) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item.id)),
         rx.table.row_header_cell(
-            rx.link(item.date, href=f"{routes.MOVEMENT_RETURNS_VIEW_ID}{item.id}"),
+            item.date,
             align="left",
         ),
         rx.table.cell(rx.text(item.incoming_storage.title)),
         rx.table.cell(rx.text(item.destination_storage.title)),
         rx.table.cell(rx.text(ListReturnsState.get_movement_statuses[item.status])),
+        on_click=rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 
@@ -193,7 +193,21 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListReturnsState),
+            filter_card(
+                ListReturnsState,
+                filter_select(
+                    "Об'єкт відправлення",
+                    ListReturnsState.filter_incoming_storage,
+                    ListReturnsState.list_sites,
+                    ListReturnsState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Склад призначення",
+                    ListReturnsState.filter_destination_storage,
+                    ListReturnsState.list_warehouses,
+                    ListReturnsState.on_change_filter_destination_storage,
+                ),
+            ),
             rx.cond(ListReturnsState.has_items, table(), rx.text("Записів немає.")),
             pagination(ListReturnsState),
             width="100%",
@@ -204,7 +218,7 @@ def list_tab_content() -> rx.Component:
 
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(
@@ -300,7 +314,7 @@ def add_tab_content() -> rx.Component:
 
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(

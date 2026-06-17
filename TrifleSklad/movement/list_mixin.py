@@ -1,12 +1,18 @@
+from datetime import date
 from typing import List, Tuple
 
 import reflex as rx
 
-from TrifleSklad.declared import movements_status_list
+from TrifleSklad.dao import OwnerDAO, StorageDAO
+from TrifleSklad.declared import StorageType, movements_status_list
+
+# Сентинел «без фільтра» для select-ів (Radix забороняє порожнє value у item).
+ALL = "all"
 
 
 class MovementListFilterMixin(rx.State, mixin=True):
-    """Спільна логіка списків руху ТМЦ: сторінкування + фільтр за датою/статусами.
+    """Спільна логіка списків руху ТМЦ: сторінкування + фільтр за датою/статусами
+    + (контекстно) за складом/власником відправлення/призначення.
     Підмішується в кожен `List*State`; конкретний запит до БД виконує `_reload`,
     який реалізує клас-нащадок (різні DAO/типи)."""
 
@@ -17,9 +23,25 @@ class MovementListFilterMixin(rx.State, mixin=True):
 
     # Фільтр (карта з'являється по кнопці)
     is_filter_open: bool = False
+    # Фільтр за датою вмикається перемикачем і застосовується по «Застосувати».
+    filter_date_enabled: bool = False
     filter_date_from: str = ""
     filter_date_to: str = ""
     selected_statuses: List[int] = []
+
+    # Фільтр за місцем/власником (застосовується кнопкою «Застосувати», як дата).
+    # Який саме з них показувати — вирішує конкретна секція (передає у filter_card).
+    filter_incoming_storage: str = ALL
+    filter_destination_storage: str = ALL
+    filter_incoming_owner: str = ALL
+    filter_destination_owner: str = ALL
+
+    # Опції селектів фільтра. list_storages — усі сховища; list_warehouses — лише
+    # склади; list_sites — площадки/відділи (вибір залежить від контексту секції).
+    list_storages: List[Tuple[str, str]] = []
+    list_warehouses: List[Tuple[str, str]] = []
+    list_sites: List[Tuple[str, str]] = []
+    list_owners: List[Tuple[str, str]] = []
 
     # Має реалізувати нащадок: оновлює self.items і self._all_pages за поточними
     # сторінкою/фільтрами (виклик відповідного DAO.get_paginated/...).
@@ -39,7 +61,12 @@ class MovementListFilterMixin(rx.State, mixin=True):
     @rx.var
     def has_active_filters(self) -> bool:
         return bool(
-            self.filter_date_from or self.filter_date_to or self.selected_statuses
+            self.filter_date_enabled
+            or self.selected_statuses
+            or self.filter_incoming_storage != ALL
+            or self.filter_destination_storage != ALL
+            or self.filter_incoming_owner != ALL
+            or self.filter_destination_owner != ALL
         )
 
     @rx.var
@@ -53,12 +80,41 @@ class MovementListFilterMixin(rx.State, mixin=True):
 
     # Backend only
     # ======================
+    def _date_from_eff(self) -> str:
+        # Дата застосовується лише коли перемикач увімкнено.
+        return self.filter_date_from if self.filter_date_enabled else ""
+
+    def _date_to_eff(self) -> str:
+        return self.filter_date_to if self.filter_date_enabled else ""
+
+    def _load_filter_options(self) -> None:
+        storages = StorageDAO.get_all()
+        self.list_storages = [(s.title, str(s.id)) for s in storages]
+        self.list_warehouses = [
+            (s.title, str(s.id)) for s in storages if s.type == StorageType.WAREHOUSE
+        ]
+        self.list_sites = [
+            (s.title, str(s.id))
+            for s in storages
+            if s.type in (StorageType.TECHNICAL_SITE, StorageType.DEPARTMENT)
+        ]
+        self.list_owners = [(o.title, str(o.id)) for o in OwnerDAO.get_all()]
+
     def _reset_list_state(self) -> None:
+        today = date.today().isoformat()
         self._current_page = 1
         self.is_filter_open = False
-        self.filter_date_from = ""
-        self.filter_date_to = ""
+        self.filter_date_enabled = False
+        # Дати за замовчуванням — сьогодні (видимі й у state), щоб фільтр спрацював
+        # одразу після увімкнення перемикача, навіть якщо дату не чіпали.
+        self.filter_date_from = today
+        self.filter_date_to = today
         self.selected_statuses = []
+        self.filter_incoming_storage = ALL
+        self.filter_destination_storage = ALL
+        self.filter_incoming_owner = ALL
+        self.filter_destination_owner = ALL
+        self._load_filter_options()
     # ======================
 
     # Event handlers
@@ -66,6 +122,10 @@ class MovementListFilterMixin(rx.State, mixin=True):
     @rx.event
     def toggle_filter(self):
         self.is_filter_open = not self.is_filter_open
+
+    @rx.event
+    def on_change_filter_date_enabled(self, value: bool):
+        self.filter_date_enabled = value
 
     @rx.event
     def on_change_filter_date_from(self, value: str):
@@ -88,10 +148,32 @@ class MovementListFilterMixin(rx.State, mixin=True):
         self._reload()
 
     @rx.event
+    def on_change_filter_incoming_storage(self, value: str):
+        self.filter_incoming_storage = value
+
+    @rx.event
+    def on_change_filter_destination_storage(self, value: str):
+        self.filter_destination_storage = value
+
+    @rx.event
+    def on_change_filter_incoming_owner(self, value: str):
+        self.filter_incoming_owner = value
+
+    @rx.event
+    def on_change_filter_destination_owner(self, value: str):
+        self.filter_destination_owner = value
+
+    @rx.event
     def reset_filters(self):
-        self.filter_date_from = ""
-        self.filter_date_to = ""
+        today = date.today().isoformat()
+        self.filter_date_enabled = False
+        self.filter_date_from = today
+        self.filter_date_to = today
         self.selected_statuses = []
+        self.filter_incoming_storage = ALL
+        self.filter_destination_storage = ALL
+        self.filter_incoming_owner = ALL
+        self.filter_destination_owner = ALL
         self._current_page = 1
         self._reload()
 

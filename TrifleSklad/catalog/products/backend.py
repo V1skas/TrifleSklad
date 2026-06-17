@@ -8,6 +8,7 @@ from TrifleSklad.actions import Action as ActionEnum
 
 from TrifleSklad.models import ProductCatalog, ProductCategory
 from TrifleSklad.dao import ProductCatalogDAO, ProductCategoryDAO, ProductDAO
+from TrifleSklad.movement.list_mixin import ALL
 
 
 class ViewProductsState(rx.State):
@@ -377,12 +378,17 @@ class ListProductsState(rx.State):
     _all_pages: int = 1
     _limit_items: int = 20
     search_str: Optional[str] = None
+    filter_category_id: str = ALL
+    list_categories: List[Tuple[str, str]] = []
 
     def _load_items(self):
-        self._all_pages, self.items = ProductCatalogDAO.get_all_with_relationships_by_page(page=self._current_page,
-                                                                                           count_items=ProductCatalogDAO.get_count_with_search(self.search_str),
-                                                                                           limit=self._limit_items,
-                                                                                           search_str=self.search_str)
+        self._all_pages, self.items = ProductCatalogDAO.get_all_with_relationships_by_page(
+            page=self._current_page,
+            count_items=ProductCatalogDAO.get_count_with_search(self.search_str, self.filter_category_id),
+            limit=self._limit_items,
+            search_str=self.search_str,
+            category_id=self.filter_category_id,
+        )
 
     # Vars
     # ====
@@ -414,6 +420,17 @@ class ListProductsState(rx.State):
     # ===============
     @rx.event
     def on_load(self):
+        self._current_page = 1
+        self.search_str = None
+        self.filter_category_id = ALL
+        self.list_categories = [
+            (c.title, str(c.id)) for c in ProductCategoryDAO.get_all()
+        ]
+        self._load_items()
+
+    @rx.event
+    def on_change_filter_category(self, value: str):
+        self.filter_category_id = value
         self._current_page = 1
         self._load_items()
 

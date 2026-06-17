@@ -12,7 +12,7 @@ from TrifleSklad.movement.write_off.backend import (
     WriteOffState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -41,14 +41,11 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(
-                                rx.link(
-                                    row[2],
-                                    on_click=rx.redirect(row[4]),
-                                    cursor="pointer",
-                                ),
-                            ),
+                            rx.table.cell(row[2]),
                             rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),
@@ -73,6 +70,77 @@ def cancel_conflict_dialog() -> rx.Component:
     )
 
 
+def position_detail_dialog() -> rx.Component:
+    # Деталізація обраної позиції: перелік списаних одиниць ТМЦ.
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title(f"Позиція: {ViewWriteOffState.selected_position_title}"),
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                        rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
+                        rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                    ),
+                    background_color=rx.color("accent", 9),
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        ViewWriteOffState.selected_position_units,
+                        lambda unit: rx.table.row(
+                            rx.table.cell(unit[0], width="1%", white_space="nowrap"),
+                            rx.table.cell(unit[1]),
+                            rx.table.cell(unit[2], width="1%", white_space="nowrap"),
+                        ),
+                    ),
+                ),
+                variant="surface",
+                width="100%",
+                margin_top="1em",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        "Закрити",
+                        on_click=ViewWriteOffState.set_position_dialog_open(False),
+                    ),
+                ),
+                justify="end",
+                margin_top="1em",
+            ),
+            max_width="40em",
+        ),
+        open=ViewWriteOffState.is_position_dialog_open,
+        on_open_change=ViewWriteOffState.set_position_dialog_open,
+    )
+
+
+def positions_table() -> rx.Component:
+    return rx.table.root(
+        rx.table.header(
+            rx.table.row(
+                rx.table.column_header_cell("Позиція", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
+            ),
+            background_color=rx.color("accent", 9),
+        ),
+        rx.table.body(
+            rx.foreach(
+                ViewWriteOffState.positions,
+                lambda row: rx.table.row(
+                    rx.table.cell(row[1]),
+                    rx.table.cell(row[2]),
+                    on_click=ViewWriteOffState.open_position_dialog(row[0]),
+                    cursor="pointer",
+                    _hover={"background_color": rx.color("accent", 3)},
+                ),
+            ),
+        ),
+        variant="surface",
+        width="100%",
+    )
+
+
 def item_preview() -> rx.Component:
     return rx.vstack(
         cancel_conflict_dialog(),
@@ -88,7 +156,9 @@ def item_preview() -> rx.Component:
             rx.text("Власник:"),
             rx.text(ViewWriteOffState.item.incoming_owner.title)
         ),
-        products(width="100%"),
+        rx.text("Списані позиції (натисніть для деталізації):", width="100%"),
+        positions_table(),
+        position_detail_dialog(),
         rx.hstack(
             rx.text("Статус:"),
             rx.text(ViewWriteOffState.item_status)
@@ -152,16 +222,15 @@ def table_row(item: Movement) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item.id)),
         rx.table.row_header_cell(
-            rx.link(
-                item.date,
-                href=f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{item.id}"
-            ),
-
+            item.date,
             align="left"
         ),
         rx.table.cell(rx.text(item.incoming_storage.title)),
         rx.table.cell(rx.text(item.incoming_owner.title)),
-        rx.table.cell(rx.text(ListWriteOffState.get_movement_statuses[item.status]))
+        rx.table.cell(rx.text(ListWriteOffState.get_movement_statuses[item.status])),
+        on_click=rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 
@@ -209,7 +278,21 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListWriteOffState),
+            filter_card(
+                ListWriteOffState,
+                filter_select(
+                    "Склад",
+                    ListWriteOffState.filter_incoming_storage,
+                    ListWriteOffState.list_warehouses,
+                    ListWriteOffState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник",
+                    ListWriteOffState.filter_incoming_owner,
+                    ListWriteOffState.list_owners,
+                    ListWriteOffState.on_change_filter_incoming_owner,
+                ),
+            ),
             rx.cond(
                 ListWriteOffState.has_items,
                 table(),
@@ -224,7 +307,7 @@ def list_tab_content() -> rx.Component:
 
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(
@@ -311,7 +394,7 @@ def add_form() -> rx.Component:
 
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(

@@ -2,6 +2,7 @@ import reflex as rx
 
 from typing import Tuple
 
+from TrifleSklad import routes
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.movement.products_selector.frontend import selector as products_selector
@@ -19,8 +20,13 @@ def dialog():
                 height="100%"
             ),
 
-            width="29em",
-            height="35em"
+            width="min(56em, 95vw)",
+            height="min(40em, 90vh)",
+            max_width="56em",
+            # Прокрутка лише всередині списку ТМЦ, а не всього діалогу.
+            overflow="hidden",
+            display="flex",
+            flex_direction="column",
         ),
 
         open=ProductsMovementListState.dialog_open,
@@ -56,6 +62,9 @@ def table_row_view_mode(item: Tuple[int, Product]):
         rx.table.cell(item[1].product_catalog.title),
         divisible_cell_text(item),
         serial_cell_text(item),
+        on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def split_controls(item: Tuple[int, Product]):

@@ -10,7 +10,7 @@ from TrifleSklad.models import PaymentType
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewPaymentTypeState.title, size="7", width="100%"),
-        rx.text(ViewPaymentTypeState.description, is_optional=True, width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewPaymentTypeState.description, is_optional=True), width="100%"),
 
         spacing="3",
 
@@ -75,13 +75,12 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: PaymentType) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.CATALOG_PAYMENT_TYPES_VIEW_ID}{item.id}"
-            ),
-
+            item.title,
             align="left"
-        )
+        ),
+        on_click=rx.redirect(f"{routes.CATALOG_PAYMENT_TYPES_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:
@@ -149,7 +148,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", required=True, size="3", value=AddPaymentTypeState.title, on_change=AddPaymentTypeState.on_change_title),
@@ -164,7 +163,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:"),
             rx.input(id="title", value=EditPaymentTypeState.title, required=True, size="3", on_change=EditPaymentTypeState.on_change_title),

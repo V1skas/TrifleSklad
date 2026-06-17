@@ -52,9 +52,9 @@ def item_preview() -> rx.Component:
         ),
         
         rx.heading(ViewWorkerState.item.fio, size="7", width="100%"),
-        rx.text(ViewWorkerState.item.position, width="100%"),
-        rx.text(ViewWorkerState.item.phone_number, width="100%"),
-        rx.text(ViewWorkerState.item.email, width="100%"),
+        rx.hstack(rx.text("Посада:"), rx.text(ViewWorkerState.item.position), width="100%"),
+        rx.hstack(rx.text("Телефон:"), rx.text(ViewWorkerState.item.phone_number), width="100%"),
+        rx.hstack(rx.text("Ел. пошта:"), rx.text(ViewWorkerState.item.email), width="100%"),
         rx.spacer(),
 
         spacing="3",
@@ -73,11 +73,7 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: Tuple[int, Worker]) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item[1].fio,
-                href=f"{routes.ADMIN_WORKERS_VIEW_ID}{item[1].id}",
-            ),
-
+            item[1].fio,
             align="left"
         ),
         rx.table.cell(
@@ -92,6 +88,9 @@ def table_row(item: Tuple[int, Worker]) -> rx.Component:
             item[1].email,
             align="left"
         ),
+        on_click=rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:
@@ -156,7 +155,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Прізвище І.Б.:"),
             rx.input(
@@ -201,7 +200,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
             rx.vstack(
                 rx.text("*Прізвище І.Б.:"),
                 rx.input(

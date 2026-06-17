@@ -10,12 +10,12 @@ from TrifleSklad.models import Supplier
 def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewSupplierState.title, size="7", width="100%"),
-        rx.text(ViewSupplierState.edrpou, width="100%"),
-        rx.text(ViewSupplierState.description, is_optional=True, width="100%"),
-        rx.text(ViewSupplierState.address, is_optional=True, width="100%"),
-        rx.text(ViewSupplierState.email, is_optional=True, width="100%"),
-        rx.text(ViewSupplierState.contact_person, width="100%"),
-        rx.text(ViewSupplierState.contact_phone, width="100%"),
+        rx.hstack(rx.text("ЄДРПОУ:"), rx.text(ViewSupplierState.edrpou), width="100%"),
+        rx.hstack(rx.text("Опис:"), rx.text(ViewSupplierState.description, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Адреса:"), rx.text(ViewSupplierState.address, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Ел. пошта:"), rx.text(ViewSupplierState.email, is_optional=True), width="100%"),
+        rx.hstack(rx.text("Контактна особа:"), rx.text(ViewSupplierState.contact_person), width="100%"),
+        rx.hstack(rx.text("Контактний телефон:"), rx.text(ViewSupplierState.contact_phone), width="100%"),
 
         spacing="3",
         height="100%",
@@ -83,10 +83,7 @@ def table_row(item: Supplier) -> rx.Component:
             align="left"
         ),
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{item.id}"
-            ),
+            item.title,
             align="left"
         ),
         rx.table.cell(
@@ -104,7 +101,10 @@ def table_row(item: Supplier) -> rx.Component:
         rx.table.cell(
             item.contact_phone,
             align="left"
-        )
+        ),
+        on_click=rx.redirect(f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:
@@ -122,7 +122,7 @@ def table() -> rx.Component:
             background_color=rx.color("accent", 9)
         ),
         rx.table.body(
-            rx.foreach(ListSupplierState.items, table_row),
+            rx.foreach(ListSupplierState.filtered_items, table_row),
 
             height="100%",
             width="100%"
@@ -164,6 +164,13 @@ def list_tab_content() -> rx.Component:
                     "border_bottom": f"1px solid {rx.color('accent', 9)}",
                 }
             ),
+            rx.input(
+                rx.input.slot(rx.icon("search")),
+                placeholder="Пошук за назвою",
+                value=ListSupplierState.filter_title,
+                on_change=ListSupplierState.on_change_filter_title,
+                width="100%",
+            ),
             rx.cond(ListSupplierState.has_items,
                 table(),
                 rx.text("Записів немає")
@@ -177,7 +184,7 @@ def list_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:", size="3", width="100%"),
             rx.input(
@@ -242,7 +249,7 @@ def add_form() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва:", size="3", width="100%"),
             rx.input(

@@ -4,14 +4,17 @@ from TrifleSklad import routes
 from TrifleSklad.state import AppState
 
 from TrifleSklad.reports.stock.backend import StockReportState
+from TrifleSklad.reports.units.backend import UnitsReportState
 
 
 class ReportsState(AppState):
     class Tabs:
         STOCK = "stock"
+        UNITS = "units"
 
     __tabs_events = {
         Tabs.STOCK: StockReportState.on_load,
+        Tabs.UNITS: UnitsReportState.on_load,
     }
 
     current_tab: str = ""
@@ -20,7 +23,7 @@ class ReportsState(AppState):
         tab = self.router.page.params.get("tab", "")
 
         if tab != "":
-            if tab not in [self.Tabs.STOCK]:
+            if tab not in [self.Tabs.STOCK, self.Tabs.UNITS]:
                 return rx.redirect(routes.WELCOME)
 
             self.current_tab = tab

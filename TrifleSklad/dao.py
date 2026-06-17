@@ -6,7 +6,7 @@ import math
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import select, func
+from sqlmodel import select, func, or_
 
 from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus
 from TrifleSklad.models import (
@@ -749,19 +749,21 @@ class ProductCatalogDAO:
             return list(products)
         
     @classmethod
-    def get_count_with_search(cls, search_str: Optional[str] = None) -> int:
+    def get_count_with_search(cls, search_str: Optional[str] = None, category_id: Optional[str] = None) -> int:
         if search_str is not None and search_str.strip():
             condition = ProductCatalog.title.ilike(f"%{search_str.strip()}%")
         else:
             condition = True
 
         statement = select(func.count(ProductCatalog.id)).where(condition).where(ProductCatalog.is_deleted == False)
+        if category_id and category_id not in ("", "all"):
+            statement = statement.where(ProductCatalog.id_category == int(category_id))
 
         with rx.session() as session:
             return session.exec(statement).one()
-        
+
     @classmethod
-    def get_all_with_relationships_by_page(cls, page: int = 1, count_items: int = 0, limit: int = 20, search_str: Optional[str] = None) -> tuple[int, List[ProductCatalog]]:
+    def get_all_with_relationships_by_page(cls, page: int = 1, count_items: int = 0, limit: int = 20, search_str: Optional[str] = None, category_id: Optional[str] = None) -> tuple[int, List[ProductCatalog]]:
         if search_str is not None and search_str.strip():
             condition = ProductCatalog.title.ilike(f"%{search_str.strip()}%")
         else:
@@ -772,15 +774,16 @@ class ProductCatalogDAO:
             total_pages = 1
 
         skip = (page - 1) * limit
-        
+
         statement = (
                 select(ProductCatalog)
                 .options(selectinload(ProductCatalog.category))
                 .where(ProductCatalog.is_deleted == False)
                 .where(condition)
-                .offset(skip)
-                .limit(limit)
             )
+        if category_id and category_id not in ("", "all"):
+            statement = statement.where(ProductCatalog.id_category == int(category_id))
+        statement = statement.offset(skip).limit(limit)
 
         with rx.session() as session:
             items = session.exec(statement).all()
@@ -1397,6 +1400,94 @@ class ProductDAO:
             return list(products)
 
     @classmethod
+    def get_filtered_paginated_by_owner_storage(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        exclude_ids: List[int],
+        search: str = "",
+        catalog_id: int = -1,
+        min_remaining: Optional[int] = None,
+        fullness: str = "all",
+        offset: int = 0,
+        limit: int = 30,
+    ) -> tuple[List[Product], bool]:
+        """Порція доступного ТМЦ для діалогу вибору (нескінченний скрол).
+
+        Фільтри:
+        - owner_id == -1 — без фільтра за власником (на місці лежить ТМЦ різних
+          власників, напр. повернення з площадки);
+        - exclude_ids — одиниці, які вже додані до руху або вже обрані в діалозі;
+        - search — за назвою каталогу / серійним номером / id;
+        - catalog_id — конкретна позиція каталогу;
+        - min_remaining — залишок (Product.count) >= значення;
+        - fullness — "full" (count == capacity) / "partial" (count < capacity) / "all".
+
+        Повертає (порція, чи_є_ще): тягнемо limit+1 рядків, щоб дізнатися, чи
+        лишилися ще дані, не роблячи окремий COUNT.
+        """
+        statement = (
+            select(Product)
+            .join(ProductCatalog, Product.id_product_catalog == ProductCatalog.id)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+        if catalog_id != -1:
+            statement = statement.where(Product.id_product_catalog == catalog_id)
+        if min_remaining is not None:
+            statement = statement.where(Product.count >= min_remaining)
+        if fullness == "full":
+            statement = statement.where(Product.count == ProductCatalog.capacity)
+        elif fullness == "partial":
+            statement = statement.where(Product.count < ProductCatalog.capacity)
+        if search:
+            term = search.strip()
+            if term:
+                like = f"%{term.lower()}%"
+                conditions = [
+                    func.lower(ProductCatalog.title).like(like),
+                    func.lower(func.coalesce(Product.serial_number, "")).like(like),
+                ]
+                if term.isdigit():
+                    conditions.append(Product.id == int(term))
+                statement = statement.where(or_(*conditions))
+
+        statement = statement.order_by(Product.id).offset(offset).limit(limit + 1)
+
+        with rx.session() as session:
+            products = list(session.exec(statement).all())
+            has_more = len(products) > limit
+            if has_more:
+                products = products[:limit]
+            if len(products) > 0:
+                session.expunge_all()
+            return products, has_more
+
+    @classmethod
+    def get_catalog_options_by_owner_storage(
+        cls, owner_id: int, storage_id: int
+    ) -> List[tuple[int, str]]:
+        """Перелік позицій каталогу (id, назва), у яких є доступні одиниці на
+        вказаному місці/власнику — для випадаючого фільтра в діалозі вибору."""
+        statement = (
+            select(ProductCatalog.id, ProductCatalog.title)
+            .join(Product, Product.id_product_catalog == ProductCatalog.id)
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        statement = statement.distinct().order_by(ProductCatalog.title)
+
+        with rx.session() as session:
+            return [(row[0], row[1]) for row in session.exec(statement).all()]
+
+    @classmethod
     def count_by_storage(cls, storage_id: int) -> int:
         statement = (
             select(func.count(Product.id))
@@ -1700,6 +1791,99 @@ class ProductDAO:
             return list(products)
 
     @classmethod
+    def get_by_id_with_relationships(cls, id: int) -> Optional[Product]:
+        """Одиниця ТМЦ з підвантаженими каталогом/місцем/власником — для детальної
+        сторінки одиниці. На відміну від get_stock_units не фільтрує is_deleted:
+        спожита одиниця теж має історію (доступна за прямим id з діалогу поставки)."""
+        statement = (
+            select(Product)
+            .options(
+                joinedload(Product.product_catalog),
+                joinedload(Product.storage),
+                joinedload(Product.owner),
+            )
+            .where(Product.id == id)
+        )
+
+        with rx.session() as session:
+            product = session.exec(statement).one_or_none()
+
+            if product:
+                session.expunge(product)
+            return product
+
+    @classmethod
+    def get_units_count(
+        cls, search: Optional[str] = None, catalog_id: Optional[int] = None
+    ) -> int:
+        """Кількість живих одиниць ТМЦ для пагінації переліку одиниць.
+        search — за назвою каталогу / серійним номером / id."""
+        statement = (
+            select(func.count(Product.id))
+            .join(ProductCatalog, Product.id_product_catalog == ProductCatalog.id)
+            .where(Product.is_deleted == False)
+        )
+        if catalog_id is not None:
+            statement = statement.where(Product.id_product_catalog == catalog_id)
+        if search is not None and search.strip():
+            term = search.strip()
+            like = f"%{term.lower()}%"
+            conditions = [
+                func.lower(ProductCatalog.title).like(like),
+                func.lower(func.coalesce(Product.serial_number, "")).like(like),
+            ]
+            if term.isdigit():
+                conditions.append(Product.id == int(term))
+            statement = statement.where(or_(*conditions))
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+
+    @classmethod
+    def get_units_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        count_items: int = 0,
+        search: Optional[str] = None,
+        catalog_id: Optional[int] = None,
+    ) -> tuple[int, List[Product]]:
+        """Сторінка живих одиниць ТМЦ (із каталогом/місцем/власником) для переліку
+        одиниць у звіті. Сортування — за id (новіші зверху)."""
+        total_pages = max(1, math.ceil(count_items / limit))
+        skip = (max(1, page) - 1) * limit
+
+        statement = (
+            select(Product)
+            .join(ProductCatalog, Product.id_product_catalog == ProductCatalog.id)
+            .options(
+                joinedload(Product.product_catalog),
+                joinedload(Product.storage),
+                joinedload(Product.owner),
+            )
+            .where(Product.is_deleted == False)
+        )
+        if catalog_id is not None:
+            statement = statement.where(Product.id_product_catalog == catalog_id)
+        if search is not None and search.strip():
+            term = search.strip()
+            like = f"%{term.lower()}%"
+            conditions = [
+                func.lower(ProductCatalog.title).like(like),
+                func.lower(func.coalesce(Product.serial_number, "")).like(like),
+            ]
+            if term.isdigit():
+                conditions.append(Product.id == int(term))
+            statement = statement.where(or_(*conditions))
+
+        statement = statement.order_by(Product.id.desc()).offset(skip).limit(limit)
+
+        with rx.session() as session:
+            items = session.exec(statement).all()
+            session.expunge_all()
+            return total_pages, list(items)
+
+    @classmethod
     def update_serial_numbers(cls, serials: Dict[int, str]) -> tuple[bool, str]:
         if not serials:
             return True, ""
@@ -1726,9 +1910,15 @@ def movement_filter_conditions(
     date_from: str = "",
     date_to: str = "",
     statuses: Optional[List[int]] = None,
+    incoming_storage: Optional[str] = None,
+    destination_storage: Optional[str] = None,
+    incoming_owner: Optional[str] = None,
+    destination_owner: Optional[str] = None,
 ) -> list:
-    """Список SQLAlchemy-умов фільтрації рухів за датою (рядок ISO) і статусами.
-    Спільний для всіх типів руху (поступлення/списання/переміщення/видача/продаж)."""
+    """Список SQLAlchemy-умов фільтрації рухів за датою (рядок ISO), статусами та
+    (контекстно) складом/власником відправлення/призначення.
+    Спільний для всіх типів руху (поступлення/списання/переміщення/видача/продаж).
+    Значення складу/власника — рядок id; "" / "all" / None означають «без фільтра»."""
     conditions = []
     if date_from:
         conditions.append(Movement.date >= date_from)
@@ -1736,6 +1926,18 @@ def movement_filter_conditions(
         conditions.append(Movement.date <= date_to)
     if statuses:
         conditions.append(Movement.status.in_(statuses))
+
+    def _add(column, value):
+        if value and value not in ("", "all"):
+            try:
+                conditions.append(column == int(value))
+            except (TypeError, ValueError):
+                pass
+
+    _add(Movement.id_incoming_storage, incoming_storage)
+    _add(Movement.id_destination_storage, destination_storage)
+    _add(Movement.id_incoming_owner, incoming_owner)
+    _add(Movement.id_destination_owner, destination_owner)
     return conditions
 
 
@@ -1815,10 +2017,17 @@ class MovementDAO:
         date_from: str = "",
         date_to: str = "",
         statuses: Optional[List[int]] = None,
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
     ) -> tuple[int, List[Movement]]:
-        """Сторінкований перелік рухів одного типу з фільтром за датою/статусами.
-        Дата — рядок ISO 'YYYY-MM-DD', лексикографічне порівняння коректне."""
-        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        """Сторінкований перелік рухів одного типу з фільтром за датою/статусами
+        та складом/власником. Дата — рядок ISO 'YYYY-MM-DD'."""
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            incoming_storage, destination_storage, incoming_owner, destination_owner,
+        )
 
         count_stmt = select(func.count(Movement.id)).where(Movement.type == type)
         for cond in conditions:
@@ -1990,6 +2199,39 @@ class MovementDAO:
             )
             .where(MovementProducts.id_product.in_(product_ids))
             .where(Movement.id >= from_movement_id)
+            .distinct()
+            .order_by(Movement.id)
+        )
+
+        with rx.session() as session:
+            movements = session.exec(statement).all()
+
+            if len(movements) > 0:
+                session.expunge_all()
+            return list(movements)
+
+    @classmethod
+    def get_history_by_product_id(cls, product_id: int) -> List[Movement]:
+        """Історія руху однієї одиниці ТМЦ: усі рухи, до яких вона входить
+        (через MovementProducts), із підвантаженими місцями/власниками, у порядку
+        створення (id за зростанням). Для детальної сторінки одиниці."""
+        statement = (
+            select(Movement)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .join(
+                MovementProducts,
+                MovementProducts.id_movement_product == MovementProductsCatalog.id,
+            )
+            .options(
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.destination_storage),
+                joinedload(Movement.incoming_owner),
+                joinedload(Movement.destination_owner),
+            )
+            .where(MovementProducts.id_product == product_id)
             .distinct()
             .order_by(Movement.id)
         )
@@ -2392,16 +2634,35 @@ class AdmissionDAO:
         date_from: str = "",
         date_to: str = "",
         statuses: Optional[List[int]] = None,
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        supplier: Optional[str] = None,
     ) -> tuple[int, List[Admission]]:
-        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            incoming_storage, destination_storage, incoming_owner, destination_owner,
+        )
         movement_ids = select(Movement.id)
         for cond in conditions:
             movement_ids = movement_ids.where(cond)
 
+        # Фільтр за постачальником — на таблиці Admission.
+        admission_conditions = []
+        if supplier and supplier not in ("", "all"):
+            try:
+                admission_conditions.append(Admission.id_supplier == int(supplier))
+            except (TypeError, ValueError):
+                pass
+
         with rx.session() as session:
-            total = session.exec(
-                select(func.count(Admission.id)).where(Admission.id.in_(movement_ids))
-            ).one()
+            count_stmt = select(func.count(Admission.id)).where(
+                Admission.id.in_(movement_ids)
+            )
+            for cond in admission_conditions:
+                count_stmt = count_stmt.where(cond)
+            total = session.exec(count_stmt).one()
             total_pages = max(1, math.ceil(total / limit))
             skip = (max(1, page) - 1) * limit
 
@@ -2417,9 +2678,11 @@ class AdmissionDAO:
                     ),
                 )
                 .where(Admission.id.in_(movement_ids))
-                .order_by(Admission.id.desc())
-                .offset(skip)
-                .limit(limit)
+            )
+            for cond in admission_conditions:
+                statement = statement.where(cond)
+            statement = (
+                statement.order_by(Admission.id.desc()).offset(skip).limit(limit)
             )
             admissions = session.exec(statement).all()
             if len(admissions) > 0:
@@ -2652,16 +2915,35 @@ class IssueDAO:
         date_from: str = "",
         date_to: str = "",
         statuses: Optional[List[int]] = None,
+        incoming_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        site: Optional[str] = None,
+        recipient: Optional[str] = None,
     ) -> tuple[int, List[Issue]]:
-        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        # Місце призначення видачі (площадка/відділ) — це destination_storage руху.
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            incoming_storage=incoming_storage,
+            destination_storage=site,
+            incoming_owner=incoming_owner,
+        )
         movement_ids = select(Movement.id)
         for cond in conditions:
             movement_ids = movement_ids.where(cond)
 
+        # Фільтр за відповідальним (отримувачем) — на таблиці Issue.
+        issue_conditions = []
+        if recipient and recipient not in ("", "all"):
+            try:
+                issue_conditions.append(Issue.id_recipient == int(recipient))
+            except (TypeError, ValueError):
+                pass
+
         with rx.session() as session:
-            total = session.exec(
-                select(func.count(Issue.id)).where(Issue.id.in_(movement_ids))
-            ).one()
+            count_stmt = select(func.count(Issue.id)).where(Issue.id.in_(movement_ids))
+            for cond in issue_conditions:
+                count_stmt = count_stmt.where(cond)
+            total = session.exec(count_stmt).one()
             total_pages = max(1, math.ceil(total / limit))
             skip = (max(1, page) - 1) * limit
 
@@ -2676,9 +2958,11 @@ class IssueDAO:
                     joinedload(Issue.recipient),
                 )
                 .where(Issue.id.in_(movement_ids))
-                .order_by(Issue.id.desc())
-                .offset(skip)
-                .limit(limit)
+            )
+            for cond in issue_conditions:
+                statement = statement.where(cond)
+            statement = (
+                statement.order_by(Issue.id.desc()).offset(skip).limit(limit)
             )
             issues = session.exec(statement).all()
             if len(issues) > 0:
@@ -2827,16 +3111,32 @@ class SaleDAO:
         date_from: str = "",
         date_to: str = "",
         statuses: Optional[List[int]] = None,
+        incoming_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        responsible: Optional[str] = None,
     ) -> tuple[int, List[Sale]]:
-        conditions = movement_filter_conditions(date_from, date_to, statuses)
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            incoming_storage=incoming_storage,
+            incoming_owner=incoming_owner,
+        )
         movement_ids = select(Movement.id)
         for cond in conditions:
             movement_ids = movement_ids.where(cond)
 
+        # Фільтр за відповідальним — на таблиці Sale.
+        sale_conditions = []
+        if responsible and responsible not in ("", "all"):
+            try:
+                sale_conditions.append(Sale.id_responsible == int(responsible))
+            except (TypeError, ValueError):
+                pass
+
         with rx.session() as session:
-            total = session.exec(
-                select(func.count(Sale.id)).where(Sale.id.in_(movement_ids))
-            ).one()
+            count_stmt = select(func.count(Sale.id)).where(Sale.id.in_(movement_ids))
+            for cond in sale_conditions:
+                count_stmt = count_stmt.where(cond)
+            total = session.exec(count_stmt).one()
             total_pages = max(1, math.ceil(total / limit))
             skip = (max(1, page) - 1) * limit
 
@@ -2850,9 +3150,11 @@ class SaleDAO:
                     joinedload(Sale.responsible),
                 )
                 .where(Sale.id.in_(movement_ids))
-                .order_by(Sale.id.desc())
-                .offset(skip)
-                .limit(limit)
+            )
+            for cond in sale_conditions:
+                statement = statement.where(cond)
+            statement = (
+                statement.order_by(Sale.id.desc()).offset(skip).limit(limit)
             )
             sales = session.exec(statement).all()
             if len(sales) > 0:

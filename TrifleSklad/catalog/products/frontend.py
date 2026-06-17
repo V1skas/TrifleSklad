@@ -7,6 +7,8 @@ from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
 
 from TrifleSklad.catalog.products.backend import AddProductsState, EditProductsState, ViewProductsState, ListProductsState, ProductsState
+from TrifleSklad.movement.list_components import pagination
+from TrifleSklad.movement.list_mixin import ALL
 
 from TrifleSklad.models import ProductCatalog
 
@@ -102,8 +104,8 @@ def item_preview() -> rx.Component:
         rx.heading(ViewProductsState.title, size="7", width="100%"),
         rx.text(ViewProductsState.description, is_optional=True, width="100%"),
         rx.hstack(
-            rx.text(f"Единица измерения: {ViewProductsState.unit}", width="50%"),
-            rx.text(f"Количество: {ViewProductsState.count}", width="50%"),
+            rx.text(f"Одиниця виміру: {ViewProductsState.unit}", width="50%"),
+            rx.text(f"Кількість: {ViewProductsState.count}", width="50%"),
             width="100%"
         ),
         rx.hstack(
@@ -196,10 +198,7 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: ProductCatalog) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            rx.link(
-                item.title,
-                href=f"{routes.CATALOG_PRODUCTS_VIEW_ID}{item.id}"
-            ),
+            item.title,
             align="left"
         ),
         rx.table.cell(
@@ -221,6 +220,16 @@ def table_row(item: ProductCatalog) -> rx.Component:
                     rx.text("-")
                     )
         ),
+        rx.table.cell(
+            rx.cond(
+                item.uniq,
+                rx.text("Так"),
+                rx.text("Ні")
+            )
+        ),
+        on_click=rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 def table() -> rx.Component:
@@ -232,6 +241,7 @@ def table() -> rx.Component:
                 rx.table.column_header_cell("Одиниця виміру", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Подільний", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Місткість", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
             ),
 
             background_color=rx.color("accent", 9),
@@ -280,33 +290,36 @@ def table_tab_content() -> rx.Component:
             ),
             rx.hstack(
                 rx.input(
+                    placeholder="Пошук за назвою",
                     value=ListProductsState.get_search_str,
-                    on_change=ListProductsState.on_change_search_str
+                    on_change=ListProductsState.on_change_search_str,
+                    flex="1",
+                    min_width="0",
                 ),
-                rx.button("Пошук", on_click=ListProductsState.on_click_search),
-
-                width="100%"
+                rx.button("Пошук", on_click=ListProductsState.on_click_search, flex_shrink="0"),
+                rx.select.root(
+                    rx.select.trigger(placeholder="Усі категорії"),
+                    rx.select.content(
+                        rx.select.item("Усі категорії", value=ALL),
+                        rx.foreach(
+                            ListProductsState.list_categories,
+                            lambda c: rx.select.item(c[0], value=c[1]),
+                        ),
+                    ),
+                    value=ListProductsState.filter_category_id,
+                    on_change=ListProductsState.on_change_filter_category,
+                    width="16em",
+                    flex_shrink="0",
+                ),
+                width="100%",
+                spacing="3",
+                align="center",
             ),
             rx.cond(ListProductsState.has_items,
                 table(),
                 rx.text("Записів немає")
             ),
-            rx.hstack(
-                rx.button("Назад", on_click=ListProductsState.current_page_decrement),
-                rx.input(
-                    value=ListProductsState.get_current_page,
-                    on_change=ListProductsState.on_change_current_page,
-                    type="number",
-                    min="1",
-                    max=ListProductsState.get_all_pages),
-                rx.text("/"),
-                rx.text(ListProductsState.get_all_pages),
-                rx.button("Вперед", on_click=ListProductsState.current_page_increment),
-
-                justify="center",
-
-                width="100%"
-            ),
+            pagination(ListProductsState),
 
             width="100%",
             height="100%",
@@ -316,7 +329,7 @@ def table_tab_content() -> rx.Component:
     )
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва", size="3", width="100%"),
             rx.input(id="title", required=True, size="3", value=AddProductsState.title, on_change=AddProductsState.on_change_title, width="100%"),
@@ -405,7 +418,7 @@ def add_tab_content() -> rx.Component:
     )
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Назва", size="3", width="100%"),
             rx.input(id="title", required=True, size="3", value=EditProductsState.title, on_change=EditProductsState.on_change_title, width="100%"),

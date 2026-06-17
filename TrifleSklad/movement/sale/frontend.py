@@ -16,7 +16,7 @@ from TrifleSklad.movement.sale.backend import (
     ViewSaleState,
 )
 from TrifleSklad.movement.products.frontend import index as products
-from TrifleSklad.movement.list_components import filter_button, filter_card, pagination
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
 
 
 def cancel_conflict_dialog() -> rx.Component:
@@ -42,14 +42,11 @@ def cancel_conflict_dialog() -> rx.Component:
                         lambda row: rx.table.row(
                             rx.table.cell(row[0]),
                             rx.table.cell(row[1]),
-                            rx.table.cell(
-                                rx.link(
-                                    row[2],
-                                    on_click=rx.redirect(row[4]),
-                                    cursor="pointer",
-                                ),
-                            ),
+                            rx.table.cell(row[2]),
                             rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),
@@ -78,10 +75,7 @@ def table_row(item: Tuple[int, Sale]) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item[1].id)),
         rx.table.row_header_cell(
-            rx.link(
-                item[1].movement.date,
-                href=f"{routes.MOVEMENT_SALES_VIEW_ID}{item[1].id}",
-            ),
+            item[1].movement.date,
             align="left",
         ),
         rx.table.cell(rx.text(item[1].movement.incoming_storage.title)),
@@ -90,6 +84,9 @@ def table_row(item: Tuple[int, Sale]) -> rx.Component:
         rx.table.cell(
             rx.text(ListSaleState.get_movement_statuses[item[1].movement.status])
         ),
+        on_click=rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 
@@ -135,7 +132,27 @@ def list_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            filter_card(ListSaleState),
+            filter_card(
+                ListSaleState,
+                filter_select(
+                    "Склад",
+                    ListSaleState.filter_incoming_storage,
+                    ListSaleState.list_warehouses,
+                    ListSaleState.on_change_filter_incoming_storage,
+                ),
+                filter_select(
+                    "Власник",
+                    ListSaleState.filter_incoming_owner,
+                    ListSaleState.list_owners,
+                    ListSaleState.on_change_filter_incoming_owner,
+                ),
+                filter_select(
+                    "Відповідальний",
+                    ListSaleState.filter_responsible,
+                    ListSaleState.list_responsibles,
+                    ListSaleState.on_change_filter_responsible,
+                ),
+            ),
             rx.cond(ListSaleState.has_items, table(), rx.text("Записів немає.")),
             pagination(ListSaleState),
             width="100%",
@@ -187,7 +204,7 @@ def request_picker() -> rx.Component:
 
 
 def add_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             request_picker(),
             rx.text("*Дата:"),
@@ -259,8 +276,16 @@ def add_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.select.content(
+                    rx.input(
+                        rx.input.slot(rx.icon("search")),
+                        placeholder="Пошук за ПІБ",
+                        value=AddSaleState.search_responsible,
+                        on_change=AddSaleState.on_change_search_responsible,
+                        width="100%",
+                        margin_bottom="0.5em",
+                    ),
                     rx.foreach(
-                        AddSaleState.list_workers,
+                        AddSaleState.filtered_list_workers,
                         lambda worker: rx.select.item(worker[0], value=worker[1]),
                     ),
                     width="100%",
@@ -326,7 +351,7 @@ def add_tab_content() -> rx.Component:
 
 
 def edit_form() -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Дата:"),
             rx.input(

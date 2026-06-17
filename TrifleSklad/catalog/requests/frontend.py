@@ -73,7 +73,7 @@ def list_row(item: Tuple[int, Request]) -> rx.Component:
     return rx.table.row(
         rx.table.cell(item[1].id),
         rx.table.row_header_cell(
-            rx.link(item[1].date, href=f"{routes.CATALOG_REQUESTS_VIEW_ID}{item[1].id}"),
+            item[1].date,
             align="left",
         ),
         rx.table.cell(ListRequestsState.type_titles[item[1].type]),
@@ -85,6 +85,9 @@ def list_row(item: Tuple[int, Request]) -> rx.Component:
             )
         ),
         rx.table.cell(ListRequestsState.status_titles[item[1].status]),
+        on_click=rx.redirect(f"{routes.CATALOG_REQUESTS_VIEW_ID}{item[1].id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
     )
 
 
@@ -242,7 +245,7 @@ def positions_editor(State) -> rx.Component:
 
 
 def request_form(State) -> rx.Component:
-    return rx.card(
+    return rx.box(
         rx.vstack(
             rx.text("*Тип заявки:"),
             rx.select.root(
@@ -452,7 +455,7 @@ def process_tab_content() -> rx.Component:
                     ),
                 ],
             ),
-            rx.card(
+            rx.box(
                 rx.vstack(
                     rx.text(f"Тип: {ProcessRequestsState.type_title}"),
                     rx.cond(
@@ -466,7 +469,7 @@ def process_tab_content() -> rx.Component:
                     rx.text("Потрібно за заявкою:", weight="bold"),
                     process_required_table(),
                     rx.divider(),
-                    rx.text("Склад:"),
+                    rx.text("*Склад:"),
                     rx.select.root(
                         rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                         rx.select.content(
@@ -478,7 +481,7 @@ def process_tab_content() -> rx.Component:
                         on_change=ProcessRequestsState.on_change_id_incoming_storage,
                         width="100%",
                     ),
-                    rx.text("Власник:"),
+                    rx.text("*Власник:"),
                     rx.select.root(
                         rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                         rx.select.content(
@@ -493,7 +496,7 @@ def process_tab_content() -> rx.Component:
                     rx.cond(
                         ProcessRequestsState.is_issue == False,
                         rx.vstack(
-                            rx.text("Відповідальний за продаж:"),
+                            rx.text("*Відповідальний за продаж:"),
                             rx.select.root(
                                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                                 rx.select.content(

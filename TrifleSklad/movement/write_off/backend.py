@@ -27,9 +27,11 @@ class ListWriteOffState(MovementListFilterMixin, rx.State):
             MovementsType.WRITE_OFF,
             self._current_page,
             self._limit,
-            self.filter_date_from,
-            self.filter_date_to,
+            self._date_from_eff(),
+            self._date_to_eff(),
             self.selected_statuses,
+            incoming_storage=self.filter_incoming_storage,
+            incoming_owner=self.filter_incoming_owner,
         )
 
     # Dynamic variables
@@ -72,6 +74,12 @@ class ViewWriteOffState(rx.State):
     is_cancel_conflict_dialog_open: bool = False
     # ======================
 
+    # Position-detail dialog (перелік одиниць обраної позиції каталогу)
+    # ======================
+    is_position_dialog_open: bool = False
+    selected_position_index: int = -1
+    # ======================
+
     # Dynamic variables
     # ======================
     @rx.var
@@ -81,6 +89,56 @@ class ViewWriteOffState(rx.State):
     @rx.var
     def current_is_canceled(self) -> bool:
         return self.item is not None and self.item.status == MovementsStatus.CANCELED
+
+    @rx.var
+    def positions(self) -> List[Tuple[int, str, int]]:
+        # (індекс, назва позиції каталогу, підсумкова кількість одиниць)
+        if self.item is None:
+            return []
+        return [
+            (index, pc.product.title, len(pc.products))
+            for index, pc in enumerate(self.item.products_catalog)
+        ]
+
+    @rx.var
+    def has_positions(self) -> bool:
+        return self.item is not None and len(self.item.products_catalog) > 0
+
+    @rx.var
+    def selected_position_title(self) -> str:
+        if (
+            self.item is None
+            or self.selected_position_index < 0
+            or self.selected_position_index >= len(self.item.products_catalog)
+        ):
+            return ""
+        return self.item.products_catalog[self.selected_position_index].product.title
+
+    @rx.var
+    def selected_position_units(self) -> List[Tuple[str, str, str]]:
+        # (id одиниці, серійний номер або '—', залишок для подільного або '—')
+        if (
+            self.item is None
+            or self.selected_position_index < 0
+            or self.selected_position_index >= len(self.item.products_catalog)
+        ):
+            return []
+        pc = self.item.products_catalog[self.selected_position_index]
+        units: List[Tuple[str, str, str]] = []
+        for unit in pc.products:
+            catalog = unit.product_catalog
+            serial = (
+                unit.serial_number
+                if (catalog is not None and catalog.uniq and unit.serial_number)
+                else "—"
+            )
+            remain = (
+                str(unit.count)
+                if (catalog is not None and catalog.divisible)
+                else "—"
+            )
+            units.append((str(unit.id), serial, remain))
+        return units
 
     @rx.var
     def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str, str]]:
@@ -100,10 +158,23 @@ class ViewWriteOffState(rx.State):
     def set_cancel_conflict_dialog_open(self, value: bool):
         self.is_cancel_conflict_dialog_open = value
 
+    @rx.event
+    def open_position_dialog(self, index: int):
+        self.selected_position_index = index
+        self.is_position_dialog_open = True
+
+    @rx.event
+    def set_position_dialog_open(self, value: bool):
+        self.is_position_dialog_open = value
+        if not value:
+            self.selected_position_index = -1
+
     # Action handlers
     # ======================
     @rx.event
     async def on_load(self, id: int):
+        self.is_position_dialog_open = False
+        self.selected_position_index = -1
         self.item = MovementDAO.get_by_id_with_product_storage_owner(id)
         if self.item is None:
             return [

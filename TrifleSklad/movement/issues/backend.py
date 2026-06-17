@@ -29,7 +29,7 @@ from TrifleSklad.models import (
     Product,
     ProductCatalog,
 )
-from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -37,26 +37,81 @@ from TrifleSklad.state import AppState
 class ListIssueState(MovementListFilterMixin, rx.State):
     items: List[Issue] = []
 
+    # Фільтри, специфічні для видачі: відповідальний (отримувач) і площадка/відділ.
+    filter_recipient: str = ALL
+    filter_site: str = ALL
+    list_recipients: List[Tuple[str, str]] = []
+    list_sites: List[Tuple[str, str]] = []
+
     # Backend methods
     # ======================
+    def _load_issue_filter_options(self):
+        self.list_recipients = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
+        sites = StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE) + \
+            StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
+        self.list_sites = [(s.title, str(s.id)) for s in sites]
+
     def _reload(self):
         self._all_pages, self.items = IssueDAO.get_paginated(
             self._current_page,
             self._limit,
-            self.filter_date_from,
-            self.filter_date_to,
+            self._date_from_eff(),
+            self._date_to_eff(),
             self.selected_statuses,
+            incoming_storage=self.filter_incoming_storage,
+            incoming_owner=self.filter_incoming_owner,
+            site=self.filter_site,
+            recipient=self.filter_recipient,
         )
 
     @rx.event
     def on_load(self):
         self._reset_list_state()
+        self.filter_recipient = ALL
+        self.filter_site = ALL
+        self._load_issue_filter_options()
+        self._reload()
+
+    @rx.event
+    def on_change_filter_recipient(self, value: str):
+        self.filter_recipient = value
+
+    @rx.event
+    def on_change_filter_site(self, value: str):
+        self.filter_site = value
+
+    @rx.event
+    def reset_filters(self):
+        # Скидання всіх фільтрів (спільні + специфічні для видачі) + перезавантаження.
+        today = date.today().isoformat()
+        self.filter_date_enabled = False
+        self.filter_date_from = today
+        self.filter_date_to = today
+        self.selected_statuses = []
+        self.filter_incoming_storage = ALL
+        self.filter_destination_storage = ALL
+        self.filter_incoming_owner = ALL
+        self.filter_destination_owner = ALL
+        self.filter_recipient = ALL
+        self.filter_site = ALL
+        self._current_page = 1
         self._reload()
 
     # ======================
 
     # Dynamic variables
     # ======================
+    @rx.var
+    def has_active_filters(self) -> bool:
+        return bool(
+            self.filter_date_enabled
+            or self.selected_statuses
+            or self.filter_incoming_storage != ALL
+            or self.filter_incoming_owner != ALL
+            or self.filter_site != ALL
+            or self.filter_recipient != ALL
+        )
+
     @rx.var
     def has_items(self) -> bool:
         return len(self.items) > 0
