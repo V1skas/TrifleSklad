@@ -476,8 +476,10 @@ def edit_admission_products_catalog_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -488,7 +490,15 @@ def edit_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
+                        rx.table.cell(
+                            rx.cond(
+                                item[1].product.divisible,
+                                item[1].count * item[1].product.capacity,
+                                "—",
+                            )
+                        ),
                         rx.table.cell(item[1].price),
+                        rx.table.cell(item[1].count * item[1].price),
                         on_click=EditAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -507,50 +517,16 @@ def edit_admission_products_catalog_table() -> rx.Component:
         width="100%",
     )
 
-def product_catalog_table_row(item: Tuple[int, MovementProductsCatalog]):
-    return rx.table.row(
-        rx.table.cell(item[1].product.title),
-        rx.table.cell(item[1].count),
-        rx.table.cell(item[1].price),
-        on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
-        cursor="pointer",
-        _hover={"background_color": rx.color("accent", 3)},
-    )
-
-def product_catalog_table():
-    return rx.table.root(
-        rx.table.header(
-            rx.table.row(
-                rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
-            ),
-
-            background_color=rx.color("accent", 9)
-        ),
-        rx.table.body(
-            rx.foreach(
-                enumerate(AddAdmissionState.item.products),
-                lambda item: product_catalog_table_row(item)
-            ),
-
-            height="100%",
-            width="100%"
-        ),
-
-        variant="surface",
-        height="100%",
-        width="100%"
-    )
-
 def add_admission_products_catalog_table() -> rx.Component:
     return rx.vstack(
         rx.table.root(
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -561,7 +537,15 @@ def add_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
+                        rx.table.cell(
+                            rx.cond(
+                                item[1].product.divisible,
+                                item[1].count * item[1].product.capacity,
+                                "—",
+                            )
+                        ),
                         rx.table.cell(item[1].price),
+                        rx.table.cell(item[1].count * item[1].price),
                         on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -586,8 +570,10 @@ def view_admission_products_catalog_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -598,7 +584,15 @@ def view_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
+                        rx.table.cell(
+                            rx.cond(
+                                item[1].product.divisible,
+                                item[1].count * item[1].product.capacity,
+                                "—",
+                            )
+                        ),
                         rx.table.cell(item[1].price),
+                        rx.table.cell(item[1].count * item[1].price),
                         on_click=ViewAdmissionState.on_change_dialog_open(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},

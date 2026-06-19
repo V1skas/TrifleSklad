@@ -21,6 +21,10 @@ class ProductsMovementListState(rx.State):
     split_mode: Dict[int, bool] = {}
     split_amount: Dict[int, str] = {}
 
+    # Розгорнуті позиції каталогу в таблиці (клік по рядку розкриває перелік
+    # одиниць). Ключ — id позиції каталогу.
+    expanded_catalogs: Dict[int, bool] = {}
+
     # Чи обов'язковий вибір власника для відкриття діалогу. Вимикається там, де
     # власник не задається (напр. повернення з площадки — фільтр лише за складом,
     # кожна одиниця зберігає свого власника).
@@ -43,6 +47,7 @@ class ProductsMovementListState(rx.State):
         self.products_selector_state.clear()
         self.split_mode = {}
         self.split_amount = {}
+        self.expanded_catalogs = {}
         self.require_owner = True
         self.require_serial = False
         self.require_price = False
@@ -105,6 +110,65 @@ class ProductsMovementListState(rx.State):
     def get_items(self) -> List[Tuple[int, Product]]:
         return [(index, item) for index, item in enumerate(self.items)]
 
+    @rx.event
+    def toggle_catalog(self, catalog_id: int):
+        self.expanded_catalogs[catalog_id] = not self.expanded_catalogs.get(
+            catalog_id, False
+        )
+
+    @rx.var
+    def grouped(
+        self,
+    ) -> List[Tuple[int, str, int, bool, bool, str, List[Tuple[int, Product]]]]:
+        # Групує одиниці за позицією каталогу для таблиці:
+        # (id каталогу, назва, к-сть одиниць, подільне?, унікальне?, залишок,
+        #  перелік (глобальний індекс у self.items, Product)).
+        # Залишок — сума count подільних одиниць групи (для контролю обсягу),
+        # інакше «—». Глобальний індекс потрібен для on_remove_selected/split_*.
+        order: List[int] = []
+        groups: Dict[int, Tuple[str, bool, bool, int, List[Tuple[int, Product]]]] = {}
+        for index, product in enumerate(self.items):
+            catalog = product.product_catalog
+            if catalog is None:
+                continue
+            catalog_id = catalog.id
+            if catalog_id not in groups:
+                order.append(catalog_id)
+                groups[catalog_id] = (catalog.title, catalog.divisible, catalog.uniq, 0, [])
+            title, divisible, uniq, remainder, units = groups[catalog_id]
+            units.append((index, product))
+            groups[catalog_id] = (
+                title,
+                divisible,
+                uniq,
+                remainder + (product.count or 0),
+                units,
+            )
+        result: List[Tuple[int, str, int, bool, bool, str, List[Tuple[int, Product]]]] = []
+        for catalog_id in order:
+            title, divisible, uniq, remainder, units = groups[catalog_id]
+            result.append(
+                (
+                    catalog_id,
+                    title,
+                    len(units),
+                    divisible,
+                    uniq,
+                    str(remainder) if divisible else "—",
+                    units,
+                )
+            )
+        return result
+
+    @rx.var
+    def group_sums(self) -> Dict[int, float]:
+        # Сума по позиції каталогу (для продажу): ціна за одиницю × к-сть одиниць.
+        prices = self.get_prices()
+        sums: Dict[int, float] = {}
+        for catalog_id, (_title, count) in self._grouped_counts().items():
+            sums[catalog_id] = round(prices.get(catalog_id, 0.0) * count, 2)
+        return sums
+
     def _grouped_counts(self) -> Dict[int, Tuple[str, int]]:
         # Групує вибрані одиниці за позицією каталогу: id -> (назва, кількість).
         groups: Dict[int, Tuple[str, int]] = {}
@@ -115,14 +179,6 @@ class ProductsMovementListState(rx.State):
             title, count = groups.get(catalog_id, (product.product_catalog.title, 0))
             groups[catalog_id] = (title, count + 1)
         return groups
-
-    @rx.var
-    def price_positions(self) -> List[Tuple[int, str, int]]:
-        # Позиції (id каталогу, назва, кількість) для вводу ціни при продажу.
-        return [
-            (catalog_id, title, count)
-            for catalog_id, (title, count) in self._grouped_counts().items()
-        ]
 
     @rx.var
     def total_cost(self) -> float:

@@ -464,48 +464,76 @@ def edit_tab_content() -> rx.Component:
     )
 
 
-def position_detail_dialog() -> rx.Component:
-    # Деталізація обраної позиції: перелік одиниць ТМЦ (id, серійний номер, залишок).
-    return rx.dialog.root(
-        rx.dialog.content(
-            rx.dialog.title(f"Позиція: {ViewSaleState.selected_position_title}"),
-            rx.table.root(
-                rx.table.header(
-                    rx.table.row(
-                        rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                        rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
-                        rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                    ),
-                    background_color=rx.color("accent", 9),
-                ),
-                rx.table.body(
-                    rx.foreach(
-                        ViewSaleState.selected_position_units,
-                        lambda unit: rx.table.row(
-                            rx.table.cell(unit[0], width="1%", white_space="nowrap"),
-                            rx.table.cell(unit[1]),
-                            rx.table.cell(unit[2], width="1%", white_space="nowrap"),
-                        ),
-                    ),
-                ),
-                variant="surface",
-                width="100%",
-                margin_top="1em",
+def position_units_subtable(group) -> rx.Component:
+    # Вкладена таблиця одиниць позиції (group[5] — перелік одиниць);
+    # клік по одиниці → її детальна сторінка.
+    return rx.table.root(
+        rx.table.header(
+            rx.table.row(
+                rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
             ),
-            rx.flex(
-                rx.dialog.close(
-                    rx.button(
-                        "Закрити",
-                        on_click=ViewSaleState.set_position_dialog_open(False),
-                    ),
-                ),
-                justify="end",
-                margin_top="1em",
-            ),
-            max_width="40em",
+            background_color=rx.color("accent", 6),
         ),
-        open=ViewSaleState.is_position_dialog_open,
-        on_open_change=ViewSaleState.set_position_dialog_open,
+        rx.table.body(
+            rx.foreach(
+                group[5],
+                lambda unit: rx.table.row(
+                    rx.table.cell(unit[0], width="1%", white_space="nowrap"),
+                    rx.table.cell(unit[1]),
+                    rx.table.cell(unit[2], width="1%", white_space="nowrap"),
+                    on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{unit[0]}"),
+                    cursor="pointer",
+                    _hover={"background_color": rx.color("accent", 4)},
+                ),
+            ),
+        ),
+        variant="surface",
+        width="100%",
+    )
+
+
+def position_group(group) -> rx.Component:
+    # group = (індекс, назва, к-сть, ціна за од., сума, одиниці).
+    clickable = dict(
+        on_click=ViewSaleState.toggle_position(group[0]),
+        cursor="pointer",
+    )
+    return rx.fragment(
+        rx.table.row(
+            rx.table.cell(
+                rx.icon(
+                    "chevron-down",
+                    size=16,
+                    color=rx.color("accent", 9),
+                    style={
+                        "transform": rx.cond(
+                            ViewSaleState.expanded_positions[group[0]],
+                            "rotate(0deg)",
+                            "rotate(-90deg)",
+                        ),
+                        "transition": "transform 0.15s",
+                    },
+                ),
+                width="1%", white_space="nowrap", **clickable,
+            ),
+            rx.table.cell(group[1], **clickable),
+            rx.table.cell(group[2], width="1%", white_space="nowrap", **clickable),
+            rx.table.cell(group[3], width="1%", white_space="nowrap", **clickable),
+            rx.table.cell(group[4], width="1%", white_space="nowrap", **clickable),
+            _hover={"background_color": rx.color("accent", 3)},
+        ),
+        rx.cond(
+            ViewSaleState.expanded_positions[group[0]],
+            rx.table.row(
+                rx.table.cell(
+                    position_units_subtable(group),
+                    custom_attrs={"colSpan": "5"},
+                    padding="0.5em",
+                ),
+            ),
+        ),
     )
 
 
@@ -513,26 +541,16 @@ def positions_table() -> rx.Component:
     return rx.table.root(
         rx.table.header(
             rx.table.row(
+                rx.table.column_header_cell("", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                 rx.table.column_header_cell("Позиція", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Ціна за одиницю", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Сума", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
             ),
             background_color=rx.color("accent", 9),
         ),
         rx.table.body(
-            rx.foreach(
-                ViewSaleState.positions,
-                lambda row: rx.table.row(
-                    rx.table.cell(row[1]),
-                    rx.table.cell(row[2]),
-                    rx.table.cell(row[3]),
-                    rx.table.cell(row[4]),
-                    on_click=ViewSaleState.open_position_dialog(row[0]),
-                    cursor="pointer",
-                    _hover={"background_color": rx.color("accent", 3)},
-                ),
-            ),
+            rx.foreach(ViewSaleState.positions_grouped, position_group),
         ),
         variant="surface",
         width="100%",
@@ -549,7 +567,6 @@ def view_body() -> rx.Component:
         rx.text(f"Коментар: {ViewSaleState.item.movement.comment}"),
         rx.text("Продані позиції (натисніть для деталізації):", width="100%"),
         positions_table(),
-        position_detail_dialog(),
         rx.hstack(
             rx.spacer(),
             rx.heading(f"Загальна вартість: {ViewSaleState.total_cost}", size="4"),

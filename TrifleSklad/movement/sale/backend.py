@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 
@@ -118,10 +118,10 @@ class ViewSaleState(rx.State):
     is_cancel_conflict_dialog_open: bool = False
     # ======================
 
-    # Detailed position dialog (одиниці ТМЦ обраної позиції)
+    # Розгорнуті позиції в таблиці (клік по рядку розкриває перелік одиниць).
+    # Ключ — індекс позиції в products_catalog.
     # ======================
-    is_position_dialog_open: bool = False
-    selected_position_index: int = -1
+    expanded_positions: Dict[int, bool] = {}
     # ======================
 
     # Dynamic variables
@@ -142,56 +142,41 @@ class ViewSaleState(rx.State):
         )
 
     @rx.var
-    def positions(self) -> List[Tuple[int, str, int, float, float]]:
-        # (індекс, назва позиції, кількість, ціна за одиницю, сума по позиції)
+    def positions_grouped(
+        self,
+    ) -> List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]]:
+        # Позиції з вбудованим переліком одиниць для розгортання:
+        # (індекс, назва, к-сть, ціна за од., сума по позиції,
+        #  одиниці = [(id, серійний номер | '—', залишок | '—')]).
         if self.item is None:
             return []
-        return [
-            (
-                index,
-                pc.product.title,
-                pc.count,
-                pc.price,
-                round(pc.price * pc.count, 2),
+        result: List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]] = []
+        for index, pc in enumerate(self.item.movement.products_catalog):
+            units: List[Tuple[int, str, str]] = []
+            for unit in pc.products:
+                catalog = unit.product_catalog
+                serial = (
+                    unit.serial_number
+                    if (catalog is not None and catalog.uniq and unit.serial_number)
+                    else "—"
+                )
+                remain = (
+                    str(unit.count)
+                    if (catalog is not None and catalog.divisible)
+                    else "—"
+                )
+                units.append((unit.id, serial, remain))
+            result.append(
+                (
+                    index,
+                    pc.product.title,
+                    pc.count,
+                    pc.price,
+                    round(pc.price * pc.count, 2),
+                    units,
+                )
             )
-            for index, pc in enumerate(self.item.movement.products_catalog)
-        ]
-
-    @rx.var
-    def selected_position_title(self) -> str:
-        if (
-            self.item is None
-            or self.selected_position_index < 0
-            or self.selected_position_index >= len(self.item.movement.products_catalog)
-        ):
-            return ""
-        return self.item.movement.products_catalog[self.selected_position_index].product.title
-
-    @rx.var
-    def selected_position_units(self) -> List[Tuple[str, str, str]]:
-        # (id одиниці, серійний номер або '—', залишок для подільного або '—')
-        if (
-            self.item is None
-            or self.selected_position_index < 0
-            or self.selected_position_index >= len(self.item.movement.products_catalog)
-        ):
-            return []
-        pc = self.item.movement.products_catalog[self.selected_position_index]
-        units: List[Tuple[str, str, str]] = []
-        for unit in pc.products:
-            catalog = unit.product_catalog
-            serial = (
-                unit.serial_number
-                if (catalog is not None and catalog.uniq and unit.serial_number)
-                else "—"
-            )
-            remain = (
-                str(unit.count)
-                if (catalog is not None and catalog.divisible)
-                else "—"
-            )
-            units.append((str(unit.id), serial, remain))
-        return units
+        return result
 
     @rx.var
     def total_cost(self) -> float:
@@ -220,22 +205,14 @@ class ViewSaleState(rx.State):
         self.is_cancel_conflict_dialog_open = value
 
     @rx.event
-    def open_position_dialog(self, index: int):
-        self.selected_position_index = index
-        self.is_position_dialog_open = True
-
-    @rx.event
-    def set_position_dialog_open(self, value: bool):
-        self.is_position_dialog_open = value
-        if not value:
-            self.selected_position_index = -1
+    def toggle_position(self, index: int):
+        self.expanded_positions[index] = not self.expanded_positions.get(index, False)
 
     # Action handlers
     # ======================
     @rx.event
     async def on_load(self, id: int):
-        self.is_position_dialog_open = False
-        self.selected_position_index = -1
+        self.expanded_positions = {}
         self.item = SaleDAO.get_by_id_with_all_relationship(id)
         if self.item is None:
             return [
