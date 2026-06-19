@@ -49,6 +49,13 @@ class MovementProductCatalogAddEditFormState(rx.State):
     id_product_catalog_in_cache: str = ""
     is_product_uniq: bool = False
 
+    # Подільність та місткість обраної позиції каталогу як прості (примітивні)
+    # поля стану. Беремо обсяг однієї одиниці саме звідси, а не з relationship
+    # self.item.product — relationship може не зберегтися між подіями (вибір
+    # позиції та ввід кількості — різні події), і тоді обсяг хибно падав до 1.
+    selected_divisible: bool = False
+    selected_capacity: int = 0
+
     # Живий пошук позиції каталогу в селекті (підрядок у назві).
     search_catalog: str = ""
 
@@ -138,14 +145,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
     def _per_unit_count(self) -> int:
         # Подільна одиниця ТМЦ створюється з повною місткістю (capacity) — це її
         # максимальний обсяг/залишок. Неподільна одиниця завжди має count = 1.
-        product = self.item.product
-        if (
-            product is not None
-            and product.divisible
-            and product.capacity
-            and product.capacity > 0
-        ):
-            return product.capacity
+        # Спираємось на примітивні поля стану (надійно серіалізуються), а не на
+        # relationship self.item.product, який міг загубитися між подіями.
+        if self.selected_divisible and self.selected_capacity > 0:
+            return self.selected_capacity
         return 1
 
     @rx.event
@@ -164,6 +167,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return
         self.item.product = selected
         self.item.id_product_catalog = self.item.product.id
+        self.selected_divisible = selected.divisible
+        self.selected_capacity = selected.capacity or 0
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
                 self.item.products[i].serial_number = ""
@@ -237,6 +242,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.item = item
 
         self.is_product_uniq = item.product.uniq
+        self.selected_divisible = item.product.divisible if item.product else False
+        self.selected_capacity = (
+            (item.product.capacity or 0) if item.product else 0
+        )
         self.id_product_catalog_entered = True
         # Value селекта = id позиції каталогу (щоб селект показав поточну позицію).
         self.id_product_catalog_in_cache = (
@@ -252,6 +261,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
 
         self.is_product_uniq = False
+        self.selected_divisible = False
+        self.selected_capacity = 0
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
         self.search_catalog = ""
@@ -377,6 +388,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
                 self.item.product = catalog
                 self.item.id_product_catalog = catalog.id
                 self.is_product_uniq = catalog.uniq
+                self.selected_divisible = catalog.divisible
+                self.selected_capacity = catalog.capacity or 0
                 per_unit = self._per_unit_count()
                 for unit in self.item.products:
                     unit.id_product_catalog = catalog.id

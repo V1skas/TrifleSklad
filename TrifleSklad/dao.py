@@ -1448,9 +1448,10 @@ class ProductDAO:
         if search:
             term = search.strip()
             if term:
+                # Пошук лише за серійним номером / id: назву каталогу не шукаємо,
+                # бо позиція вже обрана у каскаді категорія→каталог.
                 like = f"%{term.lower()}%"
                 conditions = [
-                    func.lower(ProductCatalog.title).like(like),
                     func.lower(func.coalesce(Product.serial_number, "")).like(like),
                 ]
                 if term.isdigit():
@@ -1469,11 +1470,32 @@ class ProductDAO:
             return products, has_more
 
     @classmethod
-    def get_catalog_options_by_owner_storage(
+    def get_categories_by_owner_storage(
         cls, owner_id: int, storage_id: int
     ) -> List[tuple[int, str]]:
+        """Перелік категорій (id, назва), у яких є доступні одиниці на вказаному
+        місці/власнику — перший крок каскадного вибору в діалозі."""
+        statement = (
+            select(ProductCategory.id, ProductCategory.title)
+            .join(ProductCatalog, ProductCatalog.id_category == ProductCategory.id)
+            .join(Product, Product.id_product_catalog == ProductCatalog.id)
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        statement = statement.distinct().order_by(ProductCategory.title)
+
+        with rx.session() as session:
+            return [(row[0], row[1]) for row in session.exec(statement).all()]
+
+    @classmethod
+    def get_catalog_options_by_owner_storage(
+        cls, owner_id: int, storage_id: int, category_id: int = -1
+    ) -> List[tuple[int, str]]:
         """Перелік позицій каталогу (id, назва), у яких є доступні одиниці на
-        вказаному місці/власнику — для випадаючого фільтра в діалозі вибору."""
+        вказаному місці/власнику — для випадаючого фільтра в діалозі вибору.
+        category_id != -1 — звузити до конкретної категорії."""
         statement = (
             select(ProductCatalog.id, ProductCatalog.title)
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
@@ -1482,10 +1504,80 @@ class ProductDAO:
         )
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
+        if category_id != -1:
+            statement = statement.where(ProductCatalog.id_category == category_id)
         statement = statement.distinct().order_by(ProductCatalog.title)
 
         with rx.session() as session:
             return [(row[0], row[1]) for row in session.exec(statement).all()]
+
+    @classmethod
+    def get_units_for_mass_select(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        catalog_id: int,
+        exclude_ids: List[int],
+        full_only: bool,
+        capacity: int,
+        limit: int,
+    ) -> List[Product]:
+        """До `limit` доступних одиниць позиції каталогу для масового вибору за
+        кількістю штук. full_only=True (подільне ТМЦ) — лише повні одиниці
+        (count == capacity), щоб масовий вибір не «з'їдав» уже розділені рештки."""
+        if limit <= 0:
+            return []
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+            .where(Product.id_product_catalog == catalog_id)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+        if full_only:
+            statement = statement.where(Product.count == capacity)
+        statement = statement.order_by(Product.id).limit(limit)
+
+        with rx.session() as session:
+            products = list(session.exec(statement).all())
+            if len(products) > 0:
+                session.expunge_all()
+            return products
+
+    @classmethod
+    def get_units_for_measure(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        catalog_id: int,
+        exclude_ids: List[int],
+        limit: int = 500,
+    ) -> List[Product]:
+        """Доступні одиниці позиції каталогу для жадібного набору за мірою
+        (одиницями виміру), за спаданням залишку (count). Подільне ТМЦ —
+        великі одиниці беруться першими, решта добивається розділенням."""
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+            .where(Product.id_product_catalog == catalog_id)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+        statement = statement.order_by(Product.count.desc()).limit(limit)
+
+        with rx.session() as session:
+            products = list(session.exec(statement).all())
+            if len(products) > 0:
+                session.expunge_all()
+            return products
 
     @classmethod
     def count_by_storage(cls, storage_id: int) -> int:

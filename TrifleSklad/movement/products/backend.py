@@ -155,12 +155,19 @@ class ProductsMovementListState(rx.State):
     @rx.event
     def on_save_selected(self):
         selected = self.products_selector_state.get_selected_items_only()
+        # Намір авто-розділення решти (набір подільного ТМЦ за мірою): id → обсяг.
+        split_intent = self.products_selector_state.get_split_intent()
         self.items += selected
-        # За замовчуванням — передати цілком; режим розділення вмикає користувач.
+        # За замовчуванням — передати цілком; режим розділення вмикає користувач
+        # або масовий набір за мірою (split_intent).
         for product in selected:
             if self._is_divisible(product):
-                self.split_mode[product.id] = False
-                self.split_amount[product.id] = ""
+                if product.id in split_intent:
+                    self.split_mode[product.id] = True
+                    self.split_amount[product.id] = str(split_intent[product.id])
+                else:
+                    self.split_mode[product.id] = False
+                    self.split_amount[product.id] = ""
             # Ініціалізуємо ціну позиції (для продажу), якщо її ще немає.
             if (
                 product.product_catalog is not None
