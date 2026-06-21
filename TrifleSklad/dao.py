@@ -1892,10 +1892,11 @@ class ProductDAO:
         storage_id: Optional[int] = None,
         owner_id: Optional[int] = None,
         exclude_types: Optional[List[int]] = None,
+        category_id: Optional[int] = None,
     ) -> List[tuple]:
         """Звіт «Наявність ТМЦ»: позиції каталогу, що зараз лежать на місцях
         зберігання, із сумарною кількістю та числом одиниць. Фільтри —
-        за позицією каталогу, місцем зберігання, власником; exclude_types —
+        за позицією каталогу, категорією, місцем зберігання, власником; exclude_types —
         типи сховищ (склад/площадка/відділ), які треба виключити.
         Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
         exclude_types = exclude_types or []
@@ -1916,6 +1917,8 @@ class ProductDAO:
         )
         if catalog_id is not None:
             statement = statement.where(ProductCatalog.id == catalog_id)
+        if category_id is not None:
+            statement = statement.where(ProductCatalog.id_category == category_id)
         if storage_id is not None:
             statement = statement.where(Product.id_storage == storage_id)
         if owner_id is not None:
