@@ -24,6 +24,7 @@ from TrifleSklad.declared import (
 )
 from TrifleSklad.models import Movement, Product, Sale
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -238,7 +239,7 @@ class ViewSaleState(rx.State):
     # ======================
 
 
-class AddSaleState(rx.State):
+class AddSaleState(LookupCreatorsMixin, rx.State):
     current_date: str = date.today().__str__()
 
     id_incoming_storage: str = ""
@@ -326,6 +327,61 @@ class AddSaleState(rx.State):
     def has_request_positions(self) -> bool:
         return len(self.request_positions) > 0
     # ======================
+
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        self._load_list_storages()
+        self.id_incoming_storage = str(new_id)
+        if self.products_movement_list_state is not None:
+            self.products_movement_list_state.filter_by_storage = new_id
+            self.products_movement_list_state.items = []
+
+    def _after_create_owner(self, new_id: int):
+        self._load_list_owners()
+        self.id_incoming_owner = str(new_id)
+        if self.products_movement_list_state is not None:
+            self.products_movement_list_state.filter_by_owner = new_id
+            self.products_movement_list_state.items = []
+
+    def _after_create_worker(self, new_id: int):
+        self._load_list_workers()
+        self.id_responsible = str(new_id)
+
+    async def _reset_for_continue(self):
+        keep = dict(
+            current_date=self.current_date,
+            id_incoming_storage=self.id_incoming_storage,
+            id_incoming_owner=self.id_incoming_owner,
+            id_responsible=self.id_responsible,
+            status=self.status,
+        )
+        self.search_name_incoming_storage = ""
+        self.search_responsible = ""
+        self.comment = ""
+        self.selected_request_id = ""
+        self.request_positions = []
+
+        self.id_incoming_storage = keep["id_incoming_storage"]
+        self.id_incoming_owner = keep["id_incoming_owner"]
+        self.id_responsible = keep["id_responsible"]
+        self.current_date = keep["current_date"]
+        self.status = keep["status"]
+
+        self._load_list_storages()
+        self._load_list_owners()
+        self._load_list_workers()
+        self._load_requests()
+
+        self.products_movement_list_state.items = []
+        await self.products_movement_list_state.on_load()
+        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_require_price(True)
+        self.products_movement_list_state.set_require_serial(True)
+        if keep["id_incoming_storage"] != "":
+            self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
+        if keep["id_incoming_owner"] != "":
+            self.products_movement_list_state.filter_by_owner = int(keep["id_incoming_owner"])
 
     # Action handlers
     # ======================
@@ -425,7 +481,7 @@ class AddSaleState(rx.State):
         self.comment = value
 
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.SALES_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if (
@@ -486,6 +542,9 @@ class AddSaleState(rx.State):
             # Якщо продаж формується на основі заявки — позначаємо її виконаною.
             if self.selected_request_id != "":
                 RequestDAO.mark_completed(int(self.selected_request_id), id)
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success("Продаж проведено!")
             return [
                 rx.toast.success("Продаж проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}"),

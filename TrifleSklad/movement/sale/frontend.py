@@ -17,6 +17,13 @@ from TrifleSklad.movement.sale.backend import (
 )
 from TrifleSklad.movement.products.frontend import index as products
 from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    owner_create_dialog,
+    worker_create_dialog,
+    storage_create_dialog,
+)
+from TrifleSklad.declared import StorageType
 
 
 def cancel_conflict_dialog() -> rx.Component:
@@ -252,6 +259,8 @@ def add_form() -> rx.Component:
                 value=AddSaleState.id_incoming_storage,
                 on_change=AddSaleState.on_change_id_incoming_storage,
             ),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddSaleState.open_storage_create(StorageType.WAREHOUSE, "incoming", False)),
+            storage_create_dialog(AddSaleState),
             rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
@@ -269,6 +278,8 @@ def add_form() -> rx.Component:
                 value=AddSaleState.id_incoming_owner,
                 on_change=AddSaleState.on_change_id_incoming_owner,
             ),
+            create_lookup_button(ActionEnum.OWNERS_CREATE, "Створити власника", AddSaleState.open_owner_create),
+            owner_create_dialog(AddSaleState),
             rx.text("*Відповідальний:"),
             rx.select.root(
                 rx.select.trigger(
@@ -294,6 +305,8 @@ def add_form() -> rx.Component:
                 value=AddSaleState.id_responsible,
                 on_change=AddSaleState.on_change_id_responsible,
             ),
+            create_lookup_button(ActionEnum.WORKERS_CREATE, "Створити співробітника", AddSaleState.open_worker_create),
+            worker_create_dialog(AddSaleState),
             products(width="100%"),
             rx.hstack(
                 rx.text("*Статус:"),
@@ -335,10 +348,19 @@ def add_tab_content() -> rx.Component:
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.SALES_CREATE),
                         rx.button(
+                            "Зберегти і продовжити",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddSaleState.add_one(True),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.SALES_CREATE),
+                        rx.button(
                             "Зберегти",
                             variant="ghost",
                             size="3",
-                            on_click=AddSaleState.add_one,
+                            on_click=AddSaleState.add_one(False),
                         ),
                     ),
                 ],

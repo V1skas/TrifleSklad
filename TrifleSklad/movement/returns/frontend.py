@@ -13,6 +13,11 @@ from TrifleSklad.movement.returns.backend import (
 )
 from TrifleSklad.movement.products.frontend import index as products
 from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    storage_create_dialog,
+)
+from TrifleSklad.declared import StorageType
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -243,6 +248,7 @@ def add_form() -> rx.Component:
                 value=AddReturnsState.id_incoming_storage,
                 on_change=AddReturnsState.on_change_id_incoming_storage,
             ),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити площадку/відділ", AddReturnsState.open_storage_create(StorageType.TECHNICAL_SITE, "incoming", True)),
             rx.text("*Склад призначення:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
@@ -257,6 +263,8 @@ def add_form() -> rx.Component:
                 value=AddReturnsState.id_destination_storage,
                 on_change=AddReturnsState.on_change_id_destination_storage,
             ),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddReturnsState.open_storage_create(StorageType.WAREHOUSE, "destination", False)),
+            storage_create_dialog(AddReturnsState),
             products(width="100%"),
             rx.hstack(
                 rx.text("*Статус:"),
@@ -298,10 +306,19 @@ def add_tab_content() -> rx.Component:
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.RETURNS_CREATE),
                         rx.button(
+                            "Зберегти і продовжити",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddReturnsState.add_one(True),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.RETURNS_CREATE),
+                        rx.button(
                             "Зберегти",
                             variant="ghost",
                             size="3",
-                            on_click=AddReturnsState.add_one,
+                            on_click=AddReturnsState.add_one(False),
                         ),
                     ),
                 ],

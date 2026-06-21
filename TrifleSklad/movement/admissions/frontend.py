@@ -2,6 +2,15 @@ import reflex as rx
 
 from components.elements import subpage_header
 from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    supplier_create_dialog,
+    owner_create_dialog,
+    payment_type_create_dialog,
+    nds_rate_create_dialog,
+    storage_create_dialog,
+)
+from TrifleSklad.declared import StorageType
 
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import movements_status_list
@@ -928,6 +937,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_supplier
                 ),
+                create_lookup_button(ActionEnum.SUPPLIERS_CREATE, "Створити постачальника", AddAdmissionState.open_supplier_create),
+                supplier_create_dialog(AddAdmissionState),
                 rx.text("*Склад:"),
                 rx.select.root(
                     rx.select.trigger(
@@ -972,6 +983,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_storage
                 ),
+                create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddAdmissionState.open_storage_create(StorageType.WAREHOUSE, "destination", False)),
+                storage_create_dialog(AddAdmissionState),
                 rx.text("*Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
@@ -993,6 +1006,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_owner
                 ),
+                create_lookup_button(ActionEnum.OWNERS_CREATE, "Створити власника", AddAdmissionState.open_owner_create),
+                owner_create_dialog(AddAdmissionState),
                 rx.text("*Товари з каталогу:"),
                 add_admission_products_catalog_dialog(),
                 rx.cond(AddAdmissionState.has_item_movement_products_catalog,
@@ -1024,6 +1039,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_payment_type
                 ),
+                create_lookup_button(ActionEnum.PAYMENT_TYPE_CREATE, "Створити тип оплати", AddAdmissionState.open_payment_type_create),
+                payment_type_create_dialog(AddAdmissionState),
                 rx.text("Номер накладної оплати:"),
                 rx.input(
                     name="invoice_number",
@@ -1062,6 +1079,8 @@ def add_form() -> rx.Component:
                     width="100%",
                     align="center",
                 ),
+                create_lookup_button(ActionEnum.NDS_RATES_CREATE, "Створити ставку ПДВ", AddAdmissionState.open_nds_rate_create),
+                nds_rate_create_dialog(AddAdmissionState),
                 rx.hstack(
                     rx.switch(
                         name="flag_nds",
@@ -1348,10 +1367,19 @@ def add_tab_content() -> rx.Component:
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
                         rx.button(
+                            "Зберегти і продовжити",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddAdmissionState.add_one(True),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
+                        rx.button(
                             "Зберегти",
                             variant="ghost",
                             size="3",
-                            on_click=AddAdmissionState.add_one,
+                            on_click=AddAdmissionState.add_one(False),
                         ),
                     ),
                 ],

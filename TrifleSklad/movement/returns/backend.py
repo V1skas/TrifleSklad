@@ -15,6 +15,7 @@ from TrifleSklad.declared import (
 )
 from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -121,7 +122,7 @@ class ViewReturnsState(rx.State):
             self.app_state = await self.get_state(AppState)
 
 
-class AddReturnsState(rx.State):
+class AddReturnsState(LookupCreatorsMixin, rx.State):
     current_date: str = date.today().__str__()
 
     id_incoming_storage: str = ""
@@ -221,8 +222,43 @@ class AddReturnsState(rx.State):
     def on_change_comment(self, value: str):
         self.comment = value
 
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        self._load_storages()
+        if self.st_slot == "incoming":
+            self.id_incoming_storage = str(new_id)
+            if self.products_movement_list_state is not None:
+                self.products_movement_list_state.filter_by_storage = new_id
+                self.products_movement_list_state.items = []
+        else:
+            self.id_destination_storage = str(new_id)
+
+    async def _reset_for_continue(self):
+        keep = dict(
+            current_date=self.current_date,
+            id_incoming_storage=self.id_incoming_storage,
+            id_destination_storage=self.id_destination_storage,
+            status=self.status,
+        )
+        self.comment = ""
+
+        self.current_date = keep["current_date"]
+        self.id_incoming_storage = keep["id_incoming_storage"]
+        self.id_destination_storage = keep["id_destination_storage"]
+        self.status = keep["status"]
+
+        self._load_storages()
+
+        self.products_movement_list_state.items = []
+        await self.products_movement_list_state.on_load()
+        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_require_owner(False)
+        if keep["id_incoming_storage"] != "":
+            self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
+
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.RETURNS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.id_incoming_storage == "" or self.id_destination_storage == "":
@@ -273,6 +309,9 @@ class AddReturnsState(rx.State):
             ProductDAO.update_storage(
                 list_id_products, int(self.id_destination_storage)
             )
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success("Повернення проведено!")
             return [
                 rx.toast.success("Повернення проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}"),

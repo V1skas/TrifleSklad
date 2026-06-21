@@ -32,6 +32,7 @@ from TrifleSklad.models import (
     ProductCategory,
 )
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.state import AppState
 
 
@@ -626,7 +627,7 @@ class ListAdmissionState(MovementListFilterMixin, rx.State):
     # ======================
 
 
-class AddAdmissionState(rx.State):
+class AddAdmissionState(LookupCreatorsMixin, rx.State):
     class ProductCatalogDialogPages:
         EDIT = "edit"
         VIEW = "view"
@@ -1012,8 +1013,77 @@ class AddAdmissionState(rx.State):
     def on_close_product_catalog_dialog(self):
         self.is_open_product_catalog_dialog = False
 
+    # Inline-створення довідників: підставляємо новий запис у поточне поле.
+    def _after_create_supplier(self, new_id: int):
+        self._load_suppliers()
+        self.item.id_supplier = new_id
+
+    def _after_create_owner(self, new_id: int):
+        self._load_owners()
+        self.item.movement.id_destination_owner = new_id
+
+    def _after_create_payment_type(self, new_id: int):
+        self._load_payment_types()
+        self.item.id_payment_type = new_id
+
+    def _after_create_nds_rate(self, new_id: int):
+        self._load_nds_rates()
+        self.item.id_nds_rate = new_id
+        self._recompute_total()
+
+    def _after_create_storage(self, new_id: int):
+        self._load_storages()
+        self.item.movement.id_destination_storage = new_id
+
+    async def _reset_for_continue(self):
+        # «Зберегти і продовжити»: зберігаємо шапочні поля, очищаємо позиції/
+        # коментар/номер накладної (унікальний), готуємо форму до нового запису.
+        m = self.item.movement
+        keep = dict(
+            date=m.date,
+            id_supplier=self.item.id_supplier,
+            id_destination_storage=m.id_destination_storage,
+            id_destination_owner=m.id_destination_owner,
+            id_payment_type=self.item.id_payment_type,
+            id_nds_rate=self.item.id_nds_rate,
+            flag_nds=self.item.flag_nds,
+            dollar_rate=self.item.dollar_rate,
+            status=m.status,
+        )
+        self.item = Admission(
+            id_payment_type=keep["id_payment_type"],
+            id_supplier=keep["id_supplier"],
+            flag_nds=keep["flag_nds"],
+            id_nds_rate=keep["id_nds_rate"],
+            dollar_rate=keep["dollar_rate"],
+            invoice_number=None,
+            movement=Movement(
+                id_destination_storage=keep["id_destination_storage"],
+                id_destination_owner=keep["id_destination_owner"],
+                date=keep["date"],
+                comment="",
+                status=keep["status"],
+                type=MovementsType.ADMISSION,
+                total_cost=0.0,
+                products_catalog=[],
+            ),
+        )
+        self.current_product_catalog_index = -1
+        self.is_open_product_catalog_dialog = False
+        self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EMPTY
+
+        self._load_suppliers()
+        self._load_storages()
+        self._load_owners()
+        self._load_payment_types()
+        self._load_nds_rates()
+
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
+        form_state.clear()
+        self._recompute_total()
+
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         app_state = await self.get_state(AppState)
         if not app_state.has_permission(ActionEnum.ADMISSIONS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
@@ -1031,12 +1101,15 @@ class AddAdmissionState(rx.State):
                 product.id_owner = self.item.movement.id_destination_owner
 
         flag, text, id = AdmissionDAO.add_one(self.item)
-        if flag:
-            return [
-                rx.toast.success(text),
-                rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
-            ]
-        return rx.toast.error(text)
+        if not flag:
+            return rx.toast.error(text)
+        if keep:
+            await self._reset_for_continue()
+            return rx.toast.success(text)
+        return [
+            rx.toast.success(text),
+            rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
+        ]
 
     @rx.event
     def cancel(self):

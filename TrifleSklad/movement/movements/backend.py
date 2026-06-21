@@ -15,6 +15,7 @@ from TrifleSklad.declared import (
 )
 from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -131,7 +132,7 @@ class ViewMovementsState(rx.State):
     # ======================
 
 
-class AddMovementsState(rx.State):
+class AddMovementsState(LookupCreatorsMixin, rx.State):
     current_date: str = date.today().__str__()
 
     id_incoming_storage: str = ""
@@ -276,8 +277,61 @@ class AddMovementsState(rx.State):
     def on_change_comment(self, value: str):
         self.comment = value
 
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        self._load_list_storages()
+        if self.st_slot == "incoming":
+            self.id_incoming_storage = str(new_id)
+            if self.products_movement_list_state is not None:
+                self.products_movement_list_state.filter_by_storage = new_id
+                self.products_movement_list_state.items = []
+        else:
+            self.id_destination_storage = str(new_id)
+
+    def _after_create_owner(self, new_id: int):
+        self._load_list_owners()
+        if self.owner_slot == "incoming":
+            self.id_incoming_owner = str(new_id)
+            if self.products_movement_list_state is not None:
+                self.products_movement_list_state.filter_by_owner = new_id
+                self.products_movement_list_state.items = []
+        else:
+            self.id_destination_owner = str(new_id)
+
+    async def _reset_for_continue(self):
+        keep = dict(
+            current_date=self.current_date,
+            id_incoming_storage=self.id_incoming_storage,
+            id_incoming_owner=self.id_incoming_owner,
+            id_destination_storage=self.id_destination_storage,
+            id_destination_owner=self.id_destination_owner,
+            status=self.status,
+        )
+        self.search_name_incoming_storage = ""
+        self.search_name_destination_storage = ""
+        self.comment = ""
+
+        self.current_date = keep["current_date"]
+        self.id_incoming_storage = keep["id_incoming_storage"]
+        self.id_incoming_owner = keep["id_incoming_owner"]
+        self.id_destination_storage = keep["id_destination_storage"]
+        self.id_destination_owner = keep["id_destination_owner"]
+        self.status = keep["status"]
+
+        self._load_list_storages()
+        self._load_list_owners()
+
+        self.products_movement_list_state.items = []
+        await self.products_movement_list_state.on_load()
+        self.products_movement_list_state.set_view_mode(False)
+        if keep["id_incoming_storage"] != "":
+            self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
+        if keep["id_incoming_owner"] != "":
+            self.products_movement_list_state.filter_by_owner = int(keep["id_incoming_owner"])
+
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.MOVEMENTS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.id_incoming_owner == "" or self.id_incoming_storage == "":
@@ -317,6 +371,9 @@ class AddMovementsState(rx.State):
                 int(self.id_destination_owner),
                 int(self.id_destination_storage),
             )
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success("Переміщення проведено!")
             return [
                 rx.toast.success("Переміщення проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}"),
