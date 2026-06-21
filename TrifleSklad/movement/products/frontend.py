@@ -84,7 +84,9 @@ def split_controls(item: Tuple[int, Product]):
     )
 
 def serial_cell_input(item: Tuple[int, Product]):
-    # Для ТМЦ із серійним номером (uniq) — обов'язкове поле s/n, інакше прочерк.
+    # Для ТМЦ із серійним номером (uniq) — поле s/n, інакше прочерк. Червона
+    # рамка (помилка) лише там, де s/n обов'язковий (require_serial) і не заповнений;
+    # при переміщенні поле необов'язкове — рамку не підсвічуємо.
     return rx.table.cell(
         rx.cond(
             item[1].product_catalog.uniq,
@@ -97,7 +99,11 @@ def serial_cell_input(item: Tuple[int, Product]):
                 style=rx.cond(
                     item[1].serial_number,
                     {},
-                    {"border": "1px solid red", "box-shadow": "0 0 0 1px red"},
+                    rx.cond(
+                        ProductsMovementListState.require_serial,
+                        {"border": "1px solid red", "box-shadow": "0 0 0 1px red"},
+                        {},
+                    ),
                 ),
             ),
             rx.text("—", color="gray"),
@@ -129,7 +135,7 @@ def unit_row_edit(item: Tuple[int, Product]):
         rx.table.cell(
             rx.cond(item[1].product_catalog.divisible, split_controls(item), rx.text("Цілком", color="gray")),
         ),
-        rx.cond(ProductsMovementListState.require_serial, serial_cell_input(item)),
+        rx.cond(ProductsMovementListState.serial_visible, serial_cell_input(item)),
         rx.table.cell(
             rx.button(
                 "Видалити",
@@ -158,7 +164,7 @@ def units_subtable(group):
                     rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                     rx.table.column_header_cell("Передача", color=rx.color("accent", 2)),
                     rx.cond(
-                        ProductsMovementListState.require_serial,
+                        ProductsMovementListState.serial_visible,
                         rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                     ),
                     rx.table.column_header_cell("Дія", color=rx.color("accent", 2), width="1%", white_space="nowrap"),

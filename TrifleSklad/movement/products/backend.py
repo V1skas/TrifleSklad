@@ -32,8 +32,13 @@ class ProductsMovementListState(rx.State):
     require_owner: bool = True
 
     # Обов'язковість серійного номера (вмикається лише там, де він потрібен —
-    # напр. при видачі/продажу ТМЦ із серійним номером).
+    # напр. при видачі/продажу/списанні ТМЦ із серійним номером).
     require_serial: bool = False
+
+    # Показ поля серійного номера без обов'язковості (напр. при переміщенні —
+    # s/n можна уточнити, але це не обов'язково). require_serial теж робить поле
+    # видимим (див. serial_visible).
+    show_serial: bool = False
 
     # Ввід ціни за позицію (вмикається лише там, де він потрібен — напр. продаж).
     # Ключ — id позиції каталогу, значення — введена ціна за одиницю.
@@ -51,6 +56,7 @@ class ProductsMovementListState(rx.State):
         self.expanded_catalogs = {}
         self.require_owner = True
         self.require_serial = False
+        self.show_serial = False
         self.require_price = False
         self.prices = {}
         # Скидаємо фільтри місця/власника, інакше кнопка «Додати» лишається
@@ -65,6 +71,15 @@ class ProductsMovementListState(rx.State):
 
     def set_require_serial(self, flag: bool):
         self.require_serial = flag
+
+    def set_show_serial(self, flag: bool):
+        self.show_serial = flag
+
+    @rx.var
+    def serial_visible(self) -> bool:
+        # Поле s/n показуємо як коли воно обов'язкове (видача/продаж/списання),
+        # так і коли лише дозволене (переміщення).
+        return self.require_serial or self.show_serial
 
     def set_require_owner(self, flag: bool):
         self.require_owner = flag

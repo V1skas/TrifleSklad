@@ -149,6 +149,17 @@ def workspace(*tabs, **prop):
         **prop
     )
 
+def page(*content) -> rx.Component:
+    # Спільна обгортка сторінки: шапка + контент із нижнім відступом, щоб останні
+    # елементи не «прилипали» до низу екрана.
+    return rx.vstack(
+        navbar(),
+        *content,
+
+        width="100%",
+        padding_bottom="2em",
+    )
+
 def auth_page() -> rx.Component:
     return authorithation.frontend.index()
 
@@ -177,36 +188,16 @@ def welcome_page() -> rx.Component:
 
 @require_login
 def administration_page() -> rx.Component:
-    return rx.vstack(
-        navbar(),
-        administration.frontend.index(),
-
-        width="100%",
-    )
+    return page(administration.frontend.index())
 
 @require_login
 def catalog_page() -> rx.Component:
-    return rx.vstack(
-        navbar(),
-        catalog.frontend.index(),
-
-        width="100%",
-    )
+    return page(catalog.frontend.index())
 
 @require_login
 def movement_page() -> rx.Component:
-    return rx.vstack(
-        navbar(),
-        movement.frontend.index(),
-
-        width="100%",
-    )
+    return page(movement.frontend.index())
 
 @require_login
 def reports_page() -> rx.Component:
-    return rx.vstack(
-        navbar(),
-        reports.frontend.index(),
-
-        width="100%",
-    )
+    return page(reports.frontend.index())

@@ -194,6 +194,8 @@ class AddWriteOffState(LookupCreatorsMixin, rx.State):
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
+        # Серійний номер для унікального ТМЦ при списанні обов'язковий.
+        self.products_movement_list_state.set_require_serial(True)
 
         # Передзаповнення значень за замовчуванням (TS-33)
         default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
@@ -279,6 +281,7 @@ class AddWriteOffState(LookupCreatorsMixin, rx.State):
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_require_serial(True)
         if keep["id_incoming_storage"] != "":
             self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
         if keep["id_incoming_owner"] != "":
@@ -318,6 +321,14 @@ class AddWriteOffState(LookupCreatorsMixin, rx.State):
         list_id_item_for_delete: List[int] = [p.id for p in products_list]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
+            # Серійні номери, введені/уточнені під час списання (обов'язкові для
+            # унікального ТМЦ) — фіксуємо в картці одиниці перед списанням.
+            serials = {
+                p.id: p.serial_number
+                for p in products_list
+                if p.product_catalog is not None and p.product_catalog.uniq
+            }
+            ProductDAO.update_serial_numbers(serials)
             ProductDAO.delete_list(list_id_item_for_delete)
             if keep:
                 await self._reset_for_continue()

@@ -223,6 +223,8 @@ class AddMovementsState(LookupCreatorsMixin, rx.State):
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
+        # Серійний номер при переміщенні можна уточнити, але не обов'язково.
+        self.products_movement_list_state.set_show_serial(True)
 
         # Передзаповнення значень за замовчуванням (TS-33)
         default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
@@ -336,6 +338,7 @@ class AddMovementsState(LookupCreatorsMixin, rx.State):
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_show_serial(True)
         if keep["id_incoming_storage"] != "":
             self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
         if keep["id_incoming_owner"] != "":
@@ -377,6 +380,15 @@ class AddMovementsState(LookupCreatorsMixin, rx.State):
         list_id_products: List[int] = [p.id for p in products_list]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
+            # Серійні номери, уточнені під час переміщення (необов'язкові) —
+            # зберігаємо лише заповнені, щоб не затирати наявні значення.
+            serials = {
+                p.id: p.serial_number
+                for p in products_list
+                if p.product_catalog is not None and p.product_catalog.uniq
+                and p.serial_number not in (None, "")
+            }
+            ProductDAO.update_serial_numbers(serials)
             ProductDAO.update_owner_storage(
                 list_id_products,
                 int(self.id_destination_owner),
