@@ -30,6 +30,7 @@ from TrifleSklad.models import (
     ProductCatalog,
 )
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -211,7 +212,7 @@ class ViewIssueState(rx.State):
         self.is_cancel_conflict_dialog_open = value
 
 
-class AddIssueState(rx.State):
+class AddIssueState(LookupCreatorsMixin, rx.State):
     item: Issue = Issue(
         id_recipient=-1,
         movement=Movement(
@@ -329,6 +330,20 @@ class AddIssueState(rx.State):
         self.products_selector_state.set_view_mode(False)
         # При видачі серійний номер ТМЦ обов'язковий для одиниць із серійним номером.
         self.products_selector_state.set_require_serial(True)
+
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.item.movement.id_incoming_storage = default_storage
+            self.products_selector_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.item.movement.id_incoming_owner = default_owner
+            self.item.movement.id_destination_owner = default_owner
+            self.products_selector_state.filter_by_owner = default_owner
+        default_worker = WorkerDAO.get_default_id()
+        if default_worker is not None:
+            self.item.id_recipient = default_worker
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
@@ -482,10 +497,79 @@ class AddIssueState(rx.State):
 
     # ======================
 
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        if self.st_slot == "incoming":
+            self._load_incoming_storages()
+            self.item.movement.id_incoming_storage = new_id
+            if self.products_selector_state is not None:
+                self.products_selector_state.filter_by_storage = new_id
+                self.products_selector_state.items = []
+        else:
+            self._load_destination_storages()
+            self.item.movement.id_destination_storage = new_id
+
+    def _after_create_owner(self, new_id: int):
+        self._load_owners()
+        self.item.movement.id_incoming_owner = new_id
+        self.item.movement.id_destination_owner = new_id
+        if self.products_selector_state is not None:
+            self.products_selector_state.filter_by_owner = new_id
+            self.products_selector_state.items = []
+
+    def _after_create_worker(self, new_id: int):
+        self._load_workers()
+        self.item.id_recipient = new_id
+
+    async def _reset_for_continue(self):
+        m = self.item.movement
+        keep = dict(
+            date=m.date,
+            id_incoming_storage=m.id_incoming_storage,
+            id_incoming_owner=m.id_incoming_owner,
+            id_destination_storage=m.id_destination_storage,
+            id_destination_owner=m.id_destination_owner,
+            id_recipient=self.item.id_recipient,
+            status=m.status,
+        )
+        self.item = Issue(
+            id_recipient=keep["id_recipient"],
+            movement=Movement(
+                id_incoming_storage=keep["id_incoming_storage"],
+                id_incoming_owner=keep["id_incoming_owner"],
+                id_destination_storage=keep["id_destination_storage"],
+                id_destination_owner=keep["id_destination_owner"],
+                date=keep["date"],
+                comment="",
+                status=keep["status"],
+                type=MovementsType.ISSUE,
+                total_cost=0.0,
+                products_catalog=[],
+            ),
+        )
+        self.selected_request_id = ""
+        self.request_positions = []
+
+        self._load_incoming_storages()
+        self._load_destination_storages()
+        self._load_owners()
+        self._load_workers()
+        self._load_requests()
+
+        await self.products_selector_state.on_load()
+        self.products_selector_state.set_view_mode(False)
+        self.products_selector_state.set_require_serial(True)
+        # Відновлюємо фільтри віджета під збережені склад/власника відправлення.
+        if keep["id_incoming_storage"] != -1:
+            self.products_selector_state.filter_by_storage = keep["id_incoming_storage"]
+        if keep["id_incoming_owner"] != -1:
+            self.products_selector_state.filter_by_owner = keep["id_incoming_owner"]
+
     # Action handlers
     # ======================
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.ISSUES_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
@@ -557,6 +641,9 @@ class AddIssueState(rx.State):
             # Якщо видача формується на основі заявки — позначаємо її виконаною.
             if self.selected_request_id != "":
                 RequestDAO.mark_completed(int(self.selected_request_id), id)
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success(text)
             return [
                 rx.toast.success(text),
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),

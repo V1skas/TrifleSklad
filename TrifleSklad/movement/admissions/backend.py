@@ -32,7 +32,17 @@ from TrifleSklad.models import (
     ProductCategory,
 )
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.state import AppState
+
+
+def _format_money(value: float) -> str:
+    # Грошові суми завжди показуємо з двома знаками після коми (напр. «5.00»),
+    # навіть якщо дробова частина нульова чи відсутня.
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return "0.00"
 
 
 class MovementProductCatalogAddEditFormState(rx.State):
@@ -49,8 +59,20 @@ class MovementProductCatalogAddEditFormState(rx.State):
     id_product_catalog_in_cache: str = ""
     is_product_uniq: bool = False
 
+    # Подільність та місткість обраної позиції каталогу як прості (примітивні)
+    # поля стану. Беремо обсяг однієї одиниці саме звідси, а не з relationship
+    # self.item.product — relationship може не зберегтися між подіями (вибір
+    # позиції та ввід кількості — різні події), і тоді обсяг хибно падав до 1.
+    selected_divisible: bool = False
+    selected_capacity: int = 0
+
     # Живий пошук позиції каталогу в селекті (підрядок у назві).
     search_catalog: str = ""
+
+    # Каскад «Категорія → Позиція каталогу»: спершу обирається категорія, лише
+    # після цього доступний перелік позицій каталогу (фільтрується за категорією).
+    # Порожній рядок — категорію ще не обрано (Radix показує placeholder).
+    filter_category: str = ""
 
     # Сире (як ввів користувач) значення ціни — щоб поле не переформатувалося
     # у float-представлення на кожне натискання (інакше заважає вводити).
@@ -63,17 +85,29 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # Dynamic variables
     # ======================
     @rx.var
+    def category_options(self) -> List[Tuple[str, str]]:
+        return [(item.title, str(item.id)) for item in ProductCategoryDAO.get_all()]
+
+    @rx.var
+    def category_chosen(self) -> bool:
+        return self.filter_category != ""
+
+    @rx.var
     def products_catalog_list(self) -> List[Tuple[str, str]]:
         # Кеш — повний перелік (для пошуку за id у on_change); у вивід потрапляють
-        # лише позиції, що містять пошуковий підрядок. Value = id позиції каталогу.
+        # лише позиції обраної категорії, що містять пошуковий підрядок. Поки
+        # категорію не обрано — перелік порожній (селект позиції вимкнено).
         self.cache_products_catalog_list = ProductCatalogDAO.get_all_exclude_ids(
             self.exclude_products_catalog_list
         )
+        if self.filter_category == "":
+            return []
         term = self.search_catalog.strip().lower()
         return [
             (catalog.title, str(catalog.id))
             for catalog in self.cache_products_catalog_list
-            if term == "" or term in catalog.title.lower()
+            if str(catalog.id_category) == self.filter_category
+            and (term == "" or term in catalog.title.lower())
         ]
 
     @rx.var
@@ -138,19 +172,37 @@ class MovementProductCatalogAddEditFormState(rx.State):
     def _per_unit_count(self) -> int:
         # Подільна одиниця ТМЦ створюється з повною місткістю (capacity) — це її
         # максимальний обсяг/залишок. Неподільна одиниця завжди має count = 1.
-        product = self.item.product
-        if (
-            product is not None
-            and product.divisible
-            and product.capacity
-            and product.capacity > 0
-        ):
-            return product.capacity
+        # Спираємось на примітивні поля стану (надійно серіалізуються), а не на
+        # relationship self.item.product, який міг загубитися між подіями.
+        if self.selected_divisible and self.selected_capacity > 0:
+            return self.selected_capacity
         return 1
 
     @rx.event
     def on_change_search_catalog(self, value: str):
         self.search_catalog = value
+
+    def _reset_catalog_selection(self):
+        # Скидаємо обрану позицію каталогу та похідний стан (одиниці, серійні
+        # номери, ознаки подільності/унікальності) — використовується при зміні
+        # категорії, коли поточна позиція більше не належить новому фільтру.
+        self.item.product = None
+        self.item.id_product_catalog = -1
+        self.item.products = []
+        self.item.count = 0
+        self.id_product_catalog_in_cache = ""
+        self.search_catalog = ""
+        self.is_product_uniq = False
+        self.selected_divisible = False
+        self.selected_capacity = 0
+
+    @rx.event
+    def on_change_filter_category(self, value: str):
+        if value == self.filter_category:
+            return
+        self.filter_category = value
+        # Зміна категорії скидає вибір позиції каталогу (інша категорія — інші ТМЦ).
+        self._reset_catalog_selection()
 
     @rx.event
     def on_change_id_product_catalog(self, value: str):
@@ -164,6 +216,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return
         self.item.product = selected
         self.item.id_product_catalog = self.item.product.id
+        self.selected_divisible = selected.divisible
+        self.selected_capacity = selected.capacity or 0
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
                 self.item.products[i].serial_number = ""
@@ -177,6 +231,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     @rx.event
     def on_change_count(self, value: str):
+        # Поки позицію каталогу не обрано (item.product is None) — кількість не
+        # обробляємо: одиниці прив'язуються до позиції, тож спершу треба обрати її.
+        if self.item.product is None:
+            return
         try:
             self.item.count = int(value)
         except ValueError:
@@ -237,10 +295,21 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.item = item
 
         self.is_product_uniq = item.product.uniq
+        self.selected_divisible = item.product.divisible if item.product else False
+        self.selected_capacity = (
+            (item.product.capacity or 0) if item.product else 0
+        )
         self.id_product_catalog_entered = True
         # Value селекта = id позиції каталогу (щоб селект показав поточну позицію).
         self.id_product_catalog_in_cache = (
             str(item.product.id) if item.product is not None else ""
+        )
+        # Преставляємо категорію обраної позиції, щоб селект позицій був активним
+        # і показував поточну позицію при редагуванні.
+        self.filter_category = (
+            str(item.product.id_category)
+            if item.product is not None and item.product.id_category is not None
+            else ""
         )
         self.search_catalog = ""
         self.price_input = str(item.price)
@@ -252,9 +321,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
 
         self.is_product_uniq = False
+        self.selected_divisible = False
+        self.selected_capacity = 0
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
         self.search_catalog = ""
+        self.filter_category = ""
         self.price_input = "0"
         self.error_count = False
         self.error_price = False
@@ -368,15 +440,19 @@ class MovementProductCatalogAddEditFormState(rx.State):
         if not flag:
             return rx.toast.error(text)
 
-        # Новий товар одразу обираємо в поточному рядку поставки.
+        # Новий товар одразу обираємо в поточному рядку поставки. Переставляємо
+        # фільтр категорії на категорію нового товару, щоб він був у переліку.
         self._load_products_catalog_list()
         self.search_catalog = ""
+        self.filter_category = str(int(self.new_id_category))
         for catalog in self.cache_products_catalog_list:
             if catalog.id == new_id:
                 self.id_product_catalog_in_cache = str(catalog.id)
                 self.item.product = catalog
                 self.item.id_product_catalog = catalog.id
                 self.is_product_uniq = catalog.uniq
+                self.selected_divisible = catalog.divisible
+                self.selected_capacity = catalog.capacity or 0
                 per_unit = self._per_unit_count()
                 for unit in self.item.products:
                     unit.id_product_catalog = catalog.id
@@ -452,6 +528,10 @@ class MovementProductCatalogDetailedViewState(rx.State):
     def item_products_list(self) -> List[Tuple[int, Product]]:
         return [(index, product) for index, product in enumerate(self.item.products)]
 
+    @rx.var
+    def price_display(self) -> str:
+        return _format_money(self.item.price)
+
     # Action handlers
     # ======================
     @rx.event
@@ -503,8 +583,12 @@ class ListAdmissionState(MovementListFilterMixin, rx.State):
         return len(self.items) > 0
 
     @rx.var
-    def get_items(self) -> List[Tuple[int, Admission]]:
-        return [(index, item) for index, item in enumerate(self.items)]
+    def get_items(self) -> List[Tuple[int, Admission, str]]:
+        # Третій елемент — відформатована сума (total_cost) з двома знаками.
+        return [
+            (index, item, _format_money(item.movement.total_cost))
+            for index, item in enumerate(self.items)
+        ]
 
     @rx.var
     def get_movement_statuses(self) -> List[str]:
@@ -543,7 +627,7 @@ class ListAdmissionState(MovementListFilterMixin, rx.State):
     # ======================
 
 
-class AddAdmissionState(rx.State):
+class AddAdmissionState(LookupCreatorsMixin, rx.State):
     class ProductCatalogDialogPages:
         EDIT = "edit"
         VIEW = "view"
@@ -592,16 +676,6 @@ class AddAdmissionState(rx.State):
     is_open_product_catalog_dialog: bool
     product_catalog_dialog_page: str
     is_product_dialog_view_mode: bool
-    # ======================
-
-    # Nested form states
-    # ======================
-    addedit_product_catalog_form_state: Optional[
-        MovementProductCatalogAddEditFormState
-    ] = None
-    view_product_catalog_form_state: Optional[
-        MovementProductCatalogDetailedViewState
-    ] = None
     # ======================
 
     app_state: Optional[AppState] = None
@@ -688,12 +762,16 @@ class AddAdmissionState(rx.State):
         self._load_payment_types()
         self._load_nds_rates()
 
-        self.addedit_product_catalog_form_state = await self.get_state(
-            MovementProductCatalogAddEditFormState
-        )
-        self.view_product_catalog_form_state = await self.get_state(
-            MovementProductCatalogDetailedViewState
-        )
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.item.movement.id_destination_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.item.movement.id_destination_owner = default_owner
+        default_payment = PaymentTypeDAO.get_default_id()
+        if default_payment is not None:
+            self.item.id_payment_type = default_payment
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
@@ -747,29 +825,29 @@ class AddAdmissionState(rx.State):
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = self._get_nds_rate_value() / 100.0
         if rate <= 0:
-            return f"{round(line_total, 2)}"
+            return _format_money(line_total)
         if self.item.flag_nds:
-            return f"{round(line_total / (1 + rate), 2)}"
-        return f"{round(line_total, 2)}"
+            return _format_money(line_total / (1 + rate))
+        return _format_money(line_total)
 
     @rx.var
     def nds_amount_display(self) -> str:
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = self._get_nds_rate_value() / 100.0
         if rate <= 0:
-            return "0.0"
+            return _format_money(0)
         if self.item.flag_nds:
             subtotal = line_total / (1 + rate)
-            return f"{round(line_total - subtotal, 2)}"
-        return f"{round(line_total * rate, 2)}"
+            return _format_money(line_total - subtotal)
+        return _format_money(line_total * rate)
 
     @rx.var
     def total_display(self) -> str:
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = self._get_nds_rate_value() / 100.0
         if rate <= 0 or self.item.flag_nds:
-            return f"{round(line_total, 2)}"
-        return f"{round(line_total * (1 + rate), 2)}"
+            return _format_money(line_total)
+        return _format_money(line_total * (1 + rate))
 
     # ======================
 
@@ -872,9 +950,11 @@ class AddAdmissionState(rx.State):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str]]:
+        # Третій/четвертий елементи — відформатовані ціна за од. та сума рядка.
         return [
-            (index, pc) for index, pc in enumerate(self.item.movement.products_catalog)
+            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price))
+            for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
     @rx.var
@@ -886,42 +966,34 @@ class AddAdmissionState(rx.State):
     # Action handlers
     # ======================
     @rx.event
-    def view_product_catalog_dialog(self, index: int):
-        if self.view_product_catalog_dialog is None:
-            return
+    async def view_product_catalog_dialog(self, index: int):
+        view_state = await self.get_state(MovementProductCatalogDetailedViewState)
         self.is_product_dialog_view_mode = True
         self.current_product_catalog_index = index
-        self.view_product_catalog_form_state.item = self.item.movement.products_catalog[
-            index
-        ]
+        view_state.set_item(self.item.movement.products_catalog[index])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.VIEW
         self.is_open_product_catalog_dialog = True
 
     @rx.event
-    def add_product_catalog_dialog_open(self):
-        if self.addedit_product_catalog_form_state is None:
-            return rx.toast.error(
-                "Стан форми додавання/редагування товарної позиції не ініціалізовано"
-            )
+    async def add_product_catalog_dialog_open(self):
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
         self.current_product_catalog_index = -1
-        self.addedit_product_catalog_form_state.clear()
-        self.addedit_product_catalog_form_state.set_exclude_products_catalog_list(
+        form_state.clear()
+        form_state.set_exclude_products_catalog_list(
             [pc.product.id for pc in self.item.movement.products_catalog]
         )
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
-        return None
 
     @rx.event
-    def edit_product_catalog_dialog(self):
-        if self.addedit_product_catalog_form_state is None:
-            return
+    async def edit_product_catalog_dialog(self):
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
-        self.addedit_product_catalog_form_state.set_item(
+        form_state.set_item(
             self.item.movement.products_catalog[self.current_product_catalog_index]
         )
-        self.addedit_product_catalog_form_state.exclude_products_catalog_list = [
+        form_state.exclude_products_catalog_list = [
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
             if i != self.current_product_catalog_index
@@ -930,14 +1002,13 @@ class AddAdmissionState(rx.State):
         self.is_open_product_catalog_dialog = True
 
     @rx.event
-    def on_save_product_catalog_dialog(self):
-        if self.addedit_product_catalog_form_state is None:
+    async def on_save_product_catalog_dialog(self):
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
+
+        if form_state.has_errors:
             return
 
-        if self.addedit_product_catalog_form_state.has_errors:
-            return
-
-        item = self.addedit_product_catalog_form_state.item
+        item = form_state.item
 
         if self.current_product_catalog_index > -1:
             self.item.movement.products_catalog[self.current_product_catalog_index] = (
@@ -953,15 +1024,85 @@ class AddAdmissionState(rx.State):
     def on_close_product_catalog_dialog(self):
         self.is_open_product_catalog_dialog = False
 
+    # Inline-створення довідників: підставляємо новий запис у поточне поле.
+    def _after_create_supplier(self, new_id: int):
+        self._load_suppliers()
+        self.item.id_supplier = new_id
+
+    def _after_create_owner(self, new_id: int):
+        self._load_owners()
+        self.item.movement.id_destination_owner = new_id
+
+    def _after_create_payment_type(self, new_id: int):
+        self._load_payment_types()
+        self.item.id_payment_type = new_id
+
+    def _after_create_nds_rate(self, new_id: int):
+        self._load_nds_rates()
+        self.item.id_nds_rate = new_id
+        self._recompute_total()
+
+    def _after_create_storage(self, new_id: int):
+        self._load_storages()
+        self.item.movement.id_destination_storage = new_id
+
+    async def _reset_for_continue(self):
+        # «Зберегти і продовжити»: зберігаємо шапочні поля, очищаємо позиції/
+        # коментар/номер накладної (унікальний), готуємо форму до нового запису.
+        m = self.item.movement
+        keep = dict(
+            date=m.date,
+            id_supplier=self.item.id_supplier,
+            id_destination_storage=m.id_destination_storage,
+            id_destination_owner=m.id_destination_owner,
+            id_payment_type=self.item.id_payment_type,
+            id_nds_rate=self.item.id_nds_rate,
+            flag_nds=self.item.flag_nds,
+            dollar_rate=self.item.dollar_rate,
+            status=m.status,
+        )
+        self.item = Admission(
+            id_payment_type=keep["id_payment_type"],
+            id_supplier=keep["id_supplier"],
+            flag_nds=keep["flag_nds"],
+            id_nds_rate=keep["id_nds_rate"],
+            dollar_rate=keep["dollar_rate"],
+            invoice_number=None,
+            movement=Movement(
+                id_destination_storage=keep["id_destination_storage"],
+                id_destination_owner=keep["id_destination_owner"],
+                date=keep["date"],
+                comment="",
+                status=keep["status"],
+                type=MovementsType.ADMISSION,
+                total_cost=0.0,
+                products_catalog=[],
+            ),
+        )
+        self.current_product_catalog_index = -1
+        self.is_open_product_catalog_dialog = False
+        self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EMPTY
+
+        self._load_suppliers()
+        self._load_storages()
+        self._load_owners()
+        self._load_payment_types()
+        self._load_nds_rates()
+
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
+        form_state.clear()
+        self._recompute_total()
+
     @rx.event
-    async def add_one(self):
-        if not self.app_state.has_permission(ActionEnum.ADMISSIONS_CREATE):
+    async def add_one(self, keep: bool = False):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.ADMISSIONS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
             return rx.toast.error("Не обрано склад або власника призначення!")
         if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number):
             return rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
-        self.item.movement.id_user = (await self.get_state(AppState)).user.login
+        self.item.movement.id_user = app_state.user.login
 
         # Товар поступає на склад призначення поставки — проставляємо склад/власника
         # кожній одиниці ТМЦ, інакше залишки не знайдуться при списанні/русі.
@@ -971,12 +1112,15 @@ class AddAdmissionState(rx.State):
                 product.id_owner = self.item.movement.id_destination_owner
 
         flag, text, id = AdmissionDAO.add_one(self.item)
-        if flag:
-            return [
-                rx.toast.success(text),
-                rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
-            ]
-        return rx.toast.error(text)
+        if not flag:
+            return rx.toast.error(text)
+        if keep:
+            await self._reset_for_continue()
+            return rx.toast.success(text)
+        return [
+            rx.toast.success(text),
+            rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
+        ]
 
     @rx.event
     def cancel(self):
@@ -1017,16 +1161,6 @@ class EditAdmissionState(rx.State):
     is_open_product_catalog_dialog: bool = False
     product_catalog_dialog_page: str = ""
     is_product_dialog_view_mode: bool = False
-    # ======================
-
-    # Nested form states
-    # ======================
-    addedit_product_catalog_form_state: Optional[
-        MovementProductCatalogAddEditFormState
-    ] = None
-    view_product_catalog_form_state: Optional[
-        MovementProductCatalogDetailedViewState
-    ] = None
     # ======================
 
     app_state: Optional[AppState] = None
@@ -1103,13 +1237,6 @@ class EditAdmissionState(rx.State):
                 rx.toast.error("Запис не знайдено!"),
             ]
 
-        self.addedit_product_catalog_form_state = await self.get_state(
-            MovementProductCatalogAddEditFormState
-        )
-        self.view_product_catalog_form_state = await self.get_state(
-            MovementProductCatalogDetailedViewState
-        )
-
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
     # ======================
@@ -1163,37 +1290,37 @@ class EditAdmissionState(rx.State):
     @rx.var
     def subtotal_display(self) -> str:
         if self.item is None:
-            return "0.0"
+            return _format_money(0)
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = self._get_nds_rate_value() / 100.0
         if rate <= 0:
-            return f"{round(line_total, 2)}"
+            return _format_money(line_total)
         if self.item.flag_nds:
-            return f"{round(line_total / (1 + rate), 2)}"
-        return f"{round(line_total, 2)}"
+            return _format_money(line_total / (1 + rate))
+        return _format_money(line_total)
 
     @rx.var
     def nds_amount_display(self) -> str:
         if self.item is None:
-            return "0.0"
+            return _format_money(0)
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = self._get_nds_rate_value() / 100.0
         if rate <= 0:
-            return "0.0"
+            return _format_money(0)
         if self.item.flag_nds:
             subtotal = line_total / (1 + rate)
-            return f"{round(line_total - subtotal, 2)}"
-        return f"{round(line_total * rate, 2)}"
+            return _format_money(line_total - subtotal)
+        return _format_money(line_total * rate)
 
     @rx.var
     def total_display(self) -> str:
         if self.item is None:
-            return "0.0"
+            return _format_money(0)
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = self._get_nds_rate_value() / 100.0
         if rate <= 0 or self.item.flag_nds:
-            return f"{round(line_total, 2)}"
-        return f"{round(line_total * (1 + rate), 2)}"
+            return _format_money(line_total)
+        return _format_money(line_total * (1 + rate))
 
     @rx.var
     def item_status(self) -> str:
@@ -1206,11 +1333,12 @@ class EditAdmissionState(rx.State):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str]]:
         if self.item is None:
             return []
         return [
-            (index, pc) for index, pc in enumerate(self.item.movement.products_catalog)
+            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price))
+            for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
     @rx.var
@@ -1306,40 +1434,40 @@ class EditAdmissionState(rx.State):
     # Action handlers
     # ======================
     @rx.event
-    def view_product_catalog_dialog(self, index: int):
-        if self.view_product_catalog_form_state is None or self.item is None:
+    async def view_product_catalog_dialog(self, index: int):
+        if self.item is None:
             return
+        view_state = await self.get_state(MovementProductCatalogDetailedViewState)
         self.is_product_dialog_view_mode = True
         self.current_product_catalog_index = index
-        self.view_product_catalog_form_state.item = self.item.movement.products_catalog[index]
+        view_state.set_item(self.item.movement.products_catalog[index])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.VIEW
         self.is_open_product_catalog_dialog = True
 
     @rx.event
-    def add_product_catalog_dialog_open(self):
-        if self.addedit_product_catalog_form_state is None or self.item is None:
-            return rx.toast.error(
-                "Стан форми додавання/редагування товарної позиції не ініціалізовано"
-            )
+    async def add_product_catalog_dialog_open(self):
+        if self.item is None:
+            return
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
         self.current_product_catalog_index = -1
-        self.addedit_product_catalog_form_state.clear()
-        self.addedit_product_catalog_form_state.set_exclude_products_catalog_list(
+        form_state.clear()
+        form_state.set_exclude_products_catalog_list(
             [pc.product.id for pc in self.item.movement.products_catalog]
         )
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
-        return None
 
     @rx.event
-    def edit_product_catalog_dialog(self):
-        if self.addedit_product_catalog_form_state is None or self.item is None:
+    async def edit_product_catalog_dialog(self):
+        if self.item is None:
             return
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
-        self.addedit_product_catalog_form_state.set_item(
+        form_state.set_item(
             self.item.movement.products_catalog[self.current_product_catalog_index]
         )
-        self.addedit_product_catalog_form_state.exclude_products_catalog_list = [
+        form_state.exclude_products_catalog_list = [
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
             if i != self.current_product_catalog_index
@@ -1348,13 +1476,14 @@ class EditAdmissionState(rx.State):
         self.is_open_product_catalog_dialog = True
 
     @rx.event
-    def on_save_product_catalog_dialog(self):
-        if self.addedit_product_catalog_form_state is None or self.item is None:
+    async def on_save_product_catalog_dialog(self):
+        if self.item is None:
             return
-        if self.addedit_product_catalog_form_state.has_errors:
+        form_state = await self.get_state(MovementProductCatalogAddEditFormState)
+        if form_state.has_errors:
             return
 
-        item = self.addedit_product_catalog_form_state.item
+        item = form_state.item
 
         if self.current_product_catalog_index > -1:
             self.item.movement.products_catalog[self.current_product_catalog_index] = item
@@ -1370,7 +1499,8 @@ class EditAdmissionState(rx.State):
 
     @rx.event
     async def edit_one(self):
-        if not self.app_state.has_permission(ActionEnum.ADMISSIONS_EDIT):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.ADMISSIONS_EDIT):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.item is None:
             return rx.toast.error("Запис не завантажено!")
@@ -1378,7 +1508,7 @@ class EditAdmissionState(rx.State):
             return rx.toast.error("Не обрано склад або власника призначення!")
         if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number, exclude_id=self.item.id):
             return rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
-        self.item.movement.id_user = (await self.get_state(AppState)).user.login
+        self.item.movement.id_user = app_state.user.login
 
         # Синхронізуємо склад/власника одиниць ТМЦ зі складом призначення поставки.
         for pc in self.item.movement.products_catalog:
@@ -1423,22 +1553,12 @@ class ViewAdmissionState(rx.State):
     dialog_open: bool = False
     current_product_catalog_index: int = -1
 
-    # Nested form states
-    # ======================
-    view_product_catalog_form_state: Optional[
-        MovementProductCatalogDetailedViewState
-    ] = None
-    # ======================
-
     app_state: Optional[AppState] = None
 
     # Backend only
     # ======================
     @rx.event
     async def on_load(self, id: int):
-        self.view_product_catalog_form_state = await self.get_state(
-            MovementProductCatalogDetailedViewState
-        )
         self.item = AdmissionDAO.get_by_id_with_all_relationship(id)
         if self.item is None:
             return [
@@ -1485,9 +1605,10 @@ class ViewAdmissionState(rx.State):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str]]:
         return [
-            (index, pc) for index, pc in enumerate(self.item.movement.products_catalog)
+            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price))
+            for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
     @rx.var
@@ -1513,42 +1634,39 @@ class ViewAdmissionState(rx.State):
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
         if rate <= 0:
-            return f"{round(line_total, 2)}"
+            return _format_money(line_total)
         if self.item.flag_nds:
-            return f"{round(line_total / (1 + rate), 2)}"
-        return f"{round(line_total, 2)}"
+            return _format_money(line_total / (1 + rate))
+        return _format_money(line_total)
 
     @rx.var
     def nds_amount_display(self) -> str:
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
         if rate <= 0:
-            return "0.0"
+            return _format_money(0)
         if self.item.flag_nds:
             subtotal = line_total / (1 + rate)
-            return f"{round(line_total - subtotal, 2)}"
-        return f"{round(line_total * rate, 2)}"
+            return _format_money(line_total - subtotal)
+        return _format_money(line_total * rate)
 
     @rx.var
     def total_display(self) -> str:
         line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
         rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
         if rate <= 0 or self.item.flag_nds:
-            return f"{round(line_total, 2)}"
-        return f"{round(line_total * (1 + rate), 2)}"
+            return _format_money(line_total)
+        return _format_money(line_total * (1 + rate))
 
     # ======================
 
     # Action handlers
     # ======================
     @rx.event
-    def on_change_dialog_open(self, index: int):
-        if self.view_product_catalog_form_state is None:
-            return
+    async def on_change_dialog_open(self, index: int):
+        view_state = await self.get_state(MovementProductCatalogDetailedViewState)
         self.current_product_catalog_index = index
-        self.view_product_catalog_form_state.set_item(
-            self.item.movement.products_catalog[index]
-        )
+        view_state.set_item(self.item.movement.products_catalog[index])
         self.dialog_open = True
 
     @rx.event

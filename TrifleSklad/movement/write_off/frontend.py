@@ -13,6 +13,12 @@ from TrifleSklad.movement.write_off.backend import (
 )
 from TrifleSklad.movement.products.frontend import index as products
 from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    owner_create_dialog,
+    storage_create_dialog,
+)
+from TrifleSklad.declared import StorageType
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -70,77 +76,6 @@ def cancel_conflict_dialog() -> rx.Component:
     )
 
 
-def position_detail_dialog() -> rx.Component:
-    # Деталізація обраної позиції: перелік списаних одиниць ТМЦ.
-    return rx.dialog.root(
-        rx.dialog.content(
-            rx.dialog.title(f"Позиція: {ViewWriteOffState.selected_position_title}"),
-            rx.table.root(
-                rx.table.header(
-                    rx.table.row(
-                        rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                        rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
-                        rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                    ),
-                    background_color=rx.color("accent", 9),
-                ),
-                rx.table.body(
-                    rx.foreach(
-                        ViewWriteOffState.selected_position_units,
-                        lambda unit: rx.table.row(
-                            rx.table.cell(unit[0], width="1%", white_space="nowrap"),
-                            rx.table.cell(unit[1]),
-                            rx.table.cell(unit[2], width="1%", white_space="nowrap"),
-                        ),
-                    ),
-                ),
-                variant="surface",
-                width="100%",
-                margin_top="1em",
-            ),
-            rx.flex(
-                rx.dialog.close(
-                    rx.button(
-                        "Закрити",
-                        on_click=ViewWriteOffState.set_position_dialog_open(False),
-                    ),
-                ),
-                justify="end",
-                margin_top="1em",
-            ),
-            max_width="40em",
-        ),
-        open=ViewWriteOffState.is_position_dialog_open,
-        on_open_change=ViewWriteOffState.set_position_dialog_open,
-    )
-
-
-def positions_table() -> rx.Component:
-    return rx.table.root(
-        rx.table.header(
-            rx.table.row(
-                rx.table.column_header_cell("Позиція", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-            ),
-            background_color=rx.color("accent", 9),
-        ),
-        rx.table.body(
-            rx.foreach(
-                ViewWriteOffState.positions,
-                lambda row: rx.table.row(
-                    rx.table.cell(row[1]),
-                    rx.table.cell(row[2]),
-                    on_click=ViewWriteOffState.open_position_dialog(row[0]),
-                    cursor="pointer",
-                    _hover={"background_color": rx.color("accent", 3)},
-                ),
-            ),
-        ),
-        variant="surface",
-        width="100%",
-    )
-
-
 def item_preview() -> rx.Component:
     return rx.vstack(
         cancel_conflict_dialog(),
@@ -156,9 +91,7 @@ def item_preview() -> rx.Component:
             rx.text("Власник:"),
             rx.text(ViewWriteOffState.item.incoming_owner.title)
         ),
-        rx.text("Списані позиції (натисніть для деталізації):", width="100%"),
-        positions_table(),
-        position_detail_dialog(),
+        products(width="100%"),
         rx.hstack(
             rx.text("Статус:"),
             rx.text(ViewWriteOffState.item_status)
@@ -352,6 +285,8 @@ def add_form() -> rx.Component:
                 value=AddWriteOffState.id_incoming_storage,
                 on_change=AddWriteOffState.on_change_id_incoming_storage,
             ),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddWriteOffState.open_storage_create(StorageType.WAREHOUSE, "incoming", False)),
+            storage_create_dialog(AddWriteOffState),
             rx.text("*Власник:"),
             rx.select.root(
                 rx.select.trigger(
@@ -369,6 +304,8 @@ def add_form() -> rx.Component:
                 value=AddWriteOffState.id_incoming_owner,
                 on_change=AddWriteOffState.on_change_id_incoming_owner,
             ),
+            create_lookup_button(ActionEnum.OWNERS_CREATE, "Створити власника", AddWriteOffState.open_owner_create),
+            owner_create_dialog(AddWriteOffState),
             products(width="100%"),
             rx.hstack(
                 rx.text("*Статус:"),
@@ -480,10 +417,19 @@ def add_tab_content() -> rx.Component:
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_CREATE),
                         rx.button(
+                            "Зберегти і продовжити",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddWriteOffState.add_one(True),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_CREATE),
+                        rx.button(
                             "Зберегти",
                             variant="ghost",
                             size="3",
-                            on_click=AddWriteOffState.add_one,
+                            on_click=AddWriteOffState.add_one(False),
                         ),
                     ),
                 ],

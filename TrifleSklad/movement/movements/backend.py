@@ -15,6 +15,7 @@ from TrifleSklad.declared import (
 )
 from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -131,7 +132,7 @@ class ViewMovementsState(rx.State):
     # ======================
 
 
-class AddMovementsState(rx.State):
+class AddMovementsState(LookupCreatorsMixin, rx.State):
     current_date: str = date.today().__str__()
 
     id_incoming_storage: str = ""
@@ -222,6 +223,19 @@ class AddMovementsState(rx.State):
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
+        # Серійний номер при переміщенні можна уточнити, але не обов'язково.
+        self.products_movement_list_state.set_show_serial(True)
+
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.id_incoming_storage = str(default_storage)
+            self.products_movement_list_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.id_incoming_owner = str(default_owner)
+            self.id_destination_owner = str(default_owner)
+            self.products_movement_list_state.filter_by_owner = default_owner
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
@@ -276,8 +290,62 @@ class AddMovementsState(rx.State):
     def on_change_comment(self, value: str):
         self.comment = value
 
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        self._load_list_storages()
+        if self.st_slot == "incoming":
+            self.id_incoming_storage = str(new_id)
+            if self.products_movement_list_state is not None:
+                self.products_movement_list_state.filter_by_storage = new_id
+                self.products_movement_list_state.items = []
+        else:
+            self.id_destination_storage = str(new_id)
+
+    def _after_create_owner(self, new_id: int):
+        self._load_list_owners()
+        if self.owner_slot == "incoming":
+            self.id_incoming_owner = str(new_id)
+            if self.products_movement_list_state is not None:
+                self.products_movement_list_state.filter_by_owner = new_id
+                self.products_movement_list_state.items = []
+        else:
+            self.id_destination_owner = str(new_id)
+
+    async def _reset_for_continue(self):
+        keep = dict(
+            current_date=self.current_date,
+            id_incoming_storage=self.id_incoming_storage,
+            id_incoming_owner=self.id_incoming_owner,
+            id_destination_storage=self.id_destination_storage,
+            id_destination_owner=self.id_destination_owner,
+            status=self.status,
+        )
+        self.search_name_incoming_storage = ""
+        self.search_name_destination_storage = ""
+        self.comment = ""
+
+        self.current_date = keep["current_date"]
+        self.id_incoming_storage = keep["id_incoming_storage"]
+        self.id_incoming_owner = keep["id_incoming_owner"]
+        self.id_destination_storage = keep["id_destination_storage"]
+        self.id_destination_owner = keep["id_destination_owner"]
+        self.status = keep["status"]
+
+        self._load_list_storages()
+        self._load_list_owners()
+
+        self.products_movement_list_state.items = []
+        await self.products_movement_list_state.on_load()
+        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_show_serial(True)
+        if keep["id_incoming_storage"] != "":
+            self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
+        if keep["id_incoming_owner"] != "":
+            self.products_movement_list_state.filter_by_owner = int(keep["id_incoming_owner"])
+
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.MOVEMENTS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.id_incoming_owner == "" or self.id_incoming_storage == "":
@@ -312,11 +380,23 @@ class AddMovementsState(rx.State):
         list_id_products: List[int] = [p.id for p in products_list]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
+            # Серійні номери, уточнені під час переміщення (необов'язкові) —
+            # зберігаємо лише заповнені, щоб не затирати наявні значення.
+            serials = {
+                p.id: p.serial_number
+                for p in products_list
+                if p.product_catalog is not None and p.product_catalog.uniq
+                and p.serial_number not in (None, "")
+            }
+            ProductDAO.update_serial_numbers(serials)
             ProductDAO.update_owner_storage(
                 list_id_products,
                 int(self.id_destination_owner),
                 int(self.id_destination_storage),
             )
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success("Переміщення проведено!")
             return [
                 rx.toast.success("Переміщення проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}"),

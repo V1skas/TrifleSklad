@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 
@@ -21,9 +21,11 @@ from TrifleSklad.declared import (
     format_request_qty,
     movements_status_list,
     movements_type_list,
+    sale_line_cost,
 )
 from TrifleSklad.models import Movement, Product, Sale
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -118,10 +120,10 @@ class ViewSaleState(rx.State):
     is_cancel_conflict_dialog_open: bool = False
     # ======================
 
-    # Detailed position dialog (одиниці ТМЦ обраної позиції)
+    # Розгорнуті позиції в таблиці (клік по рядку розкриває перелік одиниць).
+    # Ключ — індекс позиції в products_catalog.
     # ======================
-    is_position_dialog_open: bool = False
-    selected_position_index: int = -1
+    expanded_positions: Dict[int, bool] = {}
     # ======================
 
     # Dynamic variables
@@ -142,56 +144,49 @@ class ViewSaleState(rx.State):
         )
 
     @rx.var
-    def positions(self) -> List[Tuple[int, str, int, float, float]]:
-        # (індекс, назва позиції, кількість, ціна за одиницю, сума по позиції)
+    def positions_grouped(
+        self,
+    ) -> List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]]:
+        # Позиції з вбудованим переліком одиниць для розгортання:
+        # (індекс, назва, к-сть, ціна за од., сума по позиції,
+        #  одиниці = [(id, серійний номер | '—', залишок | '—')]).
         if self.item is None:
             return []
-        return [
-            (
-                index,
-                pc.product.title,
-                pc.count,
-                pc.price,
-                round(pc.price * pc.count, 2),
+        result: List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]] = []
+        for index, pc in enumerate(self.item.movement.products_catalog):
+            units: List[Tuple[int, str, str]] = []
+            line_units: List[Tuple[int, bool, int]] = []
+            for unit in pc.products:
+                catalog = unit.product_catalog
+                serial = (
+                    unit.serial_number
+                    if (catalog is not None and catalog.uniq and unit.serial_number)
+                    else "—"
+                )
+                remain = (
+                    str(unit.count)
+                    if (catalog is not None and catalog.divisible)
+                    else "—"
+                )
+                units.append((unit.id, serial, remain))
+                line_units.append(
+                    (
+                        unit.count or 0,
+                        catalog.divisible if catalog is not None else False,
+                        catalog.capacity if catalog is not None else 0,
+                    )
+                )
+            result.append(
+                (
+                    index,
+                    pc.product.title,
+                    pc.count,
+                    pc.price,
+                    sale_line_cost(pc.price, line_units),
+                    units,
+                )
             )
-            for index, pc in enumerate(self.item.movement.products_catalog)
-        ]
-
-    @rx.var
-    def selected_position_title(self) -> str:
-        if (
-            self.item is None
-            or self.selected_position_index < 0
-            or self.selected_position_index >= len(self.item.movement.products_catalog)
-        ):
-            return ""
-        return self.item.movement.products_catalog[self.selected_position_index].product.title
-
-    @rx.var
-    def selected_position_units(self) -> List[Tuple[str, str, str]]:
-        # (id одиниці, серійний номер або '—', залишок для подільного або '—')
-        if (
-            self.item is None
-            or self.selected_position_index < 0
-            or self.selected_position_index >= len(self.item.movement.products_catalog)
-        ):
-            return []
-        pc = self.item.movement.products_catalog[self.selected_position_index]
-        units: List[Tuple[str, str, str]] = []
-        for unit in pc.products:
-            catalog = unit.product_catalog
-            serial = (
-                unit.serial_number
-                if (catalog is not None and catalog.uniq and unit.serial_number)
-                else "—"
-            )
-            remain = (
-                str(unit.count)
-                if (catalog is not None and catalog.divisible)
-                else "—"
-            )
-            units.append((str(unit.id), serial, remain))
-        return units
+        return result
 
     @rx.var
     def total_cost(self) -> float:
@@ -220,22 +215,14 @@ class ViewSaleState(rx.State):
         self.is_cancel_conflict_dialog_open = value
 
     @rx.event
-    def open_position_dialog(self, index: int):
-        self.selected_position_index = index
-        self.is_position_dialog_open = True
-
-    @rx.event
-    def set_position_dialog_open(self, value: bool):
-        self.is_position_dialog_open = value
-        if not value:
-            self.selected_position_index = -1
+    def toggle_position(self, index: int):
+        self.expanded_positions[index] = not self.expanded_positions.get(index, False)
 
     # Action handlers
     # ======================
     @rx.event
     async def on_load(self, id: int):
-        self.is_position_dialog_open = False
-        self.selected_position_index = -1
+        self.expanded_positions = {}
         self.item = SaleDAO.get_by_id_with_all_relationship(id)
         if self.item is None:
             return [
@@ -261,7 +248,7 @@ class ViewSaleState(rx.State):
     # ======================
 
 
-class AddSaleState(rx.State):
+class AddSaleState(LookupCreatorsMixin, rx.State):
     current_date: str = date.today().__str__()
 
     id_incoming_storage: str = ""
@@ -350,6 +337,61 @@ class AddSaleState(rx.State):
         return len(self.request_positions) > 0
     # ======================
 
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        self._load_list_storages()
+        self.id_incoming_storage = str(new_id)
+        if self.products_movement_list_state is not None:
+            self.products_movement_list_state.filter_by_storage = new_id
+            self.products_movement_list_state.items = []
+
+    def _after_create_owner(self, new_id: int):
+        self._load_list_owners()
+        self.id_incoming_owner = str(new_id)
+        if self.products_movement_list_state is not None:
+            self.products_movement_list_state.filter_by_owner = new_id
+            self.products_movement_list_state.items = []
+
+    def _after_create_worker(self, new_id: int):
+        self._load_list_workers()
+        self.id_responsible = str(new_id)
+
+    async def _reset_for_continue(self):
+        keep = dict(
+            current_date=self.current_date,
+            id_incoming_storage=self.id_incoming_storage,
+            id_incoming_owner=self.id_incoming_owner,
+            id_responsible=self.id_responsible,
+            status=self.status,
+        )
+        self.search_name_incoming_storage = ""
+        self.search_responsible = ""
+        self.comment = ""
+        self.selected_request_id = ""
+        self.request_positions = []
+
+        self.id_incoming_storage = keep["id_incoming_storage"]
+        self.id_incoming_owner = keep["id_incoming_owner"]
+        self.id_responsible = keep["id_responsible"]
+        self.current_date = keep["current_date"]
+        self.status = keep["status"]
+
+        self._load_list_storages()
+        self._load_list_owners()
+        self._load_list_workers()
+        self._load_requests()
+
+        self.products_movement_list_state.items = []
+        await self.products_movement_list_state.on_load()
+        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_require_price(True)
+        self.products_movement_list_state.set_require_serial(True)
+        if keep["id_incoming_storage"] != "":
+            self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
+        if keep["id_incoming_owner"] != "":
+            self.products_movement_list_state.filter_by_owner = int(keep["id_incoming_owner"])
+
     # Action handlers
     # ======================
     @rx.event
@@ -379,6 +421,19 @@ class AddSaleState(rx.State):
         # Продаж: ціна за позицію обов'язкова; для ТМЦ із серійним номером — s/n.
         self.products_movement_list_state.set_require_price(True)
         self.products_movement_list_state.set_require_serial(True)
+
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.id_incoming_storage = str(default_storage)
+            self.products_movement_list_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.id_incoming_owner = str(default_owner)
+            self.products_movement_list_state.filter_by_owner = default_owner
+        default_worker = WorkerDAO.get_default_id()
+        if default_worker is not None:
+            self.id_responsible = str(default_worker)
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
@@ -448,7 +503,7 @@ class AddSaleState(rx.State):
         self.comment = value
 
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.SALES_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if (
@@ -509,6 +564,9 @@ class AddSaleState(rx.State):
             # Якщо продаж формується на основі заявки — позначаємо її виконаною.
             if self.selected_request_id != "":
                 RequestDAO.mark_completed(int(self.selected_request_id), id)
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success("Продаж проведено!")
             return [
                 rx.toast.success("Продаж проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}"),

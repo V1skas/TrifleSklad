@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple
 import reflex as rx
 
 from TrifleSklad.dao import ProductDAO
+from TrifleSklad.declared import sale_line_cost
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
@@ -21,14 +22,23 @@ class ProductsMovementListState(rx.State):
     split_mode: Dict[int, bool] = {}
     split_amount: Dict[int, str] = {}
 
+    # Розгорнуті позиції каталогу в таблиці (клік по рядку розкриває перелік
+    # одиниць). Ключ — id позиції каталогу.
+    expanded_catalogs: Dict[int, bool] = {}
+
     # Чи обов'язковий вибір власника для відкриття діалогу. Вимикається там, де
     # власник не задається (напр. повернення з площадки — фільтр лише за складом,
     # кожна одиниця зберігає свого власника).
     require_owner: bool = True
 
     # Обов'язковість серійного номера (вмикається лише там, де він потрібен —
-    # напр. при видачі/продажу ТМЦ із серійним номером).
+    # напр. при видачі/продажу/списанні ТМЦ із серійним номером).
     require_serial: bool = False
+
+    # Показ поля серійного номера без обов'язковості (напр. при переміщенні —
+    # s/n можна уточнити, але це не обов'язково). require_serial теж робить поле
+    # видимим (див. serial_visible).
+    show_serial: bool = False
 
     # Ввід ціни за позицію (вмикається лише там, де він потрібен — напр. продаж).
     # Ключ — id позиції каталогу, значення — введена ціна за одиницю.
@@ -43,8 +53,10 @@ class ProductsMovementListState(rx.State):
         self.products_selector_state.clear()
         self.split_mode = {}
         self.split_amount = {}
+        self.expanded_catalogs = {}
         self.require_owner = True
         self.require_serial = False
+        self.show_serial = False
         self.require_price = False
         self.prices = {}
         # Скидаємо фільтри місця/власника, інакше кнопка «Додати» лишається
@@ -59,6 +71,15 @@ class ProductsMovementListState(rx.State):
 
     def set_require_serial(self, flag: bool):
         self.require_serial = flag
+
+    def set_show_serial(self, flag: bool):
+        self.show_serial = flag
+
+    @rx.var
+    def serial_visible(self) -> bool:
+        # Поле s/n показуємо як коли воно обов'язкове (видача/продаж/списання),
+        # так і коли лише дозволене (переміщення).
+        return self.require_serial or self.show_serial
 
     def set_require_owner(self, flag: bool):
         self.require_owner = flag
@@ -105,31 +126,86 @@ class ProductsMovementListState(rx.State):
     def get_items(self) -> List[Tuple[int, Product]]:
         return [(index, item) for index, item in enumerate(self.items)]
 
-    def _grouped_counts(self) -> Dict[int, Tuple[str, int]]:
-        # Групує вибрані одиниці за позицією каталогу: id -> (назва, кількість).
-        groups: Dict[int, Tuple[str, int]] = {}
-        for product in self.items:
-            if product.product_catalog is None:
-                continue
-            catalog_id = product.product_catalog.id
-            title, count = groups.get(catalog_id, (product.product_catalog.title, 0))
-            groups[catalog_id] = (title, count + 1)
-        return groups
+    @rx.event
+    def toggle_catalog(self, catalog_id: int):
+        self.expanded_catalogs[catalog_id] = not self.expanded_catalogs.get(
+            catalog_id, False
+        )
 
     @rx.var
-    def price_positions(self) -> List[Tuple[int, str, int]]:
-        # Позиції (id каталогу, назва, кількість) для вводу ціни при продажу.
-        return [
-            (catalog_id, title, count)
-            for catalog_id, (title, count) in self._grouped_counts().items()
-        ]
+    def grouped(
+        self,
+    ) -> List[Tuple[int, str, int, bool, bool, str, List[Tuple[int, Product]]]]:
+        # Групує одиниці за позицією каталогу для таблиці:
+        # (id каталогу, назва, к-сть одиниць, подільне?, унікальне?, залишок,
+        #  перелік (глобальний індекс у self.items, Product)).
+        # Залишок — сума count подільних одиниць групи (для контролю обсягу),
+        # інакше «—». Глобальний індекс потрібен для on_remove_selected/split_*.
+        order: List[int] = []
+        groups: Dict[int, Tuple[str, bool, bool, int, List[Tuple[int, Product]]]] = {}
+        for index, product in enumerate(self.items):
+            catalog = product.product_catalog
+            if catalog is None:
+                continue
+            catalog_id = catalog.id
+            if catalog_id not in groups:
+                order.append(catalog_id)
+                groups[catalog_id] = (catalog.title, catalog.divisible, catalog.uniq, 0, [])
+            title, divisible, uniq, remainder, units = groups[catalog_id]
+            units.append((index, product))
+            groups[catalog_id] = (
+                title,
+                divisible,
+                uniq,
+                remainder + (product.count or 0),
+                units,
+            )
+        result: List[Tuple[int, str, int, bool, bool, str, List[Tuple[int, Product]]]] = []
+        for catalog_id in order:
+            title, divisible, uniq, remainder, units = groups[catalog_id]
+            result.append(
+                (
+                    catalog_id,
+                    title,
+                    len(units),
+                    divisible,
+                    uniq,
+                    str(remainder) if divisible else "—",
+                    units,
+                )
+            )
+        return result
+
+    @rx.var
+    def group_sums(self) -> Dict[int, float]:
+        # Сума по позиції каталогу (для продажу). Для подільного ТМЦ, проданого
+        # частиною, ціна за цілу одиницю масштабується пропорційно залишку
+        # (sale_line_cost), інакше — ціна × к-сть одиниць.
+        prices = self.get_prices()
+        sums: Dict[int, float] = {}
+        for catalog_id, units in self._grouped_units().items():
+            sums[catalog_id] = sale_line_cost(prices.get(catalog_id, 0.0), units)
+        return sums
+
+    def _grouped_units(self) -> Dict[int, List[Tuple[int, bool, int]]]:
+        # Групує вибрані одиниці за позицією каталогу:
+        # id -> [(count, divisible, capacity), ...].
+        groups: Dict[int, List[Tuple[int, bool, int]]] = {}
+        for product in self.items:
+            catalog = product.product_catalog
+            if catalog is None:
+                continue
+            groups.setdefault(catalog.id, []).append(
+                (product.count or 0, catalog.divisible, catalog.capacity)
+            )
+        return groups
 
     @rx.var
     def total_cost(self) -> float:
         prices = self.get_prices()
         total = 0.0
-        for catalog_id, (_title, count) in self._grouped_counts().items():
-            total += prices.get(catalog_id, 0.0) * count
+        for catalog_id, units in self._grouped_units().items():
+            total += sale_line_cost(prices.get(catalog_id, 0.0), units)
         return round(total, 2)
 
     @rx.event
@@ -155,12 +231,19 @@ class ProductsMovementListState(rx.State):
     @rx.event
     def on_save_selected(self):
         selected = self.products_selector_state.get_selected_items_only()
+        # Намір авто-розділення решти (набір подільного ТМЦ за мірою): id → обсяг.
+        split_intent = self.products_selector_state.get_split_intent()
         self.items += selected
-        # За замовчуванням — передати цілком; режим розділення вмикає користувач.
+        # За замовчуванням — передати цілком; режим розділення вмикає користувач
+        # або масовий набір за мірою (split_intent).
         for product in selected:
             if self._is_divisible(product):
-                self.split_mode[product.id] = False
-                self.split_amount[product.id] = ""
+                if product.id in split_intent:
+                    self.split_mode[product.id] = True
+                    self.split_amount[product.id] = str(split_intent[product.id])
+                else:
+                    self.split_mode[product.id] = False
+                    self.split_amount[product.id] = ""
             # Ініціалізуємо ціну позиції (для продажу), якщо її ще немає.
             if (
                 product.product_catalog is not None

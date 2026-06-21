@@ -11,6 +11,11 @@ def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewOwnerState.item.title, size="7", width="100%"),
         rx.hstack(rx.text("Опис:"), rx.text(ViewOwnerState.description, is_optional=True), width="100%"),
+        rx.hstack(
+            rx.text("За замовчуванням для рухів:"),
+            rx.text(rx.cond(ViewOwnerState.is_default, "Так", "Ні")),
+            width="100%",
+        ),
 
         spacing="3",
 
@@ -154,6 +159,11 @@ def add_form() -> rx.Component:
             rx.input(id="title", required=True, size="3", value=AddOwnerState.item.title, on_change=AddOwnerState.on_change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", size="3", value=AddOwnerState.description, on_change=AddOwnerState.on_change_description),
+            rx.hstack(
+                rx.switch(checked=AddOwnerState.is_default, on_change=AddOwnerState.on_change_is_default),
+                rx.text("За замовчуванням для рухів"),
+                align="center", spacing="2",
+            ),
 
             align="stretch"
         ),
@@ -169,6 +179,11 @@ def edit_form() -> rx.Component:
             rx.input(id="title", required=True, size="3", value=EditOwnerState.item.title, on_change=EditOwnerState.on_change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", size="3", value=EditOwnerState.description, on_change=EditOwnerState.on_change_description),
+            rx.hstack(
+                rx.switch(checked=EditOwnerState.is_default, on_change=EditOwnerState.on_change_is_default),
+                rx.text("За замовчуванням для рухів"),
+                align="center", spacing="2",
+            ),
 
             align="stretch"
         ),

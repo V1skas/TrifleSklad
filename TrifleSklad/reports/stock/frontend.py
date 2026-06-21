@@ -2,6 +2,7 @@ import reflex as rx
 
 from components.elements import subpage_header
 
+import TrifleSklad.routes as routes
 from TrifleSklad.reports.stock.backend import StockReportState, ALL
 
 
@@ -42,6 +43,12 @@ def filter_card() -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.hstack(
+                _filter_select(
+                    "Категорія",
+                    StockReportState.filter_category_value,
+                    StockReportState.list_categories,
+                    StockReportState.on_change_category,
+                ),
                 _filter_select(
                     "Позиція каталогу",
                     StockReportState.filter_catalog_value,
@@ -135,6 +142,11 @@ def units_dialog() -> rx.Component:
                             rx.table.cell(unit[2]),
                             rx.table.cell(unit[3]),
                             rx.table.cell(unit[4], width="1%", white_space="nowrap"),
+                            on_click=rx.redirect(
+                                f"{routes.REPORTS_UNITS_VIEW_ID}{unit[0]}"
+                            ),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
                         ),
                     ),
                 ),

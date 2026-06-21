@@ -106,6 +106,11 @@ MOVEMENT_RETURNS_VIEW_ID = "/movement/returns/view/"
 MOVEMENT_RETURNS_EDIT_ID = "/movement/returns/edit/"
 MOVEMENT_RETURNS_ADD = "/movement/returns/add/"
 
+MOVEMENT_SALE_RETURNS = "/movement/sale_returns/"
+MOVEMENT_SALE_RETURNS_VIEW_ID = "/movement/sale_returns/view/"
+MOVEMENT_SALE_RETURNS_EDIT_ID = "/movement/sale_returns/edit/"
+MOVEMENT_SALE_RETURNS_ADD = "/movement/sale_returns/add/"
+
 REPORTS_TAB = "/reports/[tab]/"
 REPORTS_TAB_PAGE = "/reports/[tab]/[page]/"
 REPORTS_TAB_PAGE_ID = "/reports/[tab]/[page]/[id]/"
@@ -129,6 +134,7 @@ _MOVEMENT_VIEW_ROUTES = {
     MovementsType.ISSUE: MOVEMENT_ISSUES_VIEW_ID,
     MovementsType.SALE: MOVEMENT_SALES_VIEW_ID,
     MovementsType.RETURN: MOVEMENT_RETURNS_VIEW_ID,
+    MovementsType.SALE_RETURN: MOVEMENT_SALE_RETURNS_VIEW_ID,
 }
 
 

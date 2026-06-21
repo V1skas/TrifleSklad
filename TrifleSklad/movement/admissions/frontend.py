@@ -2,6 +2,15 @@ import reflex as rx
 
 from components.elements import subpage_header
 from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    supplier_create_dialog,
+    owner_create_dialog,
+    payment_type_create_dialog,
+    nds_rate_create_dialog,
+    storage_create_dialog,
+)
+from TrifleSklad.declared import StorageType
 
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import movements_status_list
@@ -149,6 +158,23 @@ def create_product_dialog() -> rx.Component:
 
 def movement_product_catalog_add_edit_form() -> rx.Component:
     return rx.vstack(
+        rx.text("Категорія:", width="100%"),
+        rx.select.root(
+            rx.select.trigger(
+                placeholder="Оберіть категорію",
+                width="100%",
+            ),
+            rx.select.content(
+                rx.foreach(
+                    MovementProductCatalogAddEditFormState.category_options,
+                    lambda c: rx.select.item(c[0], value=c[1]),
+                ),
+                width="100%",
+            ),
+            value=MovementProductCatalogAddEditFormState.filter_category,
+            on_change=MovementProductCatalogAddEditFormState.on_change_filter_category,
+            width="100%",
+        ),
         rx.text("Найменування з каталогу:", width="100%"),
         rx.select.root(
             rx.select.trigger(
@@ -173,6 +199,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
 
             name="id_product_catalog",
             required=True,
+            disabled=~MovementProductCatalogAddEditFormState.category_chosen,
 
             value=MovementProductCatalogAddEditFormState.id_product_catalog,
 
@@ -348,7 +375,7 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
         rx.hstack(
             rx.text("Вартість за одиницю:"),
             rx.text(
-                MovementProductCatalogDetailedViewState.item.price,
+                MovementProductCatalogDetailedViewState.price_display,
                 weight="bold",
                 decoration="underline",
                 width="100%"
@@ -476,8 +503,10 @@ def edit_admission_products_catalog_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -488,7 +517,15 @@ def edit_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(item[1].price),
+                        rx.table.cell(
+                            rx.cond(
+                                item[1].product.divisible,
+                                item[1].count * item[1].product.capacity,
+                                "—",
+                            )
+                        ),
+                        rx.table.cell(item[2]),
+                        rx.table.cell(item[3]),
                         on_click=EditAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -507,50 +544,16 @@ def edit_admission_products_catalog_table() -> rx.Component:
         width="100%",
     )
 
-def product_catalog_table_row(item: Tuple[int, MovementProductsCatalog]):
-    return rx.table.row(
-        rx.table.cell(item[1].product.title),
-        rx.table.cell(item[1].count),
-        rx.table.cell(item[1].price),
-        on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
-        cursor="pointer",
-        _hover={"background_color": rx.color("accent", 3)},
-    )
-
-def product_catalog_table():
-    return rx.table.root(
-        rx.table.header(
-            rx.table.row(
-                rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
-            ),
-
-            background_color=rx.color("accent", 9)
-        ),
-        rx.table.body(
-            rx.foreach(
-                enumerate(AddAdmissionState.item.products),
-                lambda item: product_catalog_table_row(item)
-            ),
-
-            height="100%",
-            width="100%"
-        ),
-
-        variant="surface",
-        height="100%",
-        width="100%"
-    )
-
 def add_admission_products_catalog_table() -> rx.Component:
     return rx.vstack(
         rx.table.root(
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -561,7 +564,15 @@ def add_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(item[1].price),
+                        rx.table.cell(
+                            rx.cond(
+                                item[1].product.divisible,
+                                item[1].count * item[1].product.capacity,
+                                "—",
+                            )
+                        ),
+                        rx.table.cell(item[2]),
+                        rx.table.cell(item[3]),
                         on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -586,8 +597,10 @@ def view_admission_products_catalog_table() -> rx.Component:
             rx.table.header(
                 rx.table.row(
                     rx.table.column_header_cell("Товар", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Кількість", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Вартість", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("К-сть одиниць", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
+                    rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -598,7 +611,15 @@ def view_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(item[1].price),
+                        rx.table.cell(
+                            rx.cond(
+                                item[1].product.divisible,
+                                item[1].count * item[1].product.capacity,
+                                "—",
+                            )
+                        ),
+                        rx.table.cell(item[2]),
+                        rx.table.cell(item[3]),
                         on_click=ViewAdmissionState.on_change_dialog_open(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -790,7 +811,7 @@ def item_preview_tab_content() -> rx.Component:
         value=AdmissionState.Pages.VIEW
     )
 
-def table_row(item: Tuple[int, Admission]) -> rx.Component:
+def table_row(item: Tuple[int, Admission, str]) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item[1].id)),
         rx.table.row_header_cell(
@@ -801,7 +822,7 @@ def table_row(item: Tuple[int, Admission]) -> rx.Component:
         rx.table.cell(rx.text(item[1].movement.destination_storage.title)),
         rx.table.cell(rx.text(item[1].movement.destination_owner.title)),
         rx.table.cell(rx.text(item[1].payment_type.title)),
-        rx.table.cell(rx.text(item[1].movement.total_cost)),
+        rx.table.cell(rx.text(item[2])),
         rx.table.cell(rx.text(rx.cond(item[1].flag_nds, "Так", "Ні"))),
         rx.table.cell(rx.text(ListAdmissionState.get_movement_statuses[item[1].movement.status])),
         on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{item[1].id}"),
@@ -916,6 +937,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_supplier
                 ),
+                create_lookup_button(ActionEnum.SUPPLIERS_CREATE, "Створити постачальника", AddAdmissionState.open_supplier_create),
+                supplier_create_dialog(AddAdmissionState),
                 rx.text("*Склад:"),
                 rx.select.root(
                     rx.select.trigger(
@@ -960,6 +983,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_storage
                 ),
+                create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddAdmissionState.open_storage_create(StorageType.WAREHOUSE, "destination", False)),
+                storage_create_dialog(AddAdmissionState),
                 rx.text("*Одержувач:"),
                 rx.select.root(
                     rx.select.trigger(
@@ -981,6 +1006,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_destination_owner
                 ),
+                create_lookup_button(ActionEnum.OWNERS_CREATE, "Створити власника", AddAdmissionState.open_owner_create),
+                owner_create_dialog(AddAdmissionState),
                 rx.text("*Товари з каталогу:"),
                 add_admission_products_catalog_dialog(),
                 rx.cond(AddAdmissionState.has_item_movement_products_catalog,
@@ -1012,6 +1039,8 @@ def add_form() -> rx.Component:
 
                     on_change=AddAdmissionState.on_change_id_payment_type
                 ),
+                create_lookup_button(ActionEnum.PAYMENT_TYPE_CREATE, "Створити тип оплати", AddAdmissionState.open_payment_type_create),
+                payment_type_create_dialog(AddAdmissionState),
                 rx.text("Номер накладної оплати:"),
                 rx.input(
                     name="invoice_number",
@@ -1050,6 +1079,8 @@ def add_form() -> rx.Component:
                     width="100%",
                     align="center",
                 ),
+                create_lookup_button(ActionEnum.NDS_RATES_CREATE, "Створити ставку ПДВ", AddAdmissionState.open_nds_rate_create),
+                nds_rate_create_dialog(AddAdmissionState),
                 rx.hstack(
                     rx.switch(
                         name="flag_nds",
@@ -1068,7 +1099,7 @@ def add_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text("*Курс долара:"),
+                    rx.text("Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -1284,7 +1315,7 @@ def edit_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text("*Курс долара:"),
+                    rx.text("Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -1336,10 +1367,19 @@ def add_tab_content() -> rx.Component:
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
                         rx.button(
+                            "Зберегти і продовжити",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddAdmissionState.add_one(True),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_CREATE),
+                        rx.button(
                             "Зберегти",
                             variant="ghost",
                             size="3",
-                            on_click=AddAdmissionState.add_one,
+                            on_click=AddAdmissionState.add_one(False),
                         ),
                     ),
                 ],

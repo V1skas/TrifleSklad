@@ -32,8 +32,8 @@ class UnitsReportState(rx.State):
     # Деталь
     # ======================
     unit: Optional[Product] = None
-    # Рядок історії: (№, тип, дата, статус, маршрут, url-руху)
-    history_rows: List[Tuple[str, str, str, str, str, str]] = []
+    # Рядок історії: (№, тип, дата, маршрут (місце), власник, статус, url-руху)
+    history_rows: List[Tuple[str, str, str, str, str, str, str]] = []
 
     # Backend only
     # ======================
@@ -60,7 +60,7 @@ class UnitsReportState(rx.State):
         if self.unit is None:
             self.history_rows = []
             return
-        rows: List[Tuple[str, str, str, str, str, str]] = []
+        rows: List[Tuple[str, str, str, str, str, str, str]] = []
         for m in MovementDAO.get_history_by_product_id(id):
             type_title = movements_type_list.get(m.type, "—")
             status_title = (
@@ -71,8 +71,16 @@ class UnitsReportState(rx.State):
             src = m.incoming_storage.title if m.incoming_storage is not None else "—"
             dst = m.destination_storage.title if m.destination_storage is not None else "—"
             route = f"{src} → {dst}"
+            # Власник руху — на випадок зміни власника: відправлення → призначення.
+            src_owner = m.incoming_owner.title if m.incoming_owner is not None else "—"
+            dst_owner = (
+                m.destination_owner.title if m.destination_owner is not None else "—"
+            )
+            owner_route = f"{src_owner} → {dst_owner}"
             url = routes.movement_view_url(m.type, m.id)
-            rows.append((str(m.id), type_title, m.date, status_title, route, url))
+            rows.append(
+                (str(m.id), type_title, m.date, route, owner_route, status_title, url)
+            )
         self.history_rows = rows
 
     # Dynamic variables
@@ -156,6 +164,29 @@ class UnitsReportState(rx.State):
     @rx.var
     def unit_count(self) -> str:
         return str(self.unit.count) if self.unit is not None else "—"
+
+    @rx.var
+    def unit_count_num(self) -> int:
+        # Числовий залишок для прогрес-бара заповненості подільної одиниці.
+        return self.unit.count if self.unit is not None else 0
+
+    @rx.var
+    def unit_capacity(self) -> int:
+        return (
+            self.unit.product_catalog.capacity
+            if self.unit is not None and self.unit.product_catalog is not None
+            else 0
+        )
+
+    @rx.var
+    def unit_remain_label(self) -> str:
+        # «залишок/ємність одиниця» — як у діалозі вибору ТМЦ.
+        if self.unit is None or self.unit.product_catalog is None:
+            return "—"
+        return (
+            f"{self.unit.count}/{self.unit.product_catalog.capacity} "
+            f"{self.unit.product_catalog.unit}"
+        )
 
     @rx.var
     def has_history(self) -> bool:

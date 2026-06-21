@@ -7,7 +7,13 @@ from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
 from TrifleSklad.declared import StorageType
 
-from TrifleSklad.dao import ProductCatalogDAO, ProductDAO, StorageDAO, OwnerDAO
+from TrifleSklad.dao import (
+    ProductCatalogDAO,
+    ProductCategoryDAO,
+    ProductDAO,
+    StorageDAO,
+    OwnerDAO,
+)
 
 
 # Сентинел «усі» для селектів-фільтрів: Radix не дозволяє порожнє значення item,
@@ -22,13 +28,17 @@ class StockReportState(rx.State):
     rows: List[Tuple[int, str, str, int, int]] = []
 
     # Опції фільтрів
-    list_catalog: List[Tuple[str, str]] = []
+    # Кеш позицій каталогу: (id, title, category_id) — category_id потрібен, щоб
+    # звужувати список позицій до обраної категорії.
+    _catalog_cache: List[Tuple[str, str, str]] = []
+    list_categories: List[Tuple[str, str]] = []
     # Кеш сховищ з типом: (id, title, type) — потрібен, щоб ховати виключені типи.
     _storages_cache: List[Tuple[str, str, int]] = []
     list_owners: List[Tuple[str, str]] = []
 
     # Значення фільтрів ("" — без фільтра)
     filter_catalog: str = ""
+    filter_category: str = ""
     filter_storage: str = ""
     filter_owner: str = ""
     exclude_warehouse: bool = False
@@ -57,13 +67,27 @@ class StockReportState(rx.State):
         return excluded
 
     def _load_filter_options(self):
-        self.list_catalog = [
-            (str(c.id), c.title) for c in ProductCatalogDAO.get_all()
+        self._catalog_cache = [
+            (str(c.id), c.title, str(c.id_category) if c.id_category else "")
+            for c in ProductCatalogDAO.get_all()
+        ]
+        self.list_categories = [
+            (str(c.id), c.title) for c in ProductCategoryDAO.get_all()
         ]
         self._storages_cache = [
             (str(s.id), s.title, s.type) for s in StorageDAO.get_all()
         ]
         self.list_owners = [(str(o.id), o.title) for o in OwnerDAO.get_all()]
+
+    def _sync_catalog_filter(self):
+        # Якщо обрана позиція не належить до обраної категорії — скидаємо селект.
+        if self.filter_catalog == "" or self.filter_category == "":
+            return
+        for cid, _title, cat in self._catalog_cache:
+            if cid == self.filter_catalog:
+                if cat != self.filter_category:
+                    self.filter_catalog = ""
+                break
 
     def _sync_storage_filter(self):
         # Якщо обране сховище належить до щойно виключеного типу — скидаємо селект.
@@ -82,6 +106,7 @@ class StockReportState(rx.State):
             int(self.filter_storage) if self.filter_storage else None,
             int(self.filter_owner) if self.filter_owner else None,
             self._excluded_types(),
+            int(self.filter_category) if self.filter_category else None,
         )
 
     # Dynamic variables
@@ -102,10 +127,16 @@ class StockReportState(rx.State):
 
     @rx.var
     def filtered_list_catalog(self) -> List[Tuple[str, str]]:
+        # Звужуємо до обраної категорії (якщо задана), потім за пошуковим рядком.
+        base = [
+            (cid, title)
+            for cid, title, cat in self._catalog_cache
+            if self.filter_category == "" or cat == self.filter_category
+        ]
         term = self.search_catalog.strip().lower()
         if term == "":
-            return self.list_catalog
-        return [c for c in self.list_catalog if term in c[1].lower()]
+            return base
+        return [c for c in base if term in c[1].lower()]
 
     @rx.var
     def filtered_list_storages(self) -> List[Tuple[str, str]]:
@@ -125,6 +156,10 @@ class StockReportState(rx.State):
         return self.filter_catalog if self.filter_catalog != "" else ALL
 
     @rx.var
+    def filter_category_value(self) -> str:
+        return self.filter_category if self.filter_category != "" else ALL
+
+    @rx.var
     def filter_storage_value(self) -> str:
         return self.filter_storage if self.filter_storage != "" else ALL
 
@@ -142,6 +177,7 @@ class StockReportState(rx.State):
             return rx.redirect(routes.WELCOME)
 
         self.filter_catalog = ""
+        self.filter_category = ""
         self.filter_storage = ""
         self.filter_owner = ""
         self.exclude_warehouse = False
@@ -165,6 +201,12 @@ class StockReportState(rx.State):
     @rx.event
     def on_change_catalog(self, value: str):
         self.filter_catalog = "" if value == ALL else value
+        self._reload()
+
+    @rx.event
+    def on_change_category(self, value: str):
+        self.filter_category = "" if value == ALL else value
+        self._sync_catalog_filter()
         self._reload()
 
     @rx.event
@@ -198,6 +240,7 @@ class StockReportState(rx.State):
     @rx.event
     def reset_filters(self):
         self.filter_catalog = ""
+        self.filter_category = ""
         self.filter_storage = ""
         self.filter_owner = ""
         self.exclude_warehouse = False

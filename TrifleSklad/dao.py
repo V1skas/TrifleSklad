@@ -6,9 +6,9 @@ import math
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import select, func, or_
+from sqlmodel import select, func, or_, update
 
-from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus
+from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus, sale_line_cost
 from TrifleSklad.models import (
     Action,
     Admission,
@@ -28,6 +28,7 @@ from TrifleSklad.models import (
     Role,
     RolesActions,
     Sale,
+    SaleReturn,
     Storage,
     Supplier,
     User,
@@ -468,6 +469,17 @@ class WorkerDAO:
             return worker
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id працівника за замовчуванням (отримувач/відповідальний)."""
+        statement = (
+            select(Worker.id)
+            .where(Worker.is_default == True)
+            .where(Worker.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         worker = Worker(**form_data)
 
@@ -481,6 +493,13 @@ class WorkerDAO:
 
                 if session.exec(statement).one_or_none() is not None:
                     return False, "Помилка! Співробітник з таким ПІБ вже існує!", -1
+
+                if worker.is_default:
+                    session.exec(
+                        update(Worker)
+                        .where(Worker.is_deleted == False)
+                        .values(is_default=False)
+                    )
 
                 session.add(worker)
                 session.commit()
@@ -515,6 +534,14 @@ class WorkerDAO:
                         False,
                         "Помилка! Співробітник з таким ПІБ вже існує!",
                         worker.id,
+                    )
+
+                if worker.is_default:
+                    session.exec(
+                        update(Worker)
+                        .where(Worker.id != worker.id)
+                        .where(Worker.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 session.commit()
@@ -868,11 +895,12 @@ class ProductCatalogDAO:
                 statement = (
                     select(ProductCatalog)
                     .where(ProductCatalog.title == product.title)
+                    .where(ProductCatalog.unit == product.unit)
                     .where(ProductCatalog.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Помилка! Товар з такою назвою вже існує!", -1
+                    return False, "Помилка! Товар з такою назвою та одиницею виміру вже існує!", -1
 
                 session.add(product)
                 session.commit()
@@ -893,13 +921,14 @@ class ProductCatalogDAO:
                 statement = (
                     select(ProductCatalog)
                     .where(ProductCatalog.title == product.title)
+                    .where(ProductCatalog.unit == product.unit)
                     .where(ProductCatalog.id != product.id)
                     .where(ProductCatalog.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Помилка! Товар з такою назвою вже існує!",
+                        "Помилка! Товар з такою назвою та одиницею виміру вже існує!",
                         product.id,
                     )
 
@@ -1049,17 +1078,38 @@ class StorageDAO:
         return storage_type is not None and storage_type in types
 
     @classmethod
+    def get_default_id(cls, type: int) -> Optional[int]:
+        """Id місця зберігання за замовчуванням для заданого типу (склад/площадка/відділ)."""
+        statement = (
+            select(Storage.id)
+            .where(Storage.type == type)
+            .where(Storage.is_default == True)
+            .where(Storage.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, storage: Storage) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
+                    .where(Storage.type == storage.type)
                     .where(Storage.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Помилка! Місце зберігання з такою назвою вже існує!", -1
+                    return False, "Помилка! Місце зберігання з такою назвою та типом вже існує!", -1
+
+                if storage.is_default:
+                    session.exec(
+                        update(Storage)
+                        .where(Storage.type == storage.type)
+                        .where(Storage.is_deleted == False)
+                        .values(is_default=False)
+                    )
 
                 session.add(storage)
                 session.commit()
@@ -1078,14 +1128,24 @@ class StorageDAO:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
+                    .where(Storage.type == storage.type)
                     .where(Storage.id != storage.id)
                     .where(Storage.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Помилка! Склад з такою назвою вже існує!",
+                        "Помилка! Місце зберігання з такою назвою та типом вже існує!",
                         storage.id,
+                    )
+
+                if storage.is_default:
+                    session.exec(
+                        update(Storage)
+                        .where(Storage.type == storage.type)
+                        .where(Storage.id != storage.id)
+                        .where(Storage.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 storage = session.merge(storage)
@@ -1162,6 +1222,17 @@ class OwnerDAO:
             return session.exec(statement).all()
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id власника за замовчуванням."""
+        statement = (
+            select(Owner.id)
+            .where(Owner.is_default == True)
+            .where(Owner.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, owner: Owner) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -1176,6 +1247,13 @@ class OwnerDAO:
                         False,
                         "Помилка! Власник з такою назвою вже існує!",
                         -1,
+                    )
+
+                if owner.is_default:
+                    session.exec(
+                        update(Owner)
+                        .where(Owner.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 session.add(owner)
@@ -1203,6 +1281,14 @@ class OwnerDAO:
                         False,
                         "Помилка! Власник з такою назвою вже існує!",
                         owner.id,
+                    )
+
+                if owner.is_default:
+                    session.exec(
+                        update(Owner)
+                        .where(Owner.id != owner.id)
+                        .where(Owner.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 owner = session.merge(owner)
@@ -1448,9 +1534,10 @@ class ProductDAO:
         if search:
             term = search.strip()
             if term:
+                # Пошук лише за серійним номером / id: назву каталогу не шукаємо,
+                # бо позиція вже обрана у каскаді категорія→каталог.
                 like = f"%{term.lower()}%"
                 conditions = [
-                    func.lower(ProductCatalog.title).like(like),
                     func.lower(func.coalesce(Product.serial_number, "")).like(like),
                 ]
                 if term.isdigit():
@@ -1469,11 +1556,32 @@ class ProductDAO:
             return products, has_more
 
     @classmethod
-    def get_catalog_options_by_owner_storage(
+    def get_categories_by_owner_storage(
         cls, owner_id: int, storage_id: int
     ) -> List[tuple[int, str]]:
+        """Перелік категорій (id, назва), у яких є доступні одиниці на вказаному
+        місці/власнику — перший крок каскадного вибору в діалозі."""
+        statement = (
+            select(ProductCategory.id, ProductCategory.title)
+            .join(ProductCatalog, ProductCatalog.id_category == ProductCategory.id)
+            .join(Product, Product.id_product_catalog == ProductCatalog.id)
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        statement = statement.distinct().order_by(ProductCategory.title)
+
+        with rx.session() as session:
+            return [(row[0], row[1]) for row in session.exec(statement).all()]
+
+    @classmethod
+    def get_catalog_options_by_owner_storage(
+        cls, owner_id: int, storage_id: int, category_id: int = -1
+    ) -> List[tuple[int, str]]:
         """Перелік позицій каталогу (id, назва), у яких є доступні одиниці на
-        вказаному місці/власнику — для випадаючого фільтра в діалозі вибору."""
+        вказаному місці/власнику — для випадаючого фільтра в діалозі вибору.
+        category_id != -1 — звузити до конкретної категорії."""
         statement = (
             select(ProductCatalog.id, ProductCatalog.title)
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
@@ -1482,10 +1590,80 @@ class ProductDAO:
         )
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
+        if category_id != -1:
+            statement = statement.where(ProductCatalog.id_category == category_id)
         statement = statement.distinct().order_by(ProductCatalog.title)
 
         with rx.session() as session:
             return [(row[0], row[1]) for row in session.exec(statement).all()]
+
+    @classmethod
+    def get_units_for_mass_select(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        catalog_id: int,
+        exclude_ids: List[int],
+        full_only: bool,
+        capacity: int,
+        limit: int,
+    ) -> List[Product]:
+        """До `limit` доступних одиниць позиції каталогу для масового вибору за
+        кількістю штук. full_only=True (подільне ТМЦ) — лише повні одиниці
+        (count == capacity), щоб масовий вибір не «з'їдав» уже розділені рештки."""
+        if limit <= 0:
+            return []
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+            .where(Product.id_product_catalog == catalog_id)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+        if full_only:
+            statement = statement.where(Product.count == capacity)
+        statement = statement.order_by(Product.id).limit(limit)
+
+        with rx.session() as session:
+            products = list(session.exec(statement).all())
+            if len(products) > 0:
+                session.expunge_all()
+            return products
+
+    @classmethod
+    def get_units_for_measure(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        catalog_id: int,
+        exclude_ids: List[int],
+        limit: int = 500,
+    ) -> List[Product]:
+        """Доступні одиниці позиції каталогу для жадібного набору за мірою
+        (одиницями виміру), за спаданням залишку (count). Подільне ТМЦ —
+        великі одиниці беруться першими, решта добивається розділенням."""
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .where(Product.id_storage == storage_id)
+            .where(Product.is_deleted == False)
+            .where(Product.id_product_catalog == catalog_id)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+        statement = statement.order_by(Product.count.desc()).limit(limit)
+
+        with rx.session() as session:
+            products = list(session.exec(statement).all())
+            if len(products) > 0:
+                session.expunge_all()
+            return products
 
     @classmethod
     def count_by_storage(cls, storage_id: int) -> int:
@@ -1715,10 +1893,11 @@ class ProductDAO:
         storage_id: Optional[int] = None,
         owner_id: Optional[int] = None,
         exclude_types: Optional[List[int]] = None,
+        category_id: Optional[int] = None,
     ) -> List[tuple]:
         """Звіт «Наявність ТМЦ»: позиції каталогу, що зараз лежать на місцях
         зберігання, із сумарною кількістю та числом одиниць. Фільтри —
-        за позицією каталогу, місцем зберігання, власником; exclude_types —
+        за позицією каталогу, категорією, місцем зберігання, власником; exclude_types —
         типи сховищ (склад/площадка/відділ), які треба виключити.
         Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
         exclude_types = exclude_types or []
@@ -1739,6 +1918,8 @@ class ProductDAO:
         )
         if catalog_id is not None:
             statement = statement.where(ProductCatalog.id == catalog_id)
+        if category_id is not None:
+            statement = statement.where(ProductCatalog.id_category == category_id)
         if storage_id is not None:
             statement = statement.where(Product.id_storage == storage_id)
         if owner_id is not None:
@@ -2394,6 +2575,17 @@ class PaymentTypeDAO:
             return payment_type
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id типу оплати за замовчуванням."""
+        statement = (
+            select(PaymentType.id)
+            .where(PaymentType.is_default == True)
+            .where(PaymentType.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, payment_type: PaymentType) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -2408,6 +2600,13 @@ class PaymentTypeDAO:
                         False,
                         "Помилка! Тип оплати з такою назвою вже існує!",
                         -1,
+                    )
+
+                if payment_type.is_default:
+                    session.exec(
+                        update(PaymentType)
+                        .where(PaymentType.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 session.add(payment_type)
@@ -2435,6 +2634,14 @@ class PaymentTypeDAO:
                         False,
                         "Помилка! Тип оплати з такою назвою вже існує!",
                         payment_type.id,
+                    )
+
+                if payment_type.is_default:
+                    session.exec(
+                        update(PaymentType)
+                        .where(PaymentType.id != payment_type.id)
+                        .where(PaymentType.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 payment_type = session.merge(payment_type)
@@ -3239,11 +3446,24 @@ class SaleDAO:
                     ).all()
                 }
 
+                # Подільність/ємність позицій каталогу — для пропорційного
+                # розрахунку вартості частини подільного ТМЦ (sale_line_cost).
+                catalog_meta = {
+                    c.id: (c.divisible, c.capacity)
+                    for c in session.exec(
+                        select(ProductCatalog).where(
+                            ProductCatalog.id.in_(list(catalog_to_ids.keys()))
+                        )
+                    ).all()
+                }
+
                 movement_products_catalog: List[MovementProductsCatalog] = []
                 total_cost = 0.0
                 for catalog_id, ids in catalog_to_ids.items():
                     price = float(prices.get(catalog_id, 0.0))
                     units = [bound_products[i] for i in ids if i in bound_products]
+                    divisible, capacity = catalog_meta.get(catalog_id, (False, 0))
+                    line_units = [(u.count or 0, divisible, capacity) for u in units]
                     movement_products_catalog.append(
                         MovementProductsCatalog(
                             id_product_catalog=catalog_id,
@@ -3252,7 +3472,7 @@ class SaleDAO:
                             products=units,
                         )
                     )
-                    total_cost += price * len(units)
+                    total_cost += sale_line_cost(price, line_units)
 
                 movement.products_catalog = movement_products_catalog
                 movement.total_cost = total_cost
@@ -3295,6 +3515,253 @@ class SaleDAO:
 
         except IntegrityError as e:
             return False, "Помилка: Продаж не може бути змінено", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
+
+
+class SaleReturnDAO:
+    """Повернення продажу: проданий ТМЦ (одиниці is_deleted=True) приймається
+    назад на склад. Загальна компенсована вартість — Movement.total_cost,
+    компенсація за позицію — MovementProductsCatalog.price."""
+
+    @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+        destination_storage: Optional[str] = None,
+    ) -> tuple[int, List[SaleReturn]]:
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            destination_storage=destination_storage,
+        )
+        movement_ids = select(Movement.id).where(Movement.type == MovementsType.SALE_RETURN)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        with rx.session() as session:
+            count_stmt = select(func.count(SaleReturn.id)).where(
+                SaleReturn.id.in_(movement_ids)
+            )
+            total = session.exec(count_stmt).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(SaleReturn)
+                .options(
+                    joinedload(SaleReturn.movement).options(
+                        joinedload(Movement.destination_storage),
+                    ),
+                )
+                .where(SaleReturn.id.in_(movement_ids))
+                .order_by(SaleReturn.id.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            returns = session.exec(statement).all()
+            if len(returns) > 0:
+                session.expunge_all()
+            return total_pages, list(returns)
+
+    @classmethod
+    def get_by_id_with_all_relationship(cls, id: int) -> Optional[SaleReturn]:
+        statement = (
+            select(SaleReturn)
+            .options(
+                joinedload(SaleReturn.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                        ),
+                    ),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(SaleReturn.sale).options(
+                    joinedload(Sale.movement),
+                ),
+            )
+            .where(SaleReturn.id == id)
+        )
+        with rx.session() as session:
+            sale_return = session.exec(statement).one_or_none()
+            if sale_return:
+                session.expunge(sale_return)
+            return sale_return
+
+    @classmethod
+    def get_returnable_sales(cls) -> List[Sale]:
+        """Продажі (не скасовані), у яких є хоча б одна ще не повернена одиниця
+        (Product.is_deleted == True) — для селектора у формі повернення."""
+        sold_sale_ids = (
+            select(Movement.id)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .join(
+                MovementProducts,
+                MovementProducts.id_movement_product == MovementProductsCatalog.id,
+            )
+            .join(Product, Product.id == MovementProducts.id_product)
+            .where(Movement.type == MovementsType.SALE)
+            .where(Movement.status != MovementsStatus.CANCELED)
+            .where(Product.is_deleted == True)
+        )
+        statement = (
+            select(Sale)
+            .options(joinedload(Sale.movement))
+            .where(Sale.id.in_(sold_sale_ids))
+            .order_by(Sale.id.desc())
+        )
+        with rx.session() as session:
+            sales = session.exec(statement).all()
+            if len(sales) > 0:
+                session.expunge_all()
+            return list(sales)
+
+    @classmethod
+    def get_sale_units(cls, sale_id: int) -> List[Product]:
+        """Одиниці продажу, які ще не повернені (актуальний is_deleted == True),
+        з підвантаженим product_catalog. Згруповані по позиції каталогу зовні."""
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .join(MovementProducts, MovementProducts.id_product == Product.id)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id == MovementProducts.id_movement_product,
+            )
+            .where(MovementProductsCatalog.id_movement == sale_id)
+            .where(Product.is_deleted == True)
+            .order_by(Product.id_product_catalog, Product.id)
+        )
+        with rx.session() as session:
+            products = session.exec(statement).all()
+            if len(products) > 0:
+                session.expunge_all()
+            return list(products)
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Створює повернення продажу: Movement (тип SALE_RETURN) із позиціями
+        (price = компенсація за позицію, total_cost = Σ компенсацій) і дочірній
+        SaleReturn. Повернені одиниці відновлюються (undelete) і переміщуються на
+        склад призначення; власник кожної одиниці зберігається."""
+        try:
+            with rx.session() as session:
+                # compensations: id позиції каталогу -> компенсація за позицію.
+                compensations: Dict[int, float] = form_data.get("compensations", {})
+                product_ids: List[int] = form_data.get("product_ids", [])
+
+                bound_products = {
+                    p.id: p
+                    for p in session.exec(
+                        select(Product).where(Product.id.in_(product_ids))
+                    ).all()
+                }
+
+                catalog_to_ids: "OrderedDict[int, List[int]]" = OrderedDict()
+                for pid in product_ids:
+                    product = bound_products.get(pid)
+                    if product is None:
+                        continue
+                    catalog_to_ids.setdefault(
+                        product.id_product_catalog, []
+                    ).append(pid)
+
+                # Останній власник = власник, із яким ТМЦ було продано
+                # (`id_incoming_owner` вихідного продажу; усі одиниці продажу
+                # фільтрувалися за ним). Призначаємо його руху-поверненню.
+                sale_movement = session.get(Movement, form_data["id_sale"])
+                last_owner = (
+                    sale_movement.id_incoming_owner
+                    if sale_movement is not None
+                    else None
+                )
+
+                movement: Movement = Movement(
+                    type=MovementsType.SALE_RETURN,
+                    id_user=form_data["id_user"],
+                    id_destination_storage=form_data.get("id_destination_storage"),
+                    id_incoming_owner=last_owner,
+                    id_destination_owner=last_owner,
+                    date=form_data.get("date"),
+                    comment=form_data.get("comment"),
+                    status=form_data.get("status"),
+                    total_cost=0.0,
+                )
+
+                movement_products_catalog: List[MovementProductsCatalog] = []
+                total_cost = 0.0
+                for catalog_id, ids in catalog_to_ids.items():
+                    compensation = float(compensations.get(catalog_id, 0.0))
+                    units = [bound_products[i] for i in ids if i in bound_products]
+                    movement_products_catalog.append(
+                        MovementProductsCatalog(
+                            id_product_catalog=catalog_id,
+                            count=len(units),
+                            price=compensation,
+                            products=units,
+                        )
+                    )
+                    total_cost += compensation
+
+                movement.products_catalog = movement_products_catalog
+                movement.total_cost = round(total_cost, 2)
+
+                sale_return: SaleReturn = SaleReturn(
+                    id_sale=form_data["id_sale"],
+                    movement=movement,
+                )
+
+                # Повертаємо одиниці у залишки на склад призначення; власником
+                # призначаємо останнього власника (з яким ТМЦ було продано).
+                destination_storage = form_data.get("id_destination_storage")
+                for pid, product in bound_products.items():
+                    product.is_deleted = False
+                    if destination_storage is not None:
+                        product.id_storage = destination_storage
+                    if last_owner is not None:
+                        product.id_owner = last_owner
+                    session.add(product)
+
+                session.add(sale_return)
+                session.commit()
+                return True, "Повернення продажу успішно додано", sale_return.id
+
+        except IntegrityError as e:
+            return False, "Помилка: Повернення продажу не може бути додано", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Редагування повернення продажу: лише статус і коментар руху."""
+        try:
+            with rx.session() as session:
+                sale_return = session.get(SaleReturn, form_data["id"])
+                if sale_return is None:
+                    return False, "Помилка: Повернення не знайдено", -1
+
+                movement = session.get(Movement, form_data["id"])
+                if movement is None:
+                    return False, "Помилка: Рух товару не знайдено", -1
+
+                if "status" in form_data:
+                    movement.status = form_data["status"]
+                if "comment" in form_data:
+                    movement.comment = form_data["comment"]
+
+                session.commit()
+                return True, "Повернення продажу успішно змінено", sale_return.id
+
+        except IntegrityError as e:
+            return False, "Помилка: Повернення продажу не може бути змінено", -1
         except SQLAlchemyError as e:
             return False, f"Помилка: {str(e)}", -1
 

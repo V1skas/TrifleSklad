@@ -18,28 +18,21 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-def _has_column(table: str, column: str) -> bool:
-    insp = sa.inspect(op.get_bind())
-    return column in {c["name"] for c in insp.get_columns(table)}
-
-
 def upgrade() -> None:
-    if _has_column('suppliers', 'okpo') and not _has_column('suppliers', 'edrpou'):
-        with op.batch_alter_table('suppliers') as batch_op:
-            batch_op.alter_column(
-                'okpo',
-                new_column_name='edrpou',
-                existing_type=sa.String(length=255),
-                existing_nullable=False,
-            )
+    with op.batch_alter_table('suppliers') as batch_op:
+        batch_op.alter_column(
+            'okpo',
+            new_column_name='edrpou',
+            existing_type=sa.String(),
+            existing_nullable=False,
+        )
 
 
 def downgrade() -> None:
-    if _has_column('suppliers', 'edrpou') and not _has_column('suppliers', 'okpo'):
-        with op.batch_alter_table('suppliers') as batch_op:
-            batch_op.alter_column(
-                'edrpou',
-                new_column_name='okpo',
-                existing_type=sa.String(length=255),
-                existing_nullable=False,
-            )
+    with op.batch_alter_table('suppliers') as batch_op:
+        batch_op.alter_column(
+            'edrpou',
+            new_column_name='okpo',
+            existing_type=sa.String(),
+            existing_nullable=False,
+        )

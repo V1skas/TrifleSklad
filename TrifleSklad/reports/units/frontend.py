@@ -1,7 +1,5 @@
 import reflex as rx
 
-from typing import Tuple
-
 from components.elements import subpage_header
 
 from TrifleSklad import routes
@@ -110,6 +108,7 @@ def history_table() -> rx.Component:
                 rx.table.column_header_cell("Тип", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Дата", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Маршрут", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Власник", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Статус", color=rx.color("accent", 2)),
             ),
             background_color=rx.color("accent", 9),
@@ -121,9 +120,10 @@ def history_table() -> rx.Component:
                     rx.table.cell(row[0], width="1%", white_space="nowrap"),
                     rx.table.cell(row[1]),
                     rx.table.cell(row[2]),
-                    rx.table.cell(row[4]),
                     rx.table.cell(row[3]),
-                    on_click=rx.redirect(row[5]),
+                    rx.table.cell(row[4]),
+                    rx.table.cell(row[5]),
+                    on_click=rx.redirect(row[6]),
                     cursor="pointer",
                     _hover={"background_color": rx.color("accent", 3)},
                 ),
@@ -164,7 +164,24 @@ def unit_detail() -> rx.Component:
                 ),
                 rx.cond(
                     UnitsReportState.unit_divisible,
-                    _info_row("Залишок:", UnitsReportState.unit_count),
+                    rx.hstack(
+                        rx.text("Залишок:", weight="bold", width="14em"),
+                        rx.vstack(
+                            rx.text(UnitsReportState.unit_remain_label),
+                            rx.progress(
+                                value=UnitsReportState.unit_count_num,
+                                max=UnitsReportState.unit_capacity,
+                                color_scheme="green",
+                                height="0.5em",
+                                width="100%",
+                            ),
+                            spacing="1",
+                            width="100%",
+                            max_width="22em",
+                        ),
+                        width="100%",
+                        align="center",
+                    ),
                 ),
                 _info_row("Місце зберігання:", UnitsReportState.unit_storage),
                 _info_row("Власник:", UnitsReportState.unit_owner),

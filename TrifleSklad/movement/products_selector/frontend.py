@@ -8,11 +8,33 @@ from TrifleSklad.movement.products_selector.backend import ALL, ProductsSelector
 
 
 def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
-    # Для подільного ТМЦ показуємо поточну ємність, для решти — серійний номер.
+    # Показуємо лише поля, доречні для типу позиції каталогу:
+    # подільне → залишок «count/capacity unit» + прогрес-бар заповненості;
+    # унікальне → серійний номер;
+    # звичайне (неподільне неунікальне) → без додаткових полів.
     return rx.cond(
         item[1].product_catalog.divisible,
-        rx.text(f"Ємність: {item[1].count}", size="1", user_select="none"),
-        rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+        rx.vstack(
+            rx.text(
+                f"Залишок: {item[1].count}/{item[1].product_catalog.capacity} "
+                f"{item[1].product_catalog.unit}",
+                size="1",
+                user_select="none",
+            ),
+            rx.progress(
+                value=item[1].count,
+                max=item[1].product_catalog.capacity,
+                color_scheme="green",
+                height="0.5em",
+                width="100%",
+            ),
+            spacing="1",
+            width="100%",
+        ),
+        rx.cond(
+            item[1].product_catalog.uniq,
+            rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+        ),
     )
 
 
@@ -127,24 +149,92 @@ def selector_list() -> rx.Component:
     )
 
 
+def mass_select_panel() -> rx.Component:
+    # Масовий вибір — доступний лише після вибору позиції каталогу.
+    return rx.cond(
+        ProductsSelectorState.catalog_chosen,
+        rx.vstack(
+            rx.divider(),
+            rx.text("Масовий вибір", size="2", weight="bold"),
+            rx.text("Кількість одиниць:", size="2"),
+            rx.hstack(
+                rx.input(
+                    type="number",
+                    min=0,
+                    placeholder="0",
+                    size="2",
+                    flex="1",
+                    value=ProductsSelectorState.mass_count,
+                    on_change=ProductsSelectorState.set_mass_count,
+                ),
+                rx.button(
+                    "Застосувати",
+                    type="button",
+                    size="2",
+                    on_click=ProductsSelectorState.apply_mass_count,
+                ),
+                spacing="2",
+                width="100%",
+                align="center",
+            ),
+            rx.cond(
+                ProductsSelectorState.sel_divisible,
+                rx.vstack(
+                    rx.text(
+                        f"Обсяг ({ProductsSelectorState.sel_unit}):", size="2"
+                    ),
+                    rx.hstack(
+                        rx.input(
+                            type="number",
+                            min=0,
+                            placeholder="0",
+                            size="2",
+                            flex="1",
+                            value=ProductsSelectorState.mass_measure,
+                            on_change=ProductsSelectorState.set_mass_measure,
+                        ),
+                        rx.button(
+                            "Застосувати",
+                            type="button",
+                            size="2",
+                            color_scheme="grass",
+                            on_click=ProductsSelectorState.apply_mass_measure,
+                        ),
+                        spacing="2",
+                        width="100%",
+                        align="center",
+                    ),
+                    spacing="1",
+                    width="100%",
+                ),
+            ),
+            spacing="2",
+            width="100%",
+        ),
+    )
+
+
 def filters_panel() -> rx.Component:
     return rx.vstack(
         rx.heading("Фільтри", size="4", width="100%"),
-        rx.text("Пошук (назва / s/n / ID):", size="2"),
-        rx.debounce_input(
-            rx.input(
-                rx.input.slot(rx.icon("search")),
-                placeholder="Введіть текст",
-                width="100%",
-                size="2",
-                value=ProductsSelectorState.filter_search,
-                on_change=ProductsSelectorState.change_filter_search,
+        rx.text("Категорія:", size="2"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть категорію", width="100%"),
+            rx.select.content(
+                rx.select.item("Усі категорії", value=ALL),
+                rx.foreach(
+                    ProductsSelectorState.category_options,
+                    lambda o: rx.select.item(o[0], value=o[1]),
+                ),
             ),
-            debounce_timeout=400,
+            value=ProductsSelectorState.filter_category,
+            on_change=ProductsSelectorState.change_filter_category,
+            width="100%",
+            size="2",
         ),
         rx.text("Позиція каталогу:", size="2"),
         rx.select.root(
-            rx.select.trigger(placeholder="Усі позиції", width="100%"),
+            rx.select.trigger(placeholder="Оберіть позицію", width="100%"),
             rx.select.content(
                 rx.select.item("Усі позиції", value=ALL),
                 rx.foreach(
@@ -154,35 +244,24 @@ def filters_panel() -> rx.Component:
             ),
             value=ProductsSelectorState.filter_catalog,
             on_change=ProductsSelectorState.change_filter_catalog,
+            disabled=ProductsSelectorState.filter_category == ALL,
             width="100%",
             size="2",
         ),
-        rx.text("Залишок від ємності (≥):", size="2"),
+        rx.text("Пошук (s/n / ID):", size="2"),
         rx.debounce_input(
             rx.input(
-                type="number",
-                min=0,
-                placeholder="Будь-який",
+                rx.input.slot(rx.icon("search")),
+                placeholder="Введіть текст",
                 width="100%",
                 size="2",
-                value=ProductsSelectorState.filter_min_remaining,
-                on_change=ProductsSelectorState.change_filter_min_remaining,
+                disabled=~ProductsSelectorState.catalog_chosen,
+                value=ProductsSelectorState.filter_search,
+                on_change=ProductsSelectorState.change_filter_search,
             ),
             debounce_timeout=400,
         ),
-        rx.text("Заповненість:", size="2"),
-        rx.select.root(
-            rx.select.trigger(width="100%"),
-            rx.select.content(
-                rx.select.item("Усі", value=ALL),
-                rx.select.item("Повні", value="full"),
-                rx.select.item("Неповні", value="partial"),
-            ),
-            value=ProductsSelectorState.filter_fullness,
-            on_change=ProductsSelectorState.change_filter_fullness,
-            width="100%",
-            size="2",
-        ),
+        mass_select_panel(),
         rx.button(
             "Скинути фільтри",
             type="button",
@@ -201,7 +280,7 @@ def filters_panel() -> rx.Component:
 def selector(*child, **prop) -> rx.Component:
     prop.setdefault("width", "100%")
     prop.setdefault("height", "100%")
-    # Сам діалог не повинен прокручуватися — прокрутка лише всередині списку ліворуч.
+    # Сам діалог не повинен прокручуватися — прокрутка лише всередині списку праворуч.
     prop.setdefault("min_height", "0")
     prop.setdefault("overflow", "hidden")
     return rx.vstack(
@@ -216,33 +295,7 @@ def selector(*child, **prop) -> rx.Component:
             flex_shrink="0",
         ),
         rx.hstack(
-            # Ліворуч — список одиниць ТМЦ.
-            rx.card(
-                rx.cond(
-                    ProductsSelectorState.is_loading,
-                    selector_skeleton(),
-                    rx.cond(
-                        ProductsSelectorState.has_items,
-                        selector_list(),
-                        rx.center(
-                            rx.text(
-                                "ТМЦ не знайдено",
-                                color=rx.color("accent", 8),
-                                user_select="none",
-                                size="3",
-                            ),
-                            width="100%",
-                            height="100%",
-                        ),
-                    ),
-                ),
-                padding="1em",
-                flex="2",
-                height="100%",
-                min_width="0",
-                min_height="0",
-            ),
-            # Праворуч — параметри фільтрації.
+            # Ліворуч — параметри фільтрації.
             rx.card(
                 filters_panel(),
                 padding="1em",
@@ -251,6 +304,45 @@ def selector(*child, **prop) -> rx.Component:
                 min_width="14em",
                 min_height="0",
                 overflow_y="auto",
+            ),
+            # Праворуч — список одиниць ТМЦ.
+            rx.card(
+                rx.cond(
+                    ProductsSelectorState.catalog_chosen,
+                    rx.cond(
+                        ProductsSelectorState.is_loading,
+                        selector_skeleton(),
+                        rx.cond(
+                            ProductsSelectorState.has_items,
+                            selector_list(),
+                            rx.center(
+                                rx.text(
+                                    "ТМЦ не знайдено",
+                                    color=rx.color("accent", 8),
+                                    user_select="none",
+                                    size="3",
+                                ),
+                                width="100%",
+                                height="100%",
+                            ),
+                        ),
+                    ),
+                    rx.center(
+                        rx.text(
+                            "Оберіть категорію та позицію каталогу",
+                            color=rx.color("accent", 8),
+                            user_select="none",
+                            size="3",
+                        ),
+                        width="100%",
+                        height="100%",
+                    ),
+                ),
+                padding="1em",
+                flex="2",
+                height="100%",
+                min_width="0",
+                min_height="0",
             ),
             # Середній ряд забирає лишню висоту (flex=1) і дозволяє внутрішню
             # прокрутку (min_height=0), а не розпирає діалог.

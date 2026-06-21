@@ -15,6 +15,11 @@ def item_preview() -> rx.Component:
         rx.hstack(rx.text("Опис:"), rx.text(ViewStorageState.description, is_optional=True), width="100%"),
         rx.hstack(rx.text("Адреса:"), rx.text(ViewStorageState.address), width="100%"),
         rx.hstack(rx.text("Відповідальний:"), rx.text(ViewStorageState.responsible), width="100%"),
+        rx.hstack(
+            rx.text("За замовчуванням для рухів:"),
+            rx.text(rx.cond(ViewStorageState.is_default, "Так", "Ні")),
+            width="100%",
+        ),
 
         spacing="3",
         height="100%",
@@ -254,11 +259,16 @@ def add_form() -> rx.Component:
                 value=AddStorageState.id_responsible,
                 on_change=AddStorageState.on_change_responsible,
             ),
+            rx.hstack(
+                rx.switch(checked=AddStorageState.is_default, on_change=AddStorageState.on_change_is_default),
+                rx.text("За замовчуванням для рухів (на цей тип)"),
+                align="center", spacing="2",
+            ),
 
             spacing="3",
             width="100%"
         ),
-        
+
         width="100%",
         height="100%",
     )
@@ -330,11 +340,16 @@ def edit_form() -> rx.Component:
                 value=EditStorageState.id_responsible,
                 on_change=EditStorageState.on_change_responsible,
             ),
+            rx.hstack(
+                rx.switch(checked=EditStorageState.is_default, on_change=EditStorageState.on_change_is_default),
+                rx.text("За замовчуванням для рухів (на цей тип)"),
+                align="center", spacing="2",
+            ),
 
             spacing="3",
             width="100%"
         ),
-        
+
         width="100%",
         height="100%",
     )

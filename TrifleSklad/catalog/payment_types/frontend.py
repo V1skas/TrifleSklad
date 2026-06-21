@@ -11,6 +11,11 @@ def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewPaymentTypeState.title, size="7", width="100%"),
         rx.hstack(rx.text("Опис:"), rx.text(ViewPaymentTypeState.description, is_optional=True), width="100%"),
+        rx.hstack(
+            rx.text("За замовчуванням для рухів:"),
+            rx.text(rx.cond(ViewPaymentTypeState.is_default, "Так", "Ні")),
+            width="100%",
+        ),
 
         spacing="3",
 
@@ -154,6 +159,11 @@ def add_form() -> rx.Component:
             rx.input(id="title", required=True, size="3", value=AddPaymentTypeState.title, on_change=AddPaymentTypeState.on_change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", size="3", value=AddPaymentTypeState.description, on_change=AddPaymentTypeState.on_change_description),
+            rx.hstack(
+                rx.switch(checked=AddPaymentTypeState.is_default, on_change=AddPaymentTypeState.on_change_is_default),
+                rx.text("За замовчуванням для рухів"),
+                align="center", spacing="2",
+            ),
 
             align="stretch"
         ),
@@ -169,6 +179,11 @@ def edit_form() -> rx.Component:
             rx.input(id="title", value=EditPaymentTypeState.title, required=True, size="3", on_change=EditPaymentTypeState.on_change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", value=EditPaymentTypeState.description, size="3", is_optional=True, on_change=EditPaymentTypeState.on_change_description),
+            rx.hstack(
+                rx.switch(checked=EditPaymentTypeState.is_default, on_change=EditPaymentTypeState.on_change_is_default),
+                rx.text("За замовчуванням для рухів"),
+                align="center", spacing="2",
+            ),
 
             align="stretch"
         ),

@@ -23,6 +23,10 @@ class ViewPaymentTypeState(rx.State):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
     # ====
 
     # Action handlers
@@ -56,6 +60,10 @@ class AddPaymentTypeState(rx.State):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
     # ===========
 
     # Action handlers
@@ -73,6 +81,10 @@ class AddPaymentTypeState(rx.State):
     @rx.event
     def on_change_description(self, description: str):
         self.item.description = description if description != "" else None
+
+    @rx.event
+    def on_change_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def add_one(self):
@@ -105,6 +117,10 @@ class EditPaymentTypeState(rx.State):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
     # ====
 
     # Action handlers
@@ -127,6 +143,10 @@ class EditPaymentTypeState(rx.State):
     @rx.event
     def on_change_description(self, description: str):
         self.item.description = description if description != "" else None
+
+    @rx.event
+    def on_change_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def edit_one(self):

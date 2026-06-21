@@ -15,6 +15,7 @@ from TrifleSklad.declared import (
 )
 from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.state import AppState
 
@@ -74,12 +75,6 @@ class ViewWriteOffState(rx.State):
     is_cancel_conflict_dialog_open: bool = False
     # ======================
 
-    # Position-detail dialog (перелік одиниць обраної позиції каталогу)
-    # ======================
-    is_position_dialog_open: bool = False
-    selected_position_index: int = -1
-    # ======================
-
     # Dynamic variables
     # ======================
     @rx.var
@@ -89,56 +84,6 @@ class ViewWriteOffState(rx.State):
     @rx.var
     def current_is_canceled(self) -> bool:
         return self.item is not None and self.item.status == MovementsStatus.CANCELED
-
-    @rx.var
-    def positions(self) -> List[Tuple[int, str, int]]:
-        # (індекс, назва позиції каталогу, підсумкова кількість одиниць)
-        if self.item is None:
-            return []
-        return [
-            (index, pc.product.title, len(pc.products))
-            for index, pc in enumerate(self.item.products_catalog)
-        ]
-
-    @rx.var
-    def has_positions(self) -> bool:
-        return self.item is not None and len(self.item.products_catalog) > 0
-
-    @rx.var
-    def selected_position_title(self) -> str:
-        if (
-            self.item is None
-            or self.selected_position_index < 0
-            or self.selected_position_index >= len(self.item.products_catalog)
-        ):
-            return ""
-        return self.item.products_catalog[self.selected_position_index].product.title
-
-    @rx.var
-    def selected_position_units(self) -> List[Tuple[str, str, str]]:
-        # (id одиниці, серійний номер або '—', залишок для подільного або '—')
-        if (
-            self.item is None
-            or self.selected_position_index < 0
-            or self.selected_position_index >= len(self.item.products_catalog)
-        ):
-            return []
-        pc = self.item.products_catalog[self.selected_position_index]
-        units: List[Tuple[str, str, str]] = []
-        for unit in pc.products:
-            catalog = unit.product_catalog
-            serial = (
-                unit.serial_number
-                if (catalog is not None and catalog.uniq and unit.serial_number)
-                else "—"
-            )
-            remain = (
-                str(unit.count)
-                if (catalog is not None and catalog.divisible)
-                else "—"
-            )
-            units.append((str(unit.id), serial, remain))
-        return units
 
     @rx.var
     def cancel_conflict_rows(self) -> List[Tuple[str, str, str, str, str]]:
@@ -158,23 +103,10 @@ class ViewWriteOffState(rx.State):
     def set_cancel_conflict_dialog_open(self, value: bool):
         self.is_cancel_conflict_dialog_open = value
 
-    @rx.event
-    def open_position_dialog(self, index: int):
-        self.selected_position_index = index
-        self.is_position_dialog_open = True
-
-    @rx.event
-    def set_position_dialog_open(self, value: bool):
-        self.is_position_dialog_open = value
-        if not value:
-            self.selected_position_index = -1
-
     # Action handlers
     # ======================
     @rx.event
     async def on_load(self, id: int):
-        self.is_position_dialog_open = False
-        self.selected_position_index = -1
         self.item = MovementDAO.get_by_id_with_product_storage_owner(id)
         if self.item is None:
             return [
@@ -198,7 +130,7 @@ class ViewWriteOffState(rx.State):
     # ======================
 
 
-class AddWriteOffState(rx.State):
+class AddWriteOffState(LookupCreatorsMixin, rx.State):
     current_date: str = date.today().__str__()
 
     id_incoming_storage: str = ""
@@ -262,6 +194,18 @@ class AddWriteOffState(rx.State):
         self.products_movement_list_state.items = []
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
+        # Серійний номер для унікального ТМЦ при списанні обов'язковий.
+        self.products_movement_list_state.set_require_serial(True)
+
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.id_incoming_storage = str(default_storage)
+            self.products_movement_list_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.id_incoming_owner = str(default_owner)
+            self.products_movement_list_state.filter_by_owner = default_owner
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
@@ -300,8 +244,51 @@ class AddWriteOffState(rx.State):
     def on_change_comment(self, value: str):
         self.comment = value
 
+    # Inline-створення довідників
+    # ======================
+    def _after_create_storage(self, new_id: int):
+        self._load_list_storages()
+        self.id_incoming_storage = str(new_id)
+        if self.products_movement_list_state is not None:
+            self.products_movement_list_state.filter_by_storage = new_id
+            self.products_movement_list_state.items = []
+
+    def _after_create_owner(self, new_id: int):
+        self._load_list_owners()
+        self.id_incoming_owner = str(new_id)
+        if self.products_movement_list_state is not None:
+            self.products_movement_list_state.filter_by_owner = new_id
+            self.products_movement_list_state.items = []
+
+    async def _reset_for_continue(self):
+        keep = dict(
+            current_date=self.current_date,
+            id_incoming_storage=self.id_incoming_storage,
+            id_incoming_owner=self.id_incoming_owner,
+            status=self.status,
+        )
+        self.search_name_incoming_storage = ""
+        self.comment = ""
+
+        self.current_date = keep["current_date"]
+        self.id_incoming_storage = keep["id_incoming_storage"]
+        self.id_incoming_owner = keep["id_incoming_owner"]
+        self.status = keep["status"]
+
+        self._load_list_storages()
+        self._load_list_owners()
+
+        self.products_movement_list_state.items = []
+        await self.products_movement_list_state.on_load()
+        self.products_movement_list_state.set_view_mode(False)
+        self.products_movement_list_state.set_require_serial(True)
+        if keep["id_incoming_storage"] != "":
+            self.products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
+        if keep["id_incoming_owner"] != "":
+            self.products_movement_list_state.filter_by_owner = int(keep["id_incoming_owner"])
+
     @rx.event
-    async def add_one(self):
+    async def add_one(self, keep: bool = False):
         if not self.app_state.has_permission(ActionEnum.WRITE_OFFS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.id_incoming_storage == "" or self.id_incoming_owner == "":
@@ -334,7 +321,18 @@ class AddWriteOffState(rx.State):
         list_id_item_for_delete: List[int] = [p.id for p in products_list]
         flag, text, id = MovementDAO.add_one(form_data)
         if flag:
+            # Серійні номери, введені/уточнені під час списання (обов'язкові для
+            # унікального ТМЦ) — фіксуємо в картці одиниці перед списанням.
+            serials = {
+                p.id: p.serial_number
+                for p in products_list
+                if p.product_catalog is not None and p.product_catalog.uniq
+            }
+            ProductDAO.update_serial_numbers(serials)
             ProductDAO.delete_list(list_id_item_for_delete)
+            if keep:
+                await self._reset_for_continue()
+                return rx.toast.success("Списання проведено!")
             return [
                 rx.toast.success("Списання проведено!"),
                 rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}"),

@@ -13,6 +13,12 @@ from TrifleSklad.movement.movements.backend import (
 )
 from TrifleSklad.movement.products.frontend import index as products
 from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    owner_create_dialog,
+    storage_create_dialog,
+)
+from TrifleSklad.declared import StorageType
 
 from TrifleSklad.models import Movement
 from TrifleSklad.state import AppState
@@ -306,6 +312,7 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_incoming_storage,
                 on_change=AddMovementsState.on_change_id_incoming_storage,
             ),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddMovementsState.open_storage_create(StorageType.WAREHOUSE, "incoming", False)),
             rx.text("*Власник відправлення:"),
             rx.select.root(
                 rx.select.trigger(
@@ -323,6 +330,8 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_incoming_owner,
                 on_change=AddMovementsState.on_change_id_incoming_owner,
             ),
+            create_lookup_button(ActionEnum.OWNERS_CREATE, "Створити власника", AddMovementsState.open_owner_create("incoming")),
+            owner_create_dialog(AddMovementsState),
             rx.text("*Склад призначення:"),
             rx.select.root(
                 rx.select.trigger(
@@ -357,6 +366,8 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_destination_storage,
                 on_change=AddMovementsState.on_change_id_destination_storage,
             ),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити склад", AddMovementsState.open_storage_create(StorageType.WAREHOUSE, "destination", False)),
+            storage_create_dialog(AddMovementsState),
             rx.text("*Власник призначення:"),
             rx.select.root(
                 rx.select.trigger(
@@ -374,6 +385,7 @@ def add_form() -> rx.Component:
                 value=AddMovementsState.id_destination_owner,
                 on_change=AddMovementsState.on_change_id_destination_owner,
             ),
+            create_lookup_button(ActionEnum.OWNERS_CREATE, "Створити власника", AddMovementsState.open_owner_create("destination")),
             products(width="100%"),
             rx.hstack(
                 rx.text("*Статус:"),
@@ -413,10 +425,19 @@ def add_tab_content() -> rx.Component:
                     rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_CREATE),
                         rx.button(
+                            "Зберегти і продовжити",
+                            variant="ghost",
+                            size="3",
+                            on_click=AddMovementsState.add_one(True),
+                        ),
+                    ),
+                    rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_CREATE),
+                        rx.button(
                             "Зберегти",
                             variant="ghost",
                             size="3",
-                            on_click=AddMovementsState.add_one,
+                            on_click=AddMovementsState.add_one(False),
                         ),
                     ),
                 ],
