@@ -149,6 +149,23 @@ def create_product_dialog() -> rx.Component:
 
 def movement_product_catalog_add_edit_form() -> rx.Component:
     return rx.vstack(
+        rx.text("Категорія:", width="100%"),
+        rx.select.root(
+            rx.select.trigger(
+                placeholder="Оберіть категорію",
+                width="100%",
+            ),
+            rx.select.content(
+                rx.foreach(
+                    MovementProductCatalogAddEditFormState.category_options,
+                    lambda c: rx.select.item(c[0], value=c[1]),
+                ),
+                width="100%",
+            ),
+            value=MovementProductCatalogAddEditFormState.filter_category,
+            on_change=MovementProductCatalogAddEditFormState.on_change_filter_category,
+            width="100%",
+        ),
         rx.text("Найменування з каталогу:", width="100%"),
         rx.select.root(
             rx.select.trigger(
@@ -173,6 +190,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
 
             name="id_product_catalog",
             required=True,
+            disabled=~MovementProductCatalogAddEditFormState.category_chosen,
 
             value=MovementProductCatalogAddEditFormState.id_product_catalog,
 
@@ -348,7 +366,7 @@ def movement_product_catalog_detailed_view_form() -> rx.Component:
         rx.hstack(
             rx.text("Вартість за одиницю:"),
             rx.text(
-                MovementProductCatalogDetailedViewState.item.price,
+                MovementProductCatalogDetailedViewState.price_display,
                 weight="bold",
                 decoration="underline",
                 width="100%"
@@ -497,8 +515,8 @@ def edit_admission_products_catalog_table() -> rx.Component:
                                 "—",
                             )
                         ),
-                        rx.table.cell(item[1].price),
-                        rx.table.cell(item[1].count * item[1].price),
+                        rx.table.cell(item[2]),
+                        rx.table.cell(item[3]),
                         on_click=EditAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -544,8 +562,8 @@ def add_admission_products_catalog_table() -> rx.Component:
                                 "—",
                             )
                         ),
-                        rx.table.cell(item[1].price),
-                        rx.table.cell(item[1].count * item[1].price),
+                        rx.table.cell(item[2]),
+                        rx.table.cell(item[3]),
                         on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -591,8 +609,8 @@ def view_admission_products_catalog_table() -> rx.Component:
                                 "—",
                             )
                         ),
-                        rx.table.cell(item[1].price),
-                        rx.table.cell(item[1].count * item[1].price),
+                        rx.table.cell(item[2]),
+                        rx.table.cell(item[3]),
                         on_click=ViewAdmissionState.on_change_dialog_open(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -784,7 +802,7 @@ def item_preview_tab_content() -> rx.Component:
         value=AdmissionState.Pages.VIEW
     )
 
-def table_row(item: Tuple[int, Admission]) -> rx.Component:
+def table_row(item: Tuple[int, Admission, str]) -> rx.Component:
     return rx.table.row(
         rx.table.cell(rx.text(item[1].id)),
         rx.table.row_header_cell(
@@ -795,7 +813,7 @@ def table_row(item: Tuple[int, Admission]) -> rx.Component:
         rx.table.cell(rx.text(item[1].movement.destination_storage.title)),
         rx.table.cell(rx.text(item[1].movement.destination_owner.title)),
         rx.table.cell(rx.text(item[1].payment_type.title)),
-        rx.table.cell(rx.text(item[1].movement.total_cost)),
+        rx.table.cell(rx.text(item[2])),
         rx.table.cell(rx.text(rx.cond(item[1].flag_nds, "Так", "Ні"))),
         rx.table.cell(rx.text(ListAdmissionState.get_movement_statuses[item[1].movement.status])),
         on_click=rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{item[1].id}"),
@@ -1062,7 +1080,7 @@ def add_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text("*Курс долара:"),
+                    rx.text("Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
@@ -1278,7 +1296,7 @@ def edit_form() -> rx.Component:
                     width="100%",
                 ),
                 rx.hstack(
-                    rx.text("*Курс долара:"),
+                    rx.text("Курс долара:"),
                     rx.input(
                         name="dollar_rate",
                         required=True,
