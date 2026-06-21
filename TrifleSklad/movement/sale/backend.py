@@ -413,6 +413,19 @@ class AddSaleState(LookupCreatorsMixin, rx.State):
         self.products_movement_list_state.set_require_price(True)
         self.products_movement_list_state.set_require_serial(True)
 
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.id_incoming_storage = str(default_storage)
+            self.products_movement_list_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.id_incoming_owner = str(default_owner)
+            self.products_movement_list_state.filter_by_owner = default_owner
+        default_worker = WorkerDAO.get_default_id()
+        if default_worker is not None:
+            self.id_responsible = str(default_worker)
+
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 

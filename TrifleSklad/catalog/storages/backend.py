@@ -39,7 +39,11 @@ class ViewStorageState(rx.State):
     
     @rx.var
     def responsible(self) -> str:
-        return self.item.responsible.fio if self.item is not None and self.item.responsible is not None else "None"    
+        return self.item.responsible.fio if self.item is not None and self.item.responsible is not None else "None"
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
     # ====
 
     # Action handlers
@@ -96,7 +100,11 @@ class AddStorageState(rx.State):
 
     @rx.var
     def id_responsible(self) -> str:
-        return str(self.item.id_responsible) if self.item is not None and self.item.id_responsible is not None else "-1"  
+        return str(self.item.id_responsible) if self.item is not None and self.item.id_responsible is not None else "-1"
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
     # ====
 
     # Action handlers
@@ -132,6 +140,10 @@ class AddStorageState(rx.State):
     def on_change_responsible(self, id_responsible: str):
         if id_responsible.isdigit():
             self.item.id_responsible = int(id_responsible)
+
+    @rx.event
+    def on_change_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def add_one(self):
@@ -190,7 +202,11 @@ class EditStorageState(rx.State):
 
     @rx.var
     def id_responsible(self) -> str:
-        return str(self.item.id_responsible) if self.item is not None and self.item.id_responsible is not None else "-1"   
+        return str(self.item.id_responsible) if self.item is not None and self.item.id_responsible is not None else "-1"
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
     # ====
 
     # Action handlers
@@ -231,6 +247,10 @@ class EditStorageState(rx.State):
     def on_change_responsible(self, id_responsible: str):
         if id_responsible.isdigit():
             self.item.id_responsible = int(id_responsible)
+
+    @rx.event
+    def on_change_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def edit_one(self):

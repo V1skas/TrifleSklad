@@ -762,6 +762,17 @@ class AddAdmissionState(LookupCreatorsMixin, rx.State):
         self._load_payment_types()
         self._load_nds_rates()
 
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.item.movement.id_destination_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.item.movement.id_destination_owner = default_owner
+        default_payment = PaymentTypeDAO.get_default_id()
+        if default_payment is not None:
+            self.item.id_payment_type = default_payment
+
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 

@@ -55,6 +55,11 @@ def item_preview() -> rx.Component:
         rx.hstack(rx.text("Посада:"), rx.text(ViewWorkerState.item.position), width="100%"),
         rx.hstack(rx.text("Телефон:"), rx.text(ViewWorkerState.item.phone_number), width="100%"),
         rx.hstack(rx.text("Ел. пошта:"), rx.text(ViewWorkerState.item.email), width="100%"),
+        rx.hstack(
+            rx.text("За замовчуванням для рухів:"),
+            rx.text(rx.cond(ViewWorkerState.item.is_default, "Так", "Ні")),
+            width="100%",
+        ),
         rx.spacer(),
 
         spacing="3",
@@ -191,6 +196,11 @@ def add_form() -> rx.Component:
                 value=AddWorkerState.item.email,
                 on_change=AddWorkerState.change_email
             ),
+            rx.hstack(
+                rx.switch(checked=AddWorkerState.item.is_default, on_change=AddWorkerState.change_is_default),
+                rx.text("За замовчуванням для рухів (отримувач/відповідальний)"),
+                align="center", spacing="2",
+            ),
 
             align="stretch"
         ),
@@ -235,6 +245,11 @@ def edit_form() -> rx.Component:
 
                     value=EditWorkerState.item.email,
                     on_change=EditWorkerState.change_email
+                ),
+                rx.hstack(
+                    rx.switch(checked=EditWorkerState.item.is_default, on_change=EditWorkerState.change_is_default),
+                    rx.text("За замовчуванням для рухів (отримувач/відповідальний)"),
+                    align="center", spacing="2",
                 ),
 
                 align="stretch"

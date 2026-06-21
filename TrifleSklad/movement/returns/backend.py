@@ -194,6 +194,11 @@ class AddReturnsState(LookupCreatorsMixin, rx.State):
         # кожна одиниця зберігає свого власника.
         self.products_movement_list_state.set_require_owner(False)
 
+        # Передзаповнення складу-призначення за замовчуванням (TS-33).
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.id_destination_storage = str(default_storage)
+
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 

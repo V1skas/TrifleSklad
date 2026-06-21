@@ -331,6 +331,20 @@ class AddIssueState(LookupCreatorsMixin, rx.State):
         # При видачі серійний номер ТМЦ обов'язковий для одиниць із серійним номером.
         self.products_selector_state.set_require_serial(True)
 
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.item.movement.id_incoming_storage = default_storage
+            self.products_selector_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.item.movement.id_incoming_owner = default_owner
+            self.item.movement.id_destination_owner = default_owner
+            self.products_selector_state.filter_by_owner = default_owner
+        default_worker = WorkerDAO.get_default_id()
+        if default_worker is not None:
+            self.item.id_recipient = default_worker
+
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 

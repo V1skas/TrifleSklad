@@ -6,7 +6,7 @@ import math
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import select, func, or_
+from sqlmodel import select, func, or_, update
 
 from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus
 from TrifleSklad.models import (
@@ -468,6 +468,17 @@ class WorkerDAO:
             return worker
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id працівника за замовчуванням (отримувач/відповідальний)."""
+        statement = (
+            select(Worker.id)
+            .where(Worker.is_default == True)
+            .where(Worker.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
         worker = Worker(**form_data)
 
@@ -481,6 +492,13 @@ class WorkerDAO:
 
                 if session.exec(statement).one_or_none() is not None:
                     return False, "Помилка! Співробітник з таким ПІБ вже існує!", -1
+
+                if worker.is_default:
+                    session.exec(
+                        update(Worker)
+                        .where(Worker.is_deleted == False)
+                        .values(is_default=False)
+                    )
 
                 session.add(worker)
                 session.commit()
@@ -515,6 +533,14 @@ class WorkerDAO:
                         False,
                         "Помилка! Співробітник з таким ПІБ вже існує!",
                         worker.id,
+                    )
+
+                if worker.is_default:
+                    session.exec(
+                        update(Worker)
+                        .where(Worker.id != worker.id)
+                        .where(Worker.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 session.commit()
@@ -868,11 +894,12 @@ class ProductCatalogDAO:
                 statement = (
                     select(ProductCatalog)
                     .where(ProductCatalog.title == product.title)
+                    .where(ProductCatalog.unit == product.unit)
                     .where(ProductCatalog.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Помилка! Товар з такою назвою вже існує!", -1
+                    return False, "Помилка! Товар з такою назвою та одиницею виміру вже існує!", -1
 
                 session.add(product)
                 session.commit()
@@ -893,13 +920,14 @@ class ProductCatalogDAO:
                 statement = (
                     select(ProductCatalog)
                     .where(ProductCatalog.title == product.title)
+                    .where(ProductCatalog.unit == product.unit)
                     .where(ProductCatalog.id != product.id)
                     .where(ProductCatalog.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Помилка! Товар з такою назвою вже існує!",
+                        "Помилка! Товар з такою назвою та одиницею виміру вже існує!",
                         product.id,
                     )
 
@@ -1049,17 +1077,38 @@ class StorageDAO:
         return storage_type is not None and storage_type in types
 
     @classmethod
+    def get_default_id(cls, type: int) -> Optional[int]:
+        """Id місця зберігання за замовчуванням для заданого типу (склад/площадка/відділ)."""
+        statement = (
+            select(Storage.id)
+            .where(Storage.type == type)
+            .where(Storage.is_default == True)
+            .where(Storage.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, storage: Storage) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
+                    .where(Storage.type == storage.type)
                     .where(Storage.is_deleted == False)
                 )
 
                 if session.exec(statement).one_or_none() is not None:
-                    return False, "Помилка! Місце зберігання з такою назвою вже існує!", -1
+                    return False, "Помилка! Місце зберігання з такою назвою та типом вже існує!", -1
+
+                if storage.is_default:
+                    session.exec(
+                        update(Storage)
+                        .where(Storage.type == storage.type)
+                        .where(Storage.is_deleted == False)
+                        .values(is_default=False)
+                    )
 
                 session.add(storage)
                 session.commit()
@@ -1078,14 +1127,24 @@ class StorageDAO:
                 statement = (
                     select(Storage)
                     .where(Storage.title == storage.title)
+                    .where(Storage.type == storage.type)
                     .where(Storage.id != storage.id)
                     .where(Storage.is_deleted == False)
                 )
                 if session.exec(statement).one_or_none() is not None:
                     return (
                         False,
-                        "Помилка! Склад з такою назвою вже існує!",
+                        "Помилка! Місце зберігання з такою назвою та типом вже існує!",
                         storage.id,
+                    )
+
+                if storage.is_default:
+                    session.exec(
+                        update(Storage)
+                        .where(Storage.type == storage.type)
+                        .where(Storage.id != storage.id)
+                        .where(Storage.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 storage = session.merge(storage)
@@ -1162,6 +1221,17 @@ class OwnerDAO:
             return session.exec(statement).all()
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id власника за замовчуванням."""
+        statement = (
+            select(Owner.id)
+            .where(Owner.is_default == True)
+            .where(Owner.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, owner: Owner) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -1176,6 +1246,13 @@ class OwnerDAO:
                         False,
                         "Помилка! Власник з такою назвою вже існує!",
                         -1,
+                    )
+
+                if owner.is_default:
+                    session.exec(
+                        update(Owner)
+                        .where(Owner.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 session.add(owner)
@@ -1203,6 +1280,14 @@ class OwnerDAO:
                         False,
                         "Помилка! Власник з такою назвою вже існує!",
                         owner.id,
+                    )
+
+                if owner.is_default:
+                    session.exec(
+                        update(Owner)
+                        .where(Owner.id != owner.id)
+                        .where(Owner.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 owner = session.merge(owner)
@@ -2486,6 +2571,17 @@ class PaymentTypeDAO:
             return payment_type
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id типу оплати за замовчуванням."""
+        statement = (
+            select(PaymentType.id)
+            .where(PaymentType.is_default == True)
+            .where(PaymentType.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, payment_type: PaymentType) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -2500,6 +2596,13 @@ class PaymentTypeDAO:
                         False,
                         "Помилка! Тип оплати з такою назвою вже існує!",
                         -1,
+                    )
+
+                if payment_type.is_default:
+                    session.exec(
+                        update(PaymentType)
+                        .where(PaymentType.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 session.add(payment_type)
@@ -2527,6 +2630,14 @@ class PaymentTypeDAO:
                         False,
                         "Помилка! Тип оплати з такою назвою вже існує!",
                         payment_type.id,
+                    )
+
+                if payment_type.is_default:
+                    session.exec(
+                        update(PaymentType)
+                        .where(PaymentType.id != payment_type.id)
+                        .where(PaymentType.is_deleted == False)
+                        .values(is_default=False)
                     )
 
                 payment_type = session.merge(payment_type)

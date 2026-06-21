@@ -94,6 +94,7 @@ class Worker(rx.Model, table=True):
     phone_number: Optional[str] = Field(nullable=True)
     email: Optional[str] = Field(nullable=True)
     position: Optional[str] = Field(nullable=True)
+    is_default: bool = Field(default=False, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
@@ -144,6 +145,7 @@ class Owner(rx.Model, table=True):
     id: int = Field(primary_key=True) # type: ignore
     title: str = Field(default="", nullable=False)
     description: Optional[str] = Field(nullable=True)
+    is_default: bool = Field(default=False, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
@@ -177,6 +179,7 @@ class Storage(rx.Model, table=True):
     description: Optional[str] = Field(nullable=True)
     address: str = Field(default="", nullable=False)
     id_responsible: int = Field(default=0, nullable=False, foreign_key="workers.id")
+    is_default: bool = Field(default=False, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
@@ -267,6 +270,7 @@ class PaymentType(rx.Model, table=True):
     id: int = Field(primary_key=True)
     title: str = Field(nullable=False, unique=True)
     description: Optional[str] = Field(nullable=True)
+    is_default: bool = Field(default=False, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships

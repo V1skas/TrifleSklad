@@ -16,7 +16,11 @@ class ViewOwnerState(rx.State):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
-    
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
+
     # Action handlers
     # ===============
     @rx.event
@@ -38,7 +42,11 @@ class AddOwnerState(rx.State):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
-    
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
+
     def _reset_item(self):
         self.item: Owner = Owner()
         
@@ -57,7 +65,11 @@ class AddOwnerState(rx.State):
     @rx.event
     def on_change_description(self, description: str):
         self.item.description = description
-        
+
+    @rx.event
+    def on_change_is_default(self, value: bool):
+        self.item.is_default = value
+
     @rx.event
     def add_one(self):
         if not self.app_state.has_permission(ActionEnum.OWNERS_CREATE):
@@ -80,6 +92,10 @@ class EditOwnerState(rx.State):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
 
     def _load_item(self, id: int):
         self.item = OwnerDAO.get_by_id(id)
@@ -104,6 +120,10 @@ class EditOwnerState(rx.State):
     @rx.event
     def on_change_description(self, description: str):
         self.item.description = description
+
+    @rx.event
+    def on_change_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def edit_one(self):

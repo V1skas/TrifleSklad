@@ -224,6 +224,17 @@ class AddMovementsState(LookupCreatorsMixin, rx.State):
         await self.products_movement_list_state.on_load()
         self.products_movement_list_state.set_view_mode(False)
 
+        # Передзаповнення значень за замовчуванням (TS-33)
+        default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
+        if default_storage is not None:
+            self.id_incoming_storage = str(default_storage)
+            self.products_movement_list_state.filter_by_storage = default_storage
+        default_owner = OwnerDAO.get_default_id()
+        if default_owner is not None:
+            self.id_incoming_owner = str(default_owner)
+            self.id_destination_owner = str(default_owner)
+            self.products_movement_list_state.filter_by_owner = default_owner
+
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
 

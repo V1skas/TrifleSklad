@@ -78,6 +78,10 @@ class AddWorkerState(rx.State):
         self.item.email = value if value != "" else None
 
     @rx.event
+    def change_is_default(self, value: bool):
+        self.item.is_default = value
+
+    @rx.event
     async def add_one(self):
         app_state: AppState = await self.get_state(AppState)
         if not app_state.has_permission(Action.WORKERS_CREATE):
@@ -124,6 +128,10 @@ class EditWorkerState(rx.State):
     @rx.event
     def change_email(self, value: str):
         self.item.email = value if value != "" else None
+
+    @rx.event
+    def change_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     async def edit_one(self):
