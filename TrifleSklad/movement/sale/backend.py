@@ -21,6 +21,7 @@ from TrifleSklad.declared import (
     format_request_qty,
     movements_status_list,
     movements_type_list,
+    sale_line_cost,
 )
 from TrifleSklad.models import Movement, Product, Sale
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
@@ -154,6 +155,7 @@ class ViewSaleState(rx.State):
         result: List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]] = []
         for index, pc in enumerate(self.item.movement.products_catalog):
             units: List[Tuple[int, str, str]] = []
+            line_units: List[Tuple[int, bool, int]] = []
             for unit in pc.products:
                 catalog = unit.product_catalog
                 serial = (
@@ -167,13 +169,20 @@ class ViewSaleState(rx.State):
                     else "—"
                 )
                 units.append((unit.id, serial, remain))
+                line_units.append(
+                    (
+                        unit.count or 0,
+                        catalog.divisible if catalog is not None else False,
+                        catalog.capacity if catalog is not None else 0,
+                    )
+                )
             result.append(
                 (
                     index,
                     pc.product.title,
                     pc.count,
                     pc.price,
-                    round(pc.price * pc.count, 2),
+                    sale_line_cost(pc.price, line_units),
                     units,
                 )
             )

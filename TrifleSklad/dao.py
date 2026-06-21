@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select, func, or_, update
 
-from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus
+from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus, sale_line_cost
 from TrifleSklad.models import (
     Action,
     Admission,
@@ -28,6 +28,7 @@ from TrifleSklad.models import (
     Role,
     RolesActions,
     Sale,
+    SaleReturn,
     Storage,
     Supplier,
     User,
@@ -3445,11 +3446,24 @@ class SaleDAO:
                     ).all()
                 }
 
+                # Подільність/ємність позицій каталогу — для пропорційного
+                # розрахунку вартості частини подільного ТМЦ (sale_line_cost).
+                catalog_meta = {
+                    c.id: (c.divisible, c.capacity)
+                    for c in session.exec(
+                        select(ProductCatalog).where(
+                            ProductCatalog.id.in_(list(catalog_to_ids.keys()))
+                        )
+                    ).all()
+                }
+
                 movement_products_catalog: List[MovementProductsCatalog] = []
                 total_cost = 0.0
                 for catalog_id, ids in catalog_to_ids.items():
                     price = float(prices.get(catalog_id, 0.0))
                     units = [bound_products[i] for i in ids if i in bound_products]
+                    divisible, capacity = catalog_meta.get(catalog_id, (False, 0))
+                    line_units = [(u.count or 0, divisible, capacity) for u in units]
                     movement_products_catalog.append(
                         MovementProductsCatalog(
                             id_product_catalog=catalog_id,
@@ -3458,7 +3472,7 @@ class SaleDAO:
                             products=units,
                         )
                     )
-                    total_cost += price * len(units)
+                    total_cost += sale_line_cost(price, line_units)
 
                 movement.products_catalog = movement_products_catalog
                 movement.total_cost = total_cost
@@ -3501,6 +3515,253 @@ class SaleDAO:
 
         except IntegrityError as e:
             return False, "Помилка: Продаж не може бути змінено", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
+
+
+class SaleReturnDAO:
+    """Повернення продажу: проданий ТМЦ (одиниці is_deleted=True) приймається
+    назад на склад. Загальна компенсована вартість — Movement.total_cost,
+    компенсація за позицію — MovementProductsCatalog.price."""
+
+    @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+        destination_storage: Optional[str] = None,
+    ) -> tuple[int, List[SaleReturn]]:
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            destination_storage=destination_storage,
+        )
+        movement_ids = select(Movement.id).where(Movement.type == MovementsType.SALE_RETURN)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        with rx.session() as session:
+            count_stmt = select(func.count(SaleReturn.id)).where(
+                SaleReturn.id.in_(movement_ids)
+            )
+            total = session.exec(count_stmt).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(SaleReturn)
+                .options(
+                    joinedload(SaleReturn.movement).options(
+                        joinedload(Movement.destination_storage),
+                    ),
+                )
+                .where(SaleReturn.id.in_(movement_ids))
+                .order_by(SaleReturn.id.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            returns = session.exec(statement).all()
+            if len(returns) > 0:
+                session.expunge_all()
+            return total_pages, list(returns)
+
+    @classmethod
+    def get_by_id_with_all_relationship(cls, id: int) -> Optional[SaleReturn]:
+        statement = (
+            select(SaleReturn)
+            .options(
+                joinedload(SaleReturn.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                        ),
+                    ),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(SaleReturn.sale).options(
+                    joinedload(Sale.movement),
+                ),
+            )
+            .where(SaleReturn.id == id)
+        )
+        with rx.session() as session:
+            sale_return = session.exec(statement).one_or_none()
+            if sale_return:
+                session.expunge(sale_return)
+            return sale_return
+
+    @classmethod
+    def get_returnable_sales(cls) -> List[Sale]:
+        """Продажі (не скасовані), у яких є хоча б одна ще не повернена одиниця
+        (Product.is_deleted == True) — для селектора у формі повернення."""
+        sold_sale_ids = (
+            select(Movement.id)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .join(
+                MovementProducts,
+                MovementProducts.id_movement_product == MovementProductsCatalog.id,
+            )
+            .join(Product, Product.id == MovementProducts.id_product)
+            .where(Movement.type == MovementsType.SALE)
+            .where(Movement.status != MovementsStatus.CANCELED)
+            .where(Product.is_deleted == True)
+        )
+        statement = (
+            select(Sale)
+            .options(joinedload(Sale.movement))
+            .where(Sale.id.in_(sold_sale_ids))
+            .order_by(Sale.id.desc())
+        )
+        with rx.session() as session:
+            sales = session.exec(statement).all()
+            if len(sales) > 0:
+                session.expunge_all()
+            return list(sales)
+
+    @classmethod
+    def get_sale_units(cls, sale_id: int) -> List[Product]:
+        """Одиниці продажу, які ще не повернені (актуальний is_deleted == True),
+        з підвантаженим product_catalog. Згруповані по позиції каталогу зовні."""
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .join(MovementProducts, MovementProducts.id_product == Product.id)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id == MovementProducts.id_movement_product,
+            )
+            .where(MovementProductsCatalog.id_movement == sale_id)
+            .where(Product.is_deleted == True)
+            .order_by(Product.id_product_catalog, Product.id)
+        )
+        with rx.session() as session:
+            products = session.exec(statement).all()
+            if len(products) > 0:
+                session.expunge_all()
+            return list(products)
+
+    @classmethod
+    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Створює повернення продажу: Movement (тип SALE_RETURN) із позиціями
+        (price = компенсація за позицію, total_cost = Σ компенсацій) і дочірній
+        SaleReturn. Повернені одиниці відновлюються (undelete) і переміщуються на
+        склад призначення; власник кожної одиниці зберігається."""
+        try:
+            with rx.session() as session:
+                # compensations: id позиції каталогу -> компенсація за позицію.
+                compensations: Dict[int, float] = form_data.get("compensations", {})
+                product_ids: List[int] = form_data.get("product_ids", [])
+
+                bound_products = {
+                    p.id: p
+                    for p in session.exec(
+                        select(Product).where(Product.id.in_(product_ids))
+                    ).all()
+                }
+
+                catalog_to_ids: "OrderedDict[int, List[int]]" = OrderedDict()
+                for pid in product_ids:
+                    product = bound_products.get(pid)
+                    if product is None:
+                        continue
+                    catalog_to_ids.setdefault(
+                        product.id_product_catalog, []
+                    ).append(pid)
+
+                # Останній власник = власник, із яким ТМЦ було продано
+                # (`id_incoming_owner` вихідного продажу; усі одиниці продажу
+                # фільтрувалися за ним). Призначаємо його руху-поверненню.
+                sale_movement = session.get(Movement, form_data["id_sale"])
+                last_owner = (
+                    sale_movement.id_incoming_owner
+                    if sale_movement is not None
+                    else None
+                )
+
+                movement: Movement = Movement(
+                    type=MovementsType.SALE_RETURN,
+                    id_user=form_data["id_user"],
+                    id_destination_storage=form_data.get("id_destination_storage"),
+                    id_incoming_owner=last_owner,
+                    id_destination_owner=last_owner,
+                    date=form_data.get("date"),
+                    comment=form_data.get("comment"),
+                    status=form_data.get("status"),
+                    total_cost=0.0,
+                )
+
+                movement_products_catalog: List[MovementProductsCatalog] = []
+                total_cost = 0.0
+                for catalog_id, ids in catalog_to_ids.items():
+                    compensation = float(compensations.get(catalog_id, 0.0))
+                    units = [bound_products[i] for i in ids if i in bound_products]
+                    movement_products_catalog.append(
+                        MovementProductsCatalog(
+                            id_product_catalog=catalog_id,
+                            count=len(units),
+                            price=compensation,
+                            products=units,
+                        )
+                    )
+                    total_cost += compensation
+
+                movement.products_catalog = movement_products_catalog
+                movement.total_cost = round(total_cost, 2)
+
+                sale_return: SaleReturn = SaleReturn(
+                    id_sale=form_data["id_sale"],
+                    movement=movement,
+                )
+
+                # Повертаємо одиниці у залишки на склад призначення; власником
+                # призначаємо останнього власника (з яким ТМЦ було продано).
+                destination_storage = form_data.get("id_destination_storage")
+                for pid, product in bound_products.items():
+                    product.is_deleted = False
+                    if destination_storage is not None:
+                        product.id_storage = destination_storage
+                    if last_owner is not None:
+                        product.id_owner = last_owner
+                    session.add(product)
+
+                session.add(sale_return)
+                session.commit()
+                return True, "Повернення продажу успішно додано", sale_return.id
+
+        except IntegrityError as e:
+            return False, "Помилка: Повернення продажу не може бути додано", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+        """Редагування повернення продажу: лише статус і коментар руху."""
+        try:
+            with rx.session() as session:
+                sale_return = session.get(SaleReturn, form_data["id"])
+                if sale_return is None:
+                    return False, "Помилка: Повернення не знайдено", -1
+
+                movement = session.get(Movement, form_data["id"])
+                if movement is None:
+                    return False, "Помилка: Рух товару не знайдено", -1
+
+                if "status" in form_data:
+                    movement.status = form_data["status"]
+                if "comment" in form_data:
+                    movement.comment = form_data["comment"]
+
+                session.commit()
+                return True, "Повернення продажу успішно змінено", sale_return.id
+
+        except IntegrityError as e:
+            return False, "Помилка: Повернення продажу не може бути змінено", -1
         except SQLAlchemyError as e:
             return False, f"Помилка: {str(e)}", -1
 

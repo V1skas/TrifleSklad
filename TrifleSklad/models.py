@@ -330,6 +330,21 @@ class Sale(rx.Model, table=True):
     movement: Optional[Movement] = Relationship()
 
 
+class SaleReturn(rx.Model, table=True):
+    __tablename__ = "sale_returns"
+
+    # Table columns
+    id: int = Field(primary_key=True, foreign_key="movements.id")
+    # Вихідний продаж, за яким оформлено повернення.
+    id_sale: int = Field(foreign_key="sales.id", nullable=False)
+
+    # Relationship
+    sale: Optional[Sale] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "SaleReturn.id_sale"}
+    )
+    movement: Optional[Movement] = Relationship()
+
+
 class Request(rx.Model, table=True):
     __tablename__ = "requests"
 

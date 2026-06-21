@@ -57,7 +57,7 @@ def navbar() -> rx.Component:
                     navbar_link("Каталог", routes.CATALOG),
                 ),
                 rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST) | AppState.get_user_actions.contains(ActionEnum.SALES_LIST) | AppState.get_user_actions.contains(ActionEnum.RETURNS_LIST),
+                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST) | AppState.get_user_actions.contains(ActionEnum.SALES_LIST) | AppState.get_user_actions.contains(ActionEnum.RETURNS_LIST) | AppState.get_user_actions.contains(ActionEnum.SALE_RETURNS_LIST),
                     navbar_link("Рух ТМЦ", routes.MOVEMENT),
                 ),
                 rx.cond(

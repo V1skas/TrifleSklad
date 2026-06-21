@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple
 import reflex as rx
 
 from TrifleSklad.dao import ProductDAO
+from TrifleSklad.declared import sale_line_cost
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
@@ -162,30 +163,34 @@ class ProductsMovementListState(rx.State):
 
     @rx.var
     def group_sums(self) -> Dict[int, float]:
-        # Сума по позиції каталогу (для продажу): ціна за одиницю × к-сть одиниць.
+        # Сума по позиції каталогу (для продажу). Для подільного ТМЦ, проданого
+        # частиною, ціна за цілу одиницю масштабується пропорційно залишку
+        # (sale_line_cost), інакше — ціна × к-сть одиниць.
         prices = self.get_prices()
         sums: Dict[int, float] = {}
-        for catalog_id, (_title, count) in self._grouped_counts().items():
-            sums[catalog_id] = round(prices.get(catalog_id, 0.0) * count, 2)
+        for catalog_id, units in self._grouped_units().items():
+            sums[catalog_id] = sale_line_cost(prices.get(catalog_id, 0.0), units)
         return sums
 
-    def _grouped_counts(self) -> Dict[int, Tuple[str, int]]:
-        # Групує вибрані одиниці за позицією каталогу: id -> (назва, кількість).
-        groups: Dict[int, Tuple[str, int]] = {}
+    def _grouped_units(self) -> Dict[int, List[Tuple[int, bool, int]]]:
+        # Групує вибрані одиниці за позицією каталогу:
+        # id -> [(count, divisible, capacity), ...].
+        groups: Dict[int, List[Tuple[int, bool, int]]] = {}
         for product in self.items:
-            if product.product_catalog is None:
+            catalog = product.product_catalog
+            if catalog is None:
                 continue
-            catalog_id = product.product_catalog.id
-            title, count = groups.get(catalog_id, (product.product_catalog.title, 0))
-            groups[catalog_id] = (title, count + 1)
+            groups.setdefault(catalog.id, []).append(
+                (product.count or 0, catalog.divisible, catalog.capacity)
+            )
         return groups
 
     @rx.var
     def total_cost(self) -> float:
         prices = self.get_prices()
         total = 0.0
-        for catalog_id, (_title, count) in self._grouped_counts().items():
-            total += prices.get(catalog_id, 0.0) * count
+        for catalog_id, units in self._grouped_units().items():
+            total += sale_line_cost(prices.get(catalog_id, 0.0), units)
         return round(total, 2)
 
     @rx.event

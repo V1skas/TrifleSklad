@@ -615,6 +615,18 @@ def view_tab_content() -> rx.Component:
                 ),
                 actions=[
                     rx.cond(
+                        AppState.get_user_actions.contains(ActionEnum.SALE_RETURNS_CREATE)
+                        & (ViewSaleState.current_is_canceled == False),
+                        rx.button(
+                            "Оформити повернення",
+                            variant="ghost",
+                            size="3",
+                            on_click=rx.redirect(
+                                f"{routes.MOVEMENT_SALE_RETURNS_ADD}{ViewSaleState.item.id}"
+                            ),
+                        ),
+                    ),
+                    rx.cond(
                         AppState.get_user_actions.contains(ActionEnum.SALES_EDIT)
                         & (ViewSaleState.current_is_canceled == False),
                         rx.button(
