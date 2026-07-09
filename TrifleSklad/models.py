@@ -111,7 +111,7 @@ class ProductCategory(rx.Model, table=True):
     id: int = Field(primary_key=True) # type: ignore
     title: str = Field(default="", nullable=False)
     description: Optional[str] = Field(nullable=True)
-    #id_parrent: Optional[int] = Field(default=None, foreign_key="product_categories.id", nullable=True)
+    id_parent: Optional[int] = Field(default=None, foreign_key="product_categories.id", nullable=True)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships

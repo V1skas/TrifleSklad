@@ -86,7 +86,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # ======================
     @rx.var
     def category_options(self) -> List[Tuple[str, str]]:
-        return [(item.title, str(item.id)) for item in ProductCategoryDAO.get_all()]
+        return [(label, id) for id, label in ProductCategoryDAO.get_hierarchy_options()]
 
     @rx.var
     def category_chosen(self) -> bool:
@@ -102,11 +102,16 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
         if self.filter_category == "":
             return []
+        # Обрана категорія може бути батьківською — тоді допустимі й позиції
+        # усіх її підкатегорій.
+        allowed_category_ids = set(
+            str(i) for i in ProductCategoryDAO.get_self_and_children_ids(int(self.filter_category))
+        )
         term = self.search_catalog.strip().lower()
         return [
             (catalog.title, str(catalog.id))
             for catalog in self.cache_products_catalog_list
-            if str(catalog.id_category) == self.filter_category
+            if str(catalog.id_category) in allowed_category_ids
             and (term == "" or term in catalog.title.lower())
         ]
 
@@ -359,9 +364,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     @rx.event
     def open_create_product(self):
-        self.list_categories = [
-            (str(item.id), item.title) for item in ProductCategoryDAO.get_all()
-        ]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self.units_cache = ProductCatalogDAO.get_list_units()
         self._reset_new_product()
         self.is_create_open = True
@@ -420,6 +423,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return rx.toast.error("Вкажіть назву та категорію товару!")
         if self.new_uniq and self.new_divisible:
             return rx.toast.error("Товар із серійним номером не може бути подільним!")
+        if self.new_divisible and not (self.new_capacity.isdigit() and int(self.new_capacity) > 0):
+            return rx.toast.error("Для подільного ТМЦ потрібно вказати додатну місткість!")
 
         capacity = (
             1
@@ -509,9 +514,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return rx.toast.error(text)
 
         # Перезавантажуємо список і одразу обираємо нову категорію в новому товарі.
-        self.list_categories = [
-            (str(item.id), item.title) for item in ProductCategoryDAO.get_all()
-        ]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self.new_id_category = str(new_id)
         self.is_create_category_open = False
         self._reset_new_category()
@@ -1119,6 +1122,7 @@ class AddAdmissionState(LookupCreatorsMixin, rx.State):
             return rx.toast.success(text)
         return [
             rx.toast.success(text),
+            ListAdmissionState.on_load(),
             rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
         ]
 
@@ -1520,6 +1524,7 @@ class EditAdmissionState(rx.State):
         if flag:
             return [
                 rx.toast.success(text),
+                ListAdmissionState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

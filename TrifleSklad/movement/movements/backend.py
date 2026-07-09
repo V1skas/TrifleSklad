@@ -399,6 +399,7 @@ class AddMovementsState(LookupCreatorsMixin, rx.State):
                 return rx.toast.success("Переміщення проведено!")
             return [
                 rx.toast.success("Переміщення проведено!"),
+                ListMovementsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -573,6 +574,7 @@ class EditMovementsState(rx.State):
         if flag:
             return [
                 rx.toast.success("Переміщення змінено!"),
+                ListMovementsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

@@ -646,6 +646,7 @@ class AddIssueState(LookupCreatorsMixin, rx.State):
                 return rx.toast.success(text)
             return [
                 rx.toast.success(text),
+                ListIssueState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -866,6 +867,7 @@ class EditIssueState(rx.State):
         if flag:
             return [
                 rx.toast.success(text),
+                ListIssueState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

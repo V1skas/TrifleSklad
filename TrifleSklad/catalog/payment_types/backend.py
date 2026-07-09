@@ -96,7 +96,7 @@ class AddPaymentTypeState(rx.State):
 
         flag, text, id = PaymentTypeDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PAYMENT_TYPES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListPaymentTypeState.on_load(), rx.redirect(f"{routes.CATALOG_PAYMENT_TYPES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -158,7 +158,7 @@ class EditPaymentTypeState(rx.State):
         
         flag, text, id = PaymentTypeDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PAYMENT_TYPES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListPaymentTypeState.on_load(), rx.redirect(f"{routes.CATALOG_PAYMENT_TYPES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -254,7 +254,7 @@ class PaymentTypeState(rx.State):
         if id > -1:
             flag, text = PaymentTypeDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_PAYMENT_TYPES)]
+                return [rx.toast.success(text), ListPaymentTypeState.on_load(), rx.redirect(routes.CATALOG_PAYMENT_TYPES)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

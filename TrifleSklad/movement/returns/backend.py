@@ -319,6 +319,7 @@ class AddReturnsState(LookupCreatorsMixin, rx.State):
                 return rx.toast.success("Повернення проведено!")
             return [
                 rx.toast.success("Повернення проведено!"),
+                ListReturnsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -410,6 +411,7 @@ class EditReturnsState(rx.State):
         if flag:
             return [
                 rx.toast.success("Повернення змінено!"),
+                ListReturnsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

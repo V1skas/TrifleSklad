@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 import math
@@ -650,9 +650,85 @@ class ProductCategoryDAO:
             return category
 
     @classmethod
+    def get_self_and_children_ids(cls, category_id: int) -> List[int]:
+        """[category_id] + id живих дочірніх категорій. Якщо у категорії немає
+        дітей (або вона сама дочірня) — повертає лише [category_id]."""
+        statement = (
+            select(ProductCategory.id)
+            .where(ProductCategory.id_parent == category_id)
+            .where(ProductCategory.is_deleted == False)
+        )
+        with rx.session() as session:
+            child_ids = list(session.exec(statement).all())
+            return [category_id] + child_ids
+
+    @classmethod
+    def has_children(cls, category_id: int) -> bool:
+        statement = (
+            select(ProductCategory.id)
+            .where(ProductCategory.id_parent == category_id)
+            .where(ProductCategory.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first() is not None
+
+    @classmethod
+    def get_top_level_options(cls, exclude_id: Optional[int] = None) -> List[Tuple[str, str]]:
+        statement = (
+            select(ProductCategory)
+            .where(ProductCategory.id_parent == None)
+            .where(ProductCategory.is_deleted == False)
+            .order_by(ProductCategory.title)
+        )
+        with rx.session() as session:
+            categories = session.exec(statement).all()
+            return [
+                (str(c.id), c.title) for c in categories if c.id != exclude_id
+            ]
+
+    @classmethod
+    def get_all_ordered_for_tree(cls) -> List[ProductCategory]:
+        """Живі категорії, впорядковані: батько (алфавітно), одразу за ним —
+        його діти (алфавітно)."""
+        categories = cls.get_all()
+        top_level = sorted(
+            (c for c in categories if c.id_parent is None), key=lambda c: c.title
+        )
+        children_by_parent: Dict[int, List[ProductCategory]] = {}
+        for c in categories:
+            if c.id_parent is not None:
+                children_by_parent.setdefault(c.id_parent, []).append(c)
+        for children in children_by_parent.values():
+            children.sort(key=lambda c: c.title)
+
+        result: List[ProductCategory] = []
+        for parent in top_level:
+            result.append(parent)
+            result.extend(children_by_parent.get(parent.id, []))
+        return result
+
+    @classmethod
+    def get_hierarchy_options(cls) -> List[Tuple[str, str]]:
+        """(id, назва) для всіх категорій, з відступом "— " для дочірніх —
+        єдина точка формування підписів для селектів категорій."""
+        return [
+            (str(c.id), c.title if c.id_parent is None else f"— {c.title}")
+            for c in cls.get_all_ordered_for_tree()
+        ]
+
+    @classmethod
     def add_one(cls, category: ProductCategory) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
+                if category.id_parent is not None:
+                    parent = session.get(ProductCategory, category.id_parent)
+                    if parent is None or parent.is_deleted or parent.id_parent is not None:
+                        return (
+                            False,
+                            "Неможливо обрати підкатегорію як батьківську!",
+                            -1,
+                        )
+
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
@@ -680,6 +756,29 @@ class ProductCategoryDAO:
     def edit_one(cls, category: ProductCategory) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
+                if category.id_parent is not None:
+                    if category.id_parent == category.id:
+                        return (
+                            False,
+                            "Категорія не може бути батьківською для самої себе!",
+                            category.id,
+                        )
+
+                    parent = session.get(ProductCategory, category.id_parent)
+                    if parent is None or parent.is_deleted or parent.id_parent is not None:
+                        return (
+                            False,
+                            "Неможливо обрати підкатегорію як батьківську!",
+                            category.id,
+                        )
+
+                    if cls.has_children(category.id):
+                        return (
+                            False,
+                            "Неможливо призначити батьківську категорію: у категорії вже є підкатегорії!",
+                            category.id,
+                        )
+
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
@@ -784,7 +883,9 @@ class ProductCatalogDAO:
 
         statement = select(func.count(ProductCatalog.id)).where(condition).where(ProductCatalog.is_deleted == False)
         if category_id and category_id not in ("", "all"):
-            statement = statement.where(ProductCatalog.id_category == int(category_id))
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(int(category_id)))
+            )
 
         with rx.session() as session:
             return session.exec(statement).one()
@@ -809,7 +910,9 @@ class ProductCatalogDAO:
                 .where(condition)
             )
         if category_id and category_id not in ("", "all"):
-            statement = statement.where(ProductCatalog.id_category == int(category_id))
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(int(category_id)))
+            )
         statement = statement.offset(skip).limit(limit)
 
         with rx.session() as session:
@@ -1559,10 +1662,11 @@ class ProductDAO:
     def get_categories_by_owner_storage(
         cls, owner_id: int, storage_id: int
     ) -> List[tuple[int, str]]:
-        """Перелік категорій (id, назва), у яких є доступні одиниці на вказаному
-        місці/власнику — перший крок каскадного вибору в діалозі."""
+        """Перелік категорій (id, назва з відступом для дочірніх), у яких є
+        доступні одиниці на вказаному місці/власнику — перший крок каскадного
+        вибору в діалозі."""
         statement = (
-            select(ProductCategory.id, ProductCategory.title)
+            select(ProductCategory.id, ProductCategory.title, ProductCategory.id_parent)
             .join(ProductCatalog, ProductCatalog.id_category == ProductCategory.id)
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
             .where(Product.id_storage == storage_id)
@@ -1573,7 +1677,10 @@ class ProductDAO:
         statement = statement.distinct().order_by(ProductCategory.title)
 
         with rx.session() as session:
-            return [(row[0], row[1]) for row in session.exec(statement).all()]
+            return [
+                (row[0], row[1] if row[2] is None else f"— {row[1]}")
+                for row in session.exec(statement).all()
+            ]
 
     @classmethod
     def get_catalog_options_by_owner_storage(
@@ -1591,7 +1698,9 @@ class ProductDAO:
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
         if category_id != -1:
-            statement = statement.where(ProductCatalog.id_category == category_id)
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(category_id))
+            )
         statement = statement.distinct().order_by(ProductCatalog.title)
 
         with rx.session() as session:
@@ -1919,7 +2028,9 @@ class ProductDAO:
         if catalog_id is not None:
             statement = statement.where(ProductCatalog.id == catalog_id)
         if category_id is not None:
-            statement = statement.where(ProductCatalog.id_category == category_id)
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(category_id))
+            )
         if storage_id is not None:
             statement = statement.where(Product.id_storage == storage_id)
         if owner_id is not None:

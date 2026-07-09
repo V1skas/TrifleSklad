@@ -93,7 +93,7 @@ class AddWorkerState(rx.State):
             return
         flag, text, id = WorkerDAO.add_one(self.item.dict())
         if flag:
-            yield [rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
+            yield [ListWorkersState.refresh_list(), rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
             return
         yield rx.toast.error(text)
         return
@@ -145,7 +145,7 @@ class EditWorkerState(rx.State):
             return
         flag, text, id = WorkerDAO.edit_one(self.item.dict())
         if flag:
-            yield [rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
+            yield [ListWorkersState.refresh_list(), rx.redirect(f"{routes.ADMIN_WORKERS_VIEW_ID}{id}"), rx.toast.success(text)]
             return
         yield rx.toast.error(text)
         return
@@ -225,7 +225,7 @@ class WorkersState(rx.State):
         
         flag, text = WorkerDAO.delete_one(id)
         if flag:
-            yield [rx.redirect(routes.ADMIN_WORKERS), rx.toast.success(text)]
+            yield [ListWorkersState.refresh_list(), rx.redirect(routes.ADMIN_WORKERS), rx.toast.success(text)]
             return
         yield rx.toast.error(text)
         return

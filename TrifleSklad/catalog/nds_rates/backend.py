@@ -103,7 +103,7 @@ class AddNdsRateState(rx.State):
 
         flag, text, id = NDSRateDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_NDS_RATES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListNdsRateState.on_load(), rx.redirect(f"{routes.CATALOG_NDS_RATES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -172,7 +172,7 @@ class EditNdsRateState(rx.State):
 
         flag, text, id = NDSRateDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_NDS_RATES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListNdsRateState.on_load(), rx.redirect(f"{routes.CATALOG_NDS_RATES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -258,7 +258,7 @@ class NdsRateState(rx.State):
         if id > -1:
             flag, text = NDSRateDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_NDS_RATES)]
+                return [rx.toast.success(text), ListNdsRateState.on_load(), rx.redirect(routes.CATALOG_NDS_RATES)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

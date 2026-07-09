@@ -372,6 +372,7 @@ class AddRequestsState(_RequestFormState, rx.State):
         if flag:
             return [
                 rx.toast.success(text),
+                ListRequestsState.on_load(),
                 rx.redirect(f"{routes.CATALOG_REQUESTS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -445,6 +446,7 @@ class EditRequestsState(_RequestFormState, rx.State):
         if flag:
             return [
                 rx.toast.success(text),
+                ListRequestsState.on_load(),
                 rx.redirect(f"{routes.CATALOG_REQUESTS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -846,5 +848,5 @@ class RequestsState(rx.State):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         flag, text = RequestDAO.delete_one(id)
         if flag:
-            return [rx.toast.success(text), rx.redirect(routes.CATALOG_REQUESTS)]
+            return [rx.toast.success(text), ListRequestsState.on_load(), rx.redirect(routes.CATALOG_REQUESTS)]
         return rx.toast.error(text)

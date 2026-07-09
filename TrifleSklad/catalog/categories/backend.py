@@ -1,6 +1,6 @@
 import reflex as rx
 
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import TrifleSklad.routes as routes
 from TrifleSklad.state import AppState
@@ -10,9 +10,15 @@ from TrifleSklad.models import ProductCategory, ProductCatalog
 from TrifleSklad.dao import ProductCatalogDAO, ProductCategoryDAO
 
 
+# Сентинел «без батьківської категорії» для селекту (Radix забороняє порожнє value item).
+NONE = "none"
+
+
 class ViewCategoriesState(rx.State):
     item: Optional[ProductCategory] = None
     app_state: Optional[AppState] = None
+    parent_title: str = ""
+    children: List[ProductCategory] = []
 
     # Action handlers
     # ===============
@@ -24,6 +30,13 @@ class ViewCategoriesState(rx.State):
                 rx.redirect(routes.CATALOG_CATEGORIES),
                 rx.toast.error("Запис не знайдено!")
             ]
+        self.parent_title = ""
+        if self.item.id_parent is not None:
+            parent = ProductCategoryDAO.get_by_id(self.item.id_parent)
+            self.parent_title = parent.title if parent is not None else ""
+        self.children = [
+            c for c in ProductCategoryDAO.get_all() if c.id_parent == self.item.id
+        ]
         self.app_state = await self.get_state(AppState)
     # ===============
 
@@ -31,15 +44,19 @@ class ViewCategoriesState(rx.State):
 class AddCategoriesState(rx.State):
     item: Optional[ProductCategory] = None
     app_state: Optional[AppState] = None
+    list_parent_categories: List[Tuple[str, str]] = []
+    parent_id: str = NONE
 
     def _reset_item(self):
         self.item: ProductCategory = ProductCategory()
+        self.parent_id = NONE
 
     # Action handlers
     # ===============
     @rx.event
     async def on_load(self):
         self._reset_item()
+        self.list_parent_categories = ProductCategoryDAO.get_top_level_options()
         self.app_state = await self.get_state(AppState)
 
     @rx.event
@@ -51,6 +68,10 @@ class AddCategoriesState(rx.State):
         self.item.description = new_description
 
     @rx.event
+    def on_change_parent(self, value: str):
+        self.parent_id = value
+
+    @rx.event
     def add_one(self):
         if not self.app_state.has_permission(ActionEnum.CATEGORIES_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
@@ -58,9 +79,14 @@ class AddCategoriesState(rx.State):
         if self.item.title is None or self.item.title == "":
             return rx.toast.error("Не заповнені обов'язкові поля!")
 
+        self.item.id_parent = int(self.parent_id) if self.parent_id != NONE else None
+
         flag, text, id = ProductCategoryDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_CATEGORIES_VIEW_ID}{id}")]
+            # Освіжаємо список одразу тут — інакше при поверненні на список
+            # (через кнопку «Повернутись») можна побачити застарілі дані,
+            # якщо on_load цільової сторінки з якоїсь причини не спрацює.
+            return [rx.toast.success(text), ListCategoriesState.on_load(), rx.redirect(f"{routes.CATALOG_CATEGORIES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -68,9 +94,16 @@ class AddCategoriesState(rx.State):
 class EditCategoriesState(rx.State):
     item: Optional[ProductCategory] = None
     app_state: Optional[AppState] = None
+    list_parent_categories: List[Tuple[str, str]] = []
+    parent_id: str = NONE
+    can_set_parent: bool = True
 
     def _load_item(self, id: int):
         self.item = ProductCategoryDAO.get_by_id_with_relationships(id)
+        if self.item is not None:
+            self.parent_id = str(self.item.id_parent) if self.item.id_parent is not None else NONE
+            self.can_set_parent = not ProductCategoryDAO.has_children(self.item.id)
+            self.list_parent_categories = ProductCategoryDAO.get_top_level_options(exclude_id=self.item.id)
 
     # Action handlers
     # ===============
@@ -94,6 +127,10 @@ class EditCategoriesState(rx.State):
         self.item.description = new_description
 
     @rx.event
+    def on_change_parent(self, value: str):
+        self.parent_id = value
+
+    @rx.event
     def edit_one(self):
         if not self.app_state.has_permission(ActionEnum.CATEGORIES_EDIT):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
@@ -101,9 +138,13 @@ class EditCategoriesState(rx.State):
         if self.item.title is None or self.item.title == "":
             return rx.toast.error("Не заповнені обов'язкові поля!")
 
+        self.item.id_parent = (
+            int(self.parent_id) if self.can_set_parent and self.parent_id != NONE else None
+        )
+
         flag, text, id = ProductCategoryDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_CATEGORIES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListCategoriesState.on_load(), rx.redirect(f"{routes.CATALOG_CATEGORIES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -122,7 +163,7 @@ class ListCategoriesState(rx.State):
     # ===============
     @rx.event
     def on_load(self):
-        self.items = ProductCategoryDAO.get_all()
+        self.items = ProductCategoryDAO.get_all_ordered_for_tree()
     # ===============
 
 
@@ -197,13 +238,16 @@ class CategoriesState(rx.State):
                 return rx.toast.error("Ви не маєте дозволу на цю дію!")
                 
             products_in_category: List[ProductCatalog] = ProductCatalogDAO.get_by_category(id)
-            
+
             if len(products_in_category) > 0:
                 return rx.toast.error("Неможливо видалити категорію, у яку входить ТМЦ з каталогу!")
 
+            if ProductCategoryDAO.has_children(id):
+                return rx.toast.error("Неможливо видалити категорію, у якої є підкатегорії!")
+
             flag, text = ProductCategoryDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_CATEGORIES)]
+                return [rx.toast.success(text), ListCategoriesState.on_load(), rx.redirect(routes.CATALOG_CATEGORIES)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

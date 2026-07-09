@@ -569,6 +569,7 @@ class AddSaleState(LookupCreatorsMixin, rx.State):
                 return rx.toast.success("Продаж проведено!")
             return [
                 rx.toast.success("Продаж проведено!"),
+                ListSaleState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -696,6 +697,7 @@ class EditSaleState(rx.State):
         if flag:
             return [
                 rx.toast.success("Продаж змінено!"),
+                ListSaleState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

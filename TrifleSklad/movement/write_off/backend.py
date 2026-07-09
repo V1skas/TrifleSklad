@@ -335,6 +335,7 @@ class AddWriteOffState(LookupCreatorsMixin, rx.State):
                 return rx.toast.success("Списання проведено!")
             return [
                 rx.toast.success("Списання проведено!"),
+                ListWriteOffState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -484,6 +485,7 @@ class EditWriteOffState(rx.State):
         if flag:
             return [
                 rx.toast.success("Списання змінено!"),
+                ListWriteOffState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

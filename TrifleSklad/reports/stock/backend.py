@@ -71,9 +71,7 @@ class StockReportState(rx.State):
             (str(c.id), c.title, str(c.id_category) if c.id_category else "")
             for c in ProductCatalogDAO.get_all()
         ]
-        self.list_categories = [
-            (str(c.id), c.title) for c in ProductCategoryDAO.get_all()
-        ]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self._storages_cache = [
             (str(s.id), s.title, s.type) for s in StorageDAO.get_all()
         ]
