@@ -64,6 +64,30 @@ def create_category_dialog() -> rx.Component:
     )
 
 
+def duplicate_product_confirm_dialog() -> rx.Component:
+    # Вкладений діалог: товар з такою назвою+одиницею вже є в каталозі —
+    # питаємо, чи додати наявний до поставки замість створення дубля.
+    State = MovementProductCatalogAddEditFormState
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Такий товар вже є в каталозі"),
+            rx.text(
+                f"ТМЦ «{State.duplicate_product_title}» вже є в каталозі. Додати наявний товар до поставки?",
+            ),
+            rx.hstack(
+                rx.button("Ні", variant="outline", type="button", on_click=State.cancel_duplicate_product),
+                rx.spacer(),
+                rx.button("Так, додати", type="button", on_click=State.confirm_use_duplicate_product),
+                width="100%",
+                padding_top="0.5em",
+            ),
+            width="28em",
+        ),
+        open=State.is_duplicate_confirm_open,
+        on_open_change=State.set_duplicate_confirm_open,
+    )
+
+
 def create_product_dialog() -> rx.Component:
     # Вкладений діалог створення нового товару каталогу прямо з поставки.
     State = MovementProductCatalogAddEditFormState
@@ -105,6 +129,7 @@ def create_product_dialog() -> rx.Component:
                     width="100%",
                 ),
                 create_category_dialog(),
+                duplicate_product_confirm_dialog(),
                 rx.text("Одиниця виміру:", size="2"),
                 rx.input(
                     value=State.new_unit,

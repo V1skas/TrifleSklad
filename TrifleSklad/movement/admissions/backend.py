@@ -353,6 +353,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
     new_uniq: bool = False
     new_capacity: str = "0"
 
+    # Підтвердження «такий товар вже є в каталозі — додати наявний?»
+    is_duplicate_confirm_open: bool = False
+    duplicate_product_id: int = -1
+    duplicate_product_category_id: str = ""
+    duplicate_product_title: str = ""
+
     def _reset_new_product(self):
         self.new_title = ""
         self.new_description = ""
@@ -361,12 +367,20 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.new_divisible = False
         self.new_uniq = False
         self.new_capacity = "0"
+        self.is_duplicate_confirm_open = False
+        self.duplicate_product_id = -1
+        self.duplicate_product_category_id = ""
+        self.duplicate_product_title = ""
 
     @rx.event
     def open_create_product(self):
         self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self.units_cache = ProductCatalogDAO.get_list_units()
         self._reset_new_product()
+        # Якщо в діалозі позиції вже обрано категорію — підставляємо її одразу,
+        # щоб не змушувати користувача обирати те саме вдруге.
+        if self.filter_category != "":
+            self.new_id_category = self.filter_category
         self.is_create_open = True
 
     @rx.event
@@ -413,6 +427,26 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return
         self.new_divisible = value
 
+    def _select_catalog_in_line(self, catalog_id: int, category_id: str):
+        """Обирає позицію каталогу в поточному рядку поставки — спільна логіка
+        для «товар щойно створено» та «обрано наявний дубль»."""
+        self._load_products_catalog_list()
+        self.search_catalog = ""
+        self.filter_category = category_id
+        for catalog in self.cache_products_catalog_list:
+            if catalog.id == catalog_id:
+                self.id_product_catalog_in_cache = str(catalog.id)
+                self.item.product = catalog
+                self.item.id_product_catalog = catalog.id
+                self.is_product_uniq = catalog.uniq
+                self.selected_divisible = catalog.divisible
+                self.selected_capacity = catalog.capacity or 0
+                per_unit = self._per_unit_count()
+                for unit in self.item.products:
+                    unit.id_product_catalog = catalog.id
+                    unit.count = per_unit
+                break
+
     @rx.event
     async def create_product(self):
         # Створення товару каталогу з поставки потребує права на додавання ТМЦ.
@@ -426,6 +460,19 @@ class MovementProductCatalogAddEditFormState(rx.State):
         if self.new_divisible and not (self.new_capacity.isdigit() and int(self.new_capacity) > 0):
             return rx.toast.error("Для подільного ТМЦ потрібно вказати додатну місткість!")
 
+        unit = self.new_unit.strip()
+        existing = ProductCatalogDAO.get_by_title_and_unit(title, unit)
+        if existing is not None:
+            # Товар з такою назвою+одиницею вже є в каталозі — питаємо, чи додати
+            # наявний до поставки, замість того щоб просто відхилити створення.
+            self.duplicate_product_id = existing.id
+            self.duplicate_product_category_id = (
+                str(existing.id_category) if existing.id_category is not None else ""
+            )
+            self.duplicate_product_title = f"{existing.title} ({existing.unit})"
+            self.is_duplicate_confirm_open = True
+            return
+
         capacity = (
             1
             if self.new_uniq
@@ -435,7 +482,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             title=title,
             description=self.new_description.strip() or None,
             id_category=int(self.new_id_category),
-            unit=self.new_unit.strip(),
+            unit=unit,
             divisible=False if self.new_uniq else self.new_divisible,
             uniq=self.new_uniq,
             capacity=capacity,
@@ -447,26 +494,43 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
         # Новий товар одразу обираємо в поточному рядку поставки. Переставляємо
         # фільтр категорії на категорію нового товару, щоб він був у переліку.
-        self._load_products_catalog_list()
-        self.search_catalog = ""
-        self.filter_category = str(int(self.new_id_category))
-        for catalog in self.cache_products_catalog_list:
-            if catalog.id == new_id:
-                self.id_product_catalog_in_cache = str(catalog.id)
-                self.item.product = catalog
-                self.item.id_product_catalog = catalog.id
-                self.is_product_uniq = catalog.uniq
-                self.selected_divisible = catalog.divisible
-                self.selected_capacity = catalog.capacity or 0
-                per_unit = self._per_unit_count()
-                for unit in self.item.products:
-                    unit.id_product_catalog = catalog.id
-                    unit.count = per_unit
-                break
+        self._select_catalog_in_line(new_id, str(int(self.new_id_category)))
 
         self.is_create_open = False
         self._reset_new_product()
         return rx.toast.success("Товар створено та обрано!")
+
+    @rx.event
+    def cancel_duplicate_product(self):
+        self.is_duplicate_confirm_open = False
+        self.duplicate_product_id = -1
+        self.duplicate_product_category_id = ""
+        self.duplicate_product_title = ""
+
+    @rx.event
+    def set_duplicate_confirm_open(self, value: bool):
+        if not value:
+            self.cancel_duplicate_product()
+
+    @rx.event
+    def confirm_use_duplicate_product(self):
+        # Користувач погодився використати наявний товар замість створення дубля.
+        catalog_id = self.duplicate_product_id
+        self._select_catalog_in_line(catalog_id, self.duplicate_product_category_id)
+
+        self.is_duplicate_confirm_open = False
+        self.duplicate_product_id = -1
+        self.duplicate_product_category_id = ""
+        self.duplicate_product_title = ""
+
+        if self.item.id_product_catalog != catalog_id:
+            # Товар вже використовується в іншому рядку цієї поставки — виключений
+            # з кешу, тож обрати його повторно не можна.
+            return rx.toast.error("Цей товар вже додано до поставки в іншому рядку!")
+
+        self.is_create_open = False
+        self._reset_new_product()
+        return rx.toast.success("Обрано наявний товар!")
     # ======================
 
     # Створення нової категорії прямо з діалогу створення товару
@@ -996,11 +1060,13 @@ class AddAdmissionState(LookupCreatorsMixin, rx.State):
         form_state.set_item(
             self.item.movement.products_catalog[self.current_product_catalog_index]
         )
-        form_state.exclude_products_catalog_list = [
+        # Освіжаємо кеш каталогу так само, як при відкритті на додавання —
+        # інакше нові/щойно прив'язані до категорії товари не будуть видні.
+        form_state.set_exclude_products_catalog_list([
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
             if i != self.current_product_catalog_index
-        ]
+        ])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
 
@@ -1471,11 +1537,13 @@ class EditAdmissionState(rx.State):
         form_state.set_item(
             self.item.movement.products_catalog[self.current_product_catalog_index]
         )
-        form_state.exclude_products_catalog_list = [
+        # Освіжаємо кеш каталогу так само, як при відкритті на додавання —
+        # інакше нові/щойно прив'язані до категорії товари не будуть видні.
+        form_state.set_exclude_products_catalog_list([
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
             if i != self.current_product_catalog_index
-        ]
+        ])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
 

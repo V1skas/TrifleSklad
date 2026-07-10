@@ -966,6 +966,24 @@ class ProductCatalogDAO:
                 session.expunge(product)
             return product
 
+    @classmethod
+    def get_by_title_and_unit(cls, title: str, unit: str) -> Optional[ProductCatalog]:
+        """Пошук дубля за парою назва+одиниця виміру (той самий critерій, що й
+        у add_one) — для сценарію «такий товар вже є, додати його до поставки?»."""
+        statement = (
+            select(ProductCatalog)
+            .where(ProductCatalog.title == title)
+            .where(ProductCatalog.unit == unit)
+            .where(ProductCatalog.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            product = session.exec(statement).one_or_none()
+
+            if product:
+                session.expunge(product)
+            return product
+
 
     @classmethod
     def get_by_category(cls, id_category) -> List[ProductCatalog]:
