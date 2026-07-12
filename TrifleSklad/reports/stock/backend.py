@@ -44,10 +44,16 @@ class StockReportState(rx.State):
     exclude_warehouse: bool = False
     exclude_site: bool = False
     exclude_department: bool = False
+    exclude_client: bool = False
 
     # Живий пошук усередині селектів позиції каталогу та місця зберігання.
     search_catalog: str = ""
     search_storage: str = ""
+
+    # Пошук по самому звіту — за назвою позиції каталогу або серійним номером
+    # одиниці; на відміну від search_catalog/search_storage вище фільтрує самі
+    # рядки звіту, а не лише опції селектів.
+    search_text: str = ""
 
     # Модалка одиниць позиції: (id, serial, storage, owner, count)
     is_units_open: bool = False
@@ -64,6 +70,8 @@ class StockReportState(rx.State):
             excluded.append(StorageType.TECHNICAL_SITE)
         if self.exclude_department:
             excluded.append(StorageType.DEPARTMENT)
+        if self.exclude_client:
+            excluded.append(StorageType.CLIENT)
         return excluded
 
     def _load_filter_options(self):
@@ -71,9 +79,7 @@ class StockReportState(rx.State):
             (str(c.id), c.title, str(c.id_category) if c.id_category else "")
             for c in ProductCatalogDAO.get_all()
         ]
-        self.list_categories = [
-            (str(c.id), c.title) for c in ProductCategoryDAO.get_all()
-        ]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self._storages_cache = [
             (str(s.id), s.title, s.type) for s in StorageDAO.get_all()
         ]
@@ -107,6 +113,7 @@ class StockReportState(rx.State):
             int(self.filter_owner) if self.filter_owner else None,
             self._excluded_types(),
             int(self.filter_category) if self.filter_category else None,
+            self.search_text or None,
         )
 
     # Dynamic variables
@@ -183,6 +190,8 @@ class StockReportState(rx.State):
         self.exclude_warehouse = False
         self.exclude_site = False
         self.exclude_department = False
+        self.exclude_client = False
+        self.search_text = ""
         self.is_units_open = False
         self.unit_rows = []
         self.selected_title = ""
@@ -197,6 +206,11 @@ class StockReportState(rx.State):
     @rx.event
     def on_change_search_storage(self, value: str):
         self.search_storage = value
+
+    @rx.event
+    def on_change_search_text(self, value: str):
+        self.search_text = value
+        self._reload()
 
     @rx.event
     def on_change_catalog(self, value: str):
@@ -238,6 +252,12 @@ class StockReportState(rx.State):
         self._reload()
 
     @rx.event
+    def on_change_exclude_client(self, value: bool):
+        self.exclude_client = value
+        self._sync_storage_filter()
+        self._reload()
+
+    @rx.event
     def reset_filters(self):
         self.filter_catalog = ""
         self.filter_category = ""
@@ -246,6 +266,8 @@ class StockReportState(rx.State):
         self.exclude_warehouse = False
         self.exclude_site = False
         self.exclude_department = False
+        self.exclude_client = False
+        self.search_text = ""
         self._reload()
 
     @rx.event
@@ -256,6 +278,7 @@ class StockReportState(rx.State):
             int(self.filter_storage) if self.filter_storage else None,
             int(self.filter_owner) if self.filter_owner else None,
             self._excluded_types(),
+            self.search_text or None,
         )
         rows: List[Tuple[str, str, str, str, str]] = []
         for unit in units:

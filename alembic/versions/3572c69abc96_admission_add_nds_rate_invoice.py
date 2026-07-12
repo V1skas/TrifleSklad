@@ -24,7 +24,7 @@ def upgrade() -> None:
             sa.Column('id_nds_rate', sa.Integer(), nullable=True)
         )
         batch_op.add_column(
-            sa.Column('invoice_number', sa.String(), nullable=True)
+            sa.Column('invoice_number', sqlmodel.sql.sqltypes.AutoString(), nullable=True)
         )
         batch_op.create_foreign_key(
             'fk_admissions_nds_rates',

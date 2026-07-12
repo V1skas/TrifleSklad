@@ -162,6 +162,7 @@ class AddUserState(rx.State):
         flag, text, id = UserDAO.add_one(self.item)
         if flag:
             return [
+                ListUserState.on_load(),
                 rx.redirect(f"{routes.ADMIN_USERS_VIEW_ID}{id}"),
                 rx.toast.success(text),
             ]
@@ -261,6 +262,7 @@ class EditUserState(rx.State):
         flag, text, id = UserDAO.edit_one(self.item)
         if flag:
             return [
+                ListUserState.on_load(),
                 rx.redirect(f"{routes.ADMIN_USERS_VIEW_ID}{id}"),
                 rx.toast.success(text),
             ]
@@ -359,7 +361,7 @@ class UserState(rx.State):
         if login is not None and len(login) > 0:
             flag, text = UserDAO.delete_one(login)
             if flag:
-                return [rx.redirect(routes.ADMIN_USERS), rx.toast.success(text)]
+                return [ListUserState.on_load(), rx.redirect(routes.ADMIN_USERS), rx.toast.success(text)]
             else:
                 return [rx.toast.error(text)]
         else:

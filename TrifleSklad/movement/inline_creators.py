@@ -364,11 +364,15 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.var
     def st_type_options(self) -> List[Tuple[str, str]]:
-        # Для слота призначення видачі/повернення: площадка або відділ.
-        return [
+        # Для слота призначення видачі: площадка або відділ.
+        # Для слота джерела повернення: додатково клієнт.
+        options = [
             (storage_type_list[StorageType.TECHNICAL_SITE], str(StorageType.TECHNICAL_SITE)),
             (storage_type_list[StorageType.DEPARTMENT], str(StorageType.DEPARTMENT)),
         ]
+        if self.st_slot == "incoming":
+            options.append((storage_type_list[StorageType.CLIENT], str(StorageType.CLIENT)))
+        return options
 
     @rx.event
     def open_storage_create(self, storage_type: int, slot: str, allow_type_choice: bool = False):

@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 import math
@@ -13,6 +13,7 @@ from TrifleSklad.models import (
     Action,
     Admission,
     AuthToken,
+    ClientIssue,
     Issue,
     Movement,
     MovementProducts,
@@ -650,9 +651,85 @@ class ProductCategoryDAO:
             return category
 
     @classmethod
+    def get_self_and_children_ids(cls, category_id: int) -> List[int]:
+        """[category_id] + id живих дочірніх категорій. Якщо у категорії немає
+        дітей (або вона сама дочірня) — повертає лише [category_id]."""
+        statement = (
+            select(ProductCategory.id)
+            .where(ProductCategory.id_parent == category_id)
+            .where(ProductCategory.is_deleted == False)
+        )
+        with rx.session() as session:
+            child_ids = list(session.exec(statement).all())
+            return [category_id] + child_ids
+
+    @classmethod
+    def has_children(cls, category_id: int) -> bool:
+        statement = (
+            select(ProductCategory.id)
+            .where(ProductCategory.id_parent == category_id)
+            .where(ProductCategory.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first() is not None
+
+    @classmethod
+    def get_top_level_options(cls, exclude_id: Optional[int] = None) -> List[Tuple[str, str]]:
+        statement = (
+            select(ProductCategory)
+            .where(ProductCategory.id_parent == None)
+            .where(ProductCategory.is_deleted == False)
+            .order_by(ProductCategory.title)
+        )
+        with rx.session() as session:
+            categories = session.exec(statement).all()
+            return [
+                (str(c.id), c.title) for c in categories if c.id != exclude_id
+            ]
+
+    @classmethod
+    def get_all_ordered_for_tree(cls) -> List[ProductCategory]:
+        """Живі категорії, впорядковані: батько (алфавітно), одразу за ним —
+        його діти (алфавітно)."""
+        categories = cls.get_all()
+        top_level = sorted(
+            (c for c in categories if c.id_parent is None), key=lambda c: c.title
+        )
+        children_by_parent: Dict[int, List[ProductCategory]] = {}
+        for c in categories:
+            if c.id_parent is not None:
+                children_by_parent.setdefault(c.id_parent, []).append(c)
+        for children in children_by_parent.values():
+            children.sort(key=lambda c: c.title)
+
+        result: List[ProductCategory] = []
+        for parent in top_level:
+            result.append(parent)
+            result.extend(children_by_parent.get(parent.id, []))
+        return result
+
+    @classmethod
+    def get_hierarchy_options(cls) -> List[Tuple[str, str]]:
+        """(id, назва) для всіх категорій, з відступом "— " для дочірніх —
+        єдина точка формування підписів для селектів категорій."""
+        return [
+            (str(c.id), c.title if c.id_parent is None else f"— {c.title}")
+            for c in cls.get_all_ordered_for_tree()
+        ]
+
+    @classmethod
     def add_one(cls, category: ProductCategory) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
+                if category.id_parent is not None:
+                    parent = session.get(ProductCategory, category.id_parent)
+                    if parent is None or parent.is_deleted or parent.id_parent is not None:
+                        return (
+                            False,
+                            "Неможливо обрати підкатегорію як батьківську!",
+                            -1,
+                        )
+
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
@@ -680,6 +757,29 @@ class ProductCategoryDAO:
     def edit_one(cls, category: ProductCategory) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
+                if category.id_parent is not None:
+                    if category.id_parent == category.id:
+                        return (
+                            False,
+                            "Категорія не може бути батьківською для самої себе!",
+                            category.id,
+                        )
+
+                    parent = session.get(ProductCategory, category.id_parent)
+                    if parent is None or parent.is_deleted or parent.id_parent is not None:
+                        return (
+                            False,
+                            "Неможливо обрати підкатегорію як батьківську!",
+                            category.id,
+                        )
+
+                    if cls.has_children(category.id):
+                        return (
+                            False,
+                            "Неможливо призначити батьківську категорію: у категорії вже є підкатегорії!",
+                            category.id,
+                        )
+
                 statement = (
                     select(ProductCategory)
                     .where(ProductCategory.title == category.title)
@@ -784,7 +884,9 @@ class ProductCatalogDAO:
 
         statement = select(func.count(ProductCatalog.id)).where(condition).where(ProductCatalog.is_deleted == False)
         if category_id and category_id not in ("", "all"):
-            statement = statement.where(ProductCatalog.id_category == int(category_id))
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(int(category_id)))
+            )
 
         with rx.session() as session:
             return session.exec(statement).one()
@@ -809,7 +911,9 @@ class ProductCatalogDAO:
                 .where(condition)
             )
         if category_id and category_id not in ("", "all"):
-            statement = statement.where(ProductCatalog.id_category == int(category_id))
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(int(category_id)))
+            )
         statement = statement.offset(skip).limit(limit)
 
         with rx.session() as session:
@@ -853,6 +957,24 @@ class ProductCatalogDAO:
         statement = (
             select(ProductCatalog)
             .where(ProductCatalog.title == title)
+            .where(ProductCatalog.is_deleted == False)
+        )
+
+        with rx.session() as session:
+            product = session.exec(statement).one_or_none()
+
+            if product:
+                session.expunge(product)
+            return product
+
+    @classmethod
+    def get_by_title_and_unit(cls, title: str, unit: str) -> Optional[ProductCatalog]:
+        """Пошук дубля за парою назва+одиниця виміру (той самий critерій, що й
+        у add_one) — для сценарію «такий товар вже є, додати його до поставки?»."""
+        statement = (
+            select(ProductCatalog)
+            .where(ProductCatalog.title == title)
+            .where(ProductCatalog.unit == unit)
             .where(ProductCatalog.is_deleted == False)
         )
 
@@ -1559,10 +1681,11 @@ class ProductDAO:
     def get_categories_by_owner_storage(
         cls, owner_id: int, storage_id: int
     ) -> List[tuple[int, str]]:
-        """Перелік категорій (id, назва), у яких є доступні одиниці на вказаному
-        місці/власнику — перший крок каскадного вибору в діалозі."""
+        """Перелік категорій (id, назва з відступом для дочірніх), у яких є
+        доступні одиниці на вказаному місці/власнику — перший крок каскадного
+        вибору в діалозі."""
         statement = (
-            select(ProductCategory.id, ProductCategory.title)
+            select(ProductCategory.id, ProductCategory.title, ProductCategory.id_parent)
             .join(ProductCatalog, ProductCatalog.id_category == ProductCategory.id)
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
             .where(Product.id_storage == storage_id)
@@ -1573,7 +1696,10 @@ class ProductDAO:
         statement = statement.distinct().order_by(ProductCategory.title)
 
         with rx.session() as session:
-            return [(row[0], row[1]) for row in session.exec(statement).all()]
+            return [
+                (row[0], row[1] if row[2] is None else f"— {row[1]}")
+                for row in session.exec(statement).all()
+            ]
 
     @classmethod
     def get_catalog_options_by_owner_storage(
@@ -1591,7 +1717,9 @@ class ProductDAO:
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
         if category_id != -1:
-            statement = statement.where(ProductCatalog.id_category == category_id)
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(category_id))
+            )
         statement = statement.distinct().order_by(ProductCatalog.title)
 
         with rx.session() as session:
@@ -1664,6 +1792,34 @@ class ProductDAO:
             if len(products) > 0:
                 session.expunge_all()
             return products
+
+    @classmethod
+    def get_stock_totals_by_owner_storage(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        catalog_id: int,
+        exclude_ids: List[int],
+    ) -> tuple[int, int]:
+        """Загальна кількість доступного ТМЦ позиції каталогу на місці/власнику
+        для діалогу вибору: (кількість одиниць, сумарний залишок count — для
+        подільного це сумарний обсяг у одиницях виміру, для решти дорівнює
+        кількості одиниць). exclude_ids — одиниці, вже додані до руху (не
+        рахуються доступними); поточний вибір у діалозі в exclude_ids не входить."""
+        statement = (
+            select(func.count(Product.id), func.coalesce(func.sum(Product.count), 0))
+            .where(Product.id_storage == storage_id)
+            .where(Product.id_product_catalog == catalog_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+
+        with rx.session() as session:
+            units_count, measure_sum = session.exec(statement).one()
+            return int(units_count), int(measure_sum)
 
     @classmethod
     def count_by_storage(cls, storage_id: int) -> int:
@@ -1894,11 +2050,13 @@ class ProductDAO:
         owner_id: Optional[int] = None,
         exclude_types: Optional[List[int]] = None,
         category_id: Optional[int] = None,
+        search: Optional[str] = None,
     ) -> List[tuple]:
         """Звіт «Наявність ТМЦ»: позиції каталогу, що зараз лежать на місцях
         зберігання, із сумарною кількістю та числом одиниць. Фільтри —
         за позицією каталогу, категорією, місцем зберігання, власником; exclude_types —
-        типи сховищ (склад/площадка/відділ), які треба виключити.
+        типи сховищ (склад/площадка/відділ), які треба виключити; search — вільний
+        пошук за назвою позиції каталогу або серійним номером одиниці.
         Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
         exclude_types = exclude_types or []
         statement = (
@@ -1919,13 +2077,26 @@ class ProductDAO:
         if catalog_id is not None:
             statement = statement.where(ProductCatalog.id == catalog_id)
         if category_id is not None:
-            statement = statement.where(ProductCatalog.id_category == category_id)
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(category_id))
+            )
         if storage_id is not None:
             statement = statement.where(Product.id_storage == storage_id)
         if owner_id is not None:
             statement = statement.where(Product.id_owner == owner_id)
         if exclude_types:
             statement = statement.where(Storage.type.not_in(exclude_types))
+        if search:
+            term = search.strip()
+            if term:
+                like = f"%{term.lower()}%"
+                conditions = [
+                    func.lower(ProductCatalog.title).like(like),
+                    func.lower(func.coalesce(Product.serial_number, "")).like(like),
+                ]
+                if term.isdigit():
+                    conditions.append(Product.id == int(term))
+                statement = statement.where(or_(*conditions))
 
         with rx.session() as session:
             rows = session.exec(statement).all()
@@ -1941,6 +2112,7 @@ class ProductDAO:
         storage_id: Optional[int] = None,
         owner_id: Optional[int] = None,
         exclude_types: Optional[List[int]] = None,
+        search: Optional[str] = None,
     ) -> List[Product]:
         """Окремі одиниці ТМЦ для модалки звіту: всі живі одиниці позиції каталогу
         на місцях зберігання з тими ж фільтрами, що й у згрупованому звіті."""
@@ -1964,6 +2136,16 @@ class ProductDAO:
             statement = statement.where(Product.id_owner == owner_id)
         if exclude_types:
             statement = statement.where(Storage.type.not_in(exclude_types))
+        if search:
+            term = search.strip()
+            if term:
+                like = f"%{term.lower()}%"
+                conditions = [
+                    func.lower(func.coalesce(Product.serial_number, "")).like(like),
+                ]
+                if term.isdigit():
+                    conditions.append(Product.id == int(term))
+                statement = statement.where(or_(*conditions))
 
         with rx.session() as session:
             products = session.exec(statement).all()
@@ -3005,6 +3187,91 @@ class AdmissionDAO:
             return False, "Системна помилка!", -1
 
     @classmethod
+    def can_edit_products(cls, id: int) -> bool:
+        """Чи можна редагувати перелік ТМЦ цього поставлення — той самий
+        конфлікт-чек, що й у delete_one: жодна з одиниць цього поставлення не
+        повинна фігурувати в іншому русі (напр. вже переміщена/списана)."""
+        with rx.session() as session:
+            movements_products_catalog = session.exec(
+                select(MovementProductsCatalog).where(
+                    MovementProductsCatalog.id_movement == id
+                )
+            ).all()
+            if not movements_products_catalog:
+                return True
+            products_in_movement = session.exec(
+                select(MovementProducts).where(
+                    MovementProducts.id_movement_product.in_(
+                        [mpc.id for mpc in movements_products_catalog]
+                    )
+                )
+            ).all()
+            other_movements_with_current_products = session.exec(
+                select(MovementProducts)
+                .where(
+                    MovementProducts.id_product.in_(
+                        [pim.id_product for pim in products_in_movement]
+                    )
+                )
+                .where(
+                    MovementProducts.id_movement_product.not_in(
+                        [mpc.id for mpc in movements_products_catalog]
+                    )
+                )
+            ).all()
+            return len(other_movements_with_current_products) == 0
+
+    @classmethod
+    def delete_product_line(cls, id_movement_products_catalog: int) -> tuple[bool, str]:
+        """Видаляє один рядок переліку ТМЦ поставлення (позицію каталогу разом
+        з усіма її одиницями) — за умови, що жодна з одиниць цього рядка не
+        фігурує в іншому русі. Використовується при редагуванні поставлення."""
+        try:
+            with rx.session() as session:
+                mpc: Optional[MovementProductsCatalog] = session.get(
+                    MovementProductsCatalog, id_movement_products_catalog
+                )
+                if mpc is None:
+                    return False, "Помилка! Позицію не знайдено."
+
+                products_in_line: List[MovementProducts] = session.exec(
+                    select(MovementProducts).where(
+                        MovementProducts.id_movement_product == mpc.id
+                    )
+                ).all()
+                products: List[Product] = session.exec(
+                    select(Product).where(
+                        Product.id.in_([p.id_product for p in products_in_line])
+                    )
+                ).all()
+
+                other_movements_with_current_products = session.exec(
+                    select(MovementProducts)
+                    .where(
+                        MovementProducts.id_product.in_([p.id for p in products])
+                    )
+                    .where(MovementProducts.id_movement_product != mpc.id)
+                ).all()
+                if len(other_movements_with_current_products) > 0:
+                    return (
+                        False,
+                        "Помилка! Позицію не можна видалити, оскільки товар вже використовується в іншому русі.",
+                    )
+
+                for item in products_in_line:
+                    session.delete(item)
+                for item in products:
+                    session.delete(item)
+                session.delete(mpc)
+                session.commit()
+                return True, "Позицію видалено!"
+
+        except IntegrityError:
+            return False, "Помилка! Позицію не може бути видалено."
+        except SQLAlchemyError:
+            return False, "Системна помилка!"
+
+    @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:
         try:
             with rx.session() as session:
@@ -3273,6 +3540,203 @@ class IssueDAO:
             return False, "Ошибка: Выдача не может быть изменена", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
+
+
+class ClientIssueDAO:
+    @classmethod
+    def get_all(cls) -> List[ClientIssue]:
+        statement = select(ClientIssue)
+
+        with rx.session() as session:
+            client_issues = session.exec(statement).all()
+
+            if len(client_issues) > 0:
+                session.expunge_all()
+            return list(client_issues)
+
+    @classmethod
+    def get_all_with_all_relationship(cls) -> List[ClientIssue]:
+        statement = select(ClientIssue).options(
+            joinedload(ClientIssue.movement).options(
+                selectinload(Movement.products_catalog).options(
+                    joinedload(MovementProductsCatalog.product),
+                    selectinload(MovementProductsCatalog.products).options(
+                        joinedload(Product.product_catalog),
+                        joinedload(Product.owner),
+                        joinedload(Product.storage),
+                    ),
+                ),
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.incoming_owner),
+            ),
+            joinedload(ClientIssue.recipient),
+        )
+
+        with rx.session() as session:
+            client_issues = session.exec(statement).all()
+
+            if len(client_issues) > 0:
+                session.expunge_all()
+            return list(client_issues)
+
+    @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+        incoming_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        recipient: Optional[str] = None,
+        contract_number: Optional[str] = None,
+    ) -> tuple[int, List[ClientIssue]]:
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            incoming_storage=incoming_storage,
+            incoming_owner=incoming_owner,
+        )
+        movement_ids = select(Movement.id)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        client_issue_conditions = []
+        if recipient and recipient not in ("", "all"):
+            try:
+                client_issue_conditions.append(ClientIssue.id_recipient == int(recipient))
+            except (TypeError, ValueError):
+                pass
+        if contract_number:
+            client_issue_conditions.append(ClientIssue.contract_number.contains(contract_number))
+
+        with rx.session() as session:
+            count_stmt = select(func.count(ClientIssue.id)).where(ClientIssue.id.in_(movement_ids))
+            for cond in client_issue_conditions:
+                count_stmt = count_stmt.where(cond)
+            total = session.exec(count_stmt).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(ClientIssue)
+                .options(
+                    joinedload(ClientIssue.movement).options(
+                        joinedload(Movement.incoming_storage),
+                        joinedload(Movement.incoming_owner),
+                        joinedload(Movement.destination_storage),
+                    ),
+                    joinedload(ClientIssue.recipient),
+                )
+                .where(ClientIssue.id.in_(movement_ids))
+            )
+            for cond in client_issue_conditions:
+                statement = statement.where(cond)
+            statement = (
+                statement.order_by(ClientIssue.id.desc()).offset(skip).limit(limit)
+            )
+            client_issues = session.exec(statement).all()
+            if len(client_issues) > 0:
+                session.expunge_all()
+            return total_pages, list(client_issues)
+
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[ClientIssue]:
+        statement = select(ClientIssue).where(ClientIssue.id == id)
+
+        with rx.session() as session:
+            client_issue = session.exec(statement).one_or_none()
+
+            if client_issue:
+                session.expunge(client_issue)
+            return client_issue
+
+    @classmethod
+    def get_by_id_with_all_relationship(cls, id: str) -> Optional[ClientIssue]:
+        statement = (
+            select(ClientIssue)
+            .options(
+                joinedload(ClientIssue.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                            joinedload(Product.owner),
+                            joinedload(Product.storage),
+                        ),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_owner),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(ClientIssue.recipient),
+            )
+            .where(ClientIssue.id == id)
+        )
+
+        with rx.session() as session:
+            client_issue = session.exec(statement).one_or_none()
+
+            if client_issue:
+                session.expunge(client_issue)
+            return client_issue
+
+    @classmethod
+    def get_by_id_with_movement_product_storage_owner_recipient(
+        cls, id: str
+    ) -> Optional[ClientIssue]:
+        statement = (
+            select(ClientIssue)
+            .options(
+                joinedload(ClientIssue.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(ClientIssue.recipient),
+            )
+            .where(ClientIssue.id == id)
+        )
+
+        with rx.session() as session:
+            client_issue = session.exec(statement).one_or_none()
+
+            if client_issue:
+                session.expunge(client_issue)
+            return client_issue
+
+    @classmethod
+    def add_one(cls, client_issue: ClientIssue) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
+                session.add(client_issue)
+                session.commit()
+                return True, "Видача клієнту успішно додана", client_issue.id
+
+        except IntegrityError as e:
+            return False, "Помилка: видача клієнту не може бути додана", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, client_issue: ClientIssue) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
+                session.merge(client_issue)
+                session.commit()
+                return True, "Видача клієнту успішно змінена", client_issue.id
+
+        except IntegrityError as e:
+            return False, "Помилка: видача клієнту не може бути змінена", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
 
 
 class SaleDAO:

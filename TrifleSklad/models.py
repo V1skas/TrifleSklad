@@ -102,6 +102,7 @@ class Worker(rx.Model, table=True):
     storages: Optional[List['Storage']] = Relationship(back_populates="responsible")
     issues: Optional[List['Issue']] = Relationship(back_populates="recipient")
     sales: Optional[List['Sale']] = Relationship(back_populates="responsible")
+    client_issues: Optional[List['ClientIssue']] = Relationship(back_populates="recipient")
 
 
 class ProductCategory(rx.Model, table=True):
@@ -111,7 +112,7 @@ class ProductCategory(rx.Model, table=True):
     id: int = Field(primary_key=True) # type: ignore
     title: str = Field(default="", nullable=False)
     description: Optional[str] = Field(nullable=True)
-    #id_parrent: Optional[int] = Field(default=None, foreign_key="product_categories.id", nullable=True)
+    id_parent: Optional[int] = Field(default=None, foreign_key="product_categories.id", nullable=True)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
@@ -315,6 +316,20 @@ class Issue(rx.Model, table=True):
 
     # Relationship
     recipient: Optional[Worker] = Relationship(back_populates="issues")
+    movement: Optional[Movement] = Relationship()
+
+
+class ClientIssue(rx.Model, table=True):
+    __tablename__ = "client_issues"
+
+    # Table columns
+    id: int = Field(primary_key=True, foreign_key="movements.id")
+    id_recipient: int = Field(foreign_key="workers.id", nullable=False)
+    contract_number: str = Field(default="", nullable=False)
+    installation_address: str = Field(default="", nullable=False)
+
+    # Relationship
+    recipient: Optional[Worker] = Relationship(back_populates="client_issues")
     movement: Optional[Movement] = Relationship()
 
 

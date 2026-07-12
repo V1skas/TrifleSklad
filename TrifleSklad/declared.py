@@ -1,5 +1,10 @@
 from typing import Dict, List, Optional, Tuple
 
+# Скільки днів після дати поставки дозволено редагувати перелік ТМЦ (за
+# наявності права admissions:edit_products і відсутності конфліктів із
+# пізнішими рухами — див. AdmissionDAO.can_edit_products).
+ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS = 30
+
 class MovementsType:
     ADMISSION = 1
     WRITE_OFF = 2
@@ -8,6 +13,7 @@ class MovementsType:
     SALE = 5
     RETURN = 6
     SALE_RETURN = 7
+    CLIENT_ISSUE = 8
 
 movements_type_list: Dict[int, str] = {
     MovementsType.ADMISSION: "Постачання",
@@ -17,16 +23,19 @@ movements_type_list: Dict[int, str] = {
     MovementsType.SALE: "Продаж",
     MovementsType.RETURN: "Повернення",
     MovementsType.SALE_RETURN: "Повернення продажу",
+    MovementsType.CLIENT_ISSUE: "Видача клієнту",
 }
 
 class StorageType:
     WAREHOUSE = 1
     TECHNICAL_SITE = 2
     DEPARTMENT = 3
+    CLIENT = 4
 
 storage_type_list: Dict[int, str] = {StorageType.WAREHOUSE: "Склад",
                      StorageType.TECHNICAL_SITE: "Тех. площадка",
-                     StorageType.DEPARTMENT: "Відділ"}
+                     StorageType.DEPARTMENT: "Відділ",
+                     StorageType.CLIENT: "Клієнт"}
 
 class MovementsStatus:
     CREATED = 0
@@ -67,6 +76,38 @@ def sale_line_cost(price: float, units: List[Tuple[int, bool, int]]) -> float:
         else:
             total += price
     return round(total, 2)
+
+
+def generate_serial_range(
+    mask: str, start: str, end: str, count: int, is_hex: bool = False
+) -> Tuple[Optional[List[str]], Optional[str]]:
+    """Генерує список серійних номерів за маскою з одним входженням "{n}" та
+    діапазоном [start, end]. За замовчуванням — десяткові числа; is_hex=True —
+    шістнадцяткові (0-9A-F), як прийнято для серійних номерів. Ширина
+    нуль-паддінгу — за довжиною рядка `end` (напр. end="050" -> "001".."050",
+    end="0F" -> "0A".."0F"). Повертає (список, None) при успіху або
+    (None, повідомлення_помилки)."""
+    if mask.count("{n}") != 1:
+        return None, "Маска повинна містити рівно одне входження {n}!"
+    start_s, end_s = start.strip(), end.strip()
+    base = 16 if is_hex else 10
+    try:
+        start_n = int(start_s, base)
+        end_n = int(end_s, base)
+    except ValueError:
+        kind = "шістнадцятковими" if is_hex else "цілими"
+        return None, f"Початок і кінець діапазону мають бути {kind} числами!"
+    if end_n < start_n:
+        return None, "Кінець діапазону не може бути меншим за початок!"
+    total = end_n - start_n + 1
+    if total != count:
+        return None, f"Діапазон містить {total} номер(ів), а потрібно заповнити {count}!"
+    width = len(end_s)
+    if is_hex:
+        values = [format(n, "X").zfill(width) for n in range(start_n, end_n + 1)]
+    else:
+        values = [str(n).zfill(width) for n in range(start_n, end_n + 1)]
+    return [mask.replace("{n}", v) for v in values], None
 
 
 def get_status_by_text(text: str) -> Optional[int]:

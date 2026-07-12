@@ -241,7 +241,12 @@ def group_fragment(group):
             ProductsMovementListState.expanded_catalogs[group[0]],
             rx.table.row(
                 rx.table.cell(
-                    units_subtable(group),
+                    rx.vstack(
+                        serial_range_bar(group),
+                        units_subtable(group),
+                        width="100%",
+                        spacing="2",
+                    ),
                     custom_attrs={"colSpan": "6"},
                     padding="0.5em",
                 ),
@@ -295,6 +300,60 @@ def total_section():
                 size="4",
             ),
             width="100%",
+        ),
+    )
+
+def serial_range_bar(group):
+    # Пакетне заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}") —
+    # індивідуально для цієї позиції каталогу (різний ТМЦ може мати різні правила).
+    catalog_id = group[0]
+    return rx.cond(
+        ProductsMovementListState.serial_visible & ~ProductsMovementListState.is_view_mode & group[4],
+        rx.vstack(
+            rx.hstack(
+                rx.input(
+                    placeholder="Маска, напр. СН-{n}",
+                    value=ProductsMovementListState.serial_mask[catalog_id],
+                    on_change=lambda value: ProductsMovementListState.on_change_serial_mask(catalog_id, value),
+                    size="2",
+                    width="40%",
+                ),
+                rx.input(
+                    placeholder="Від",
+                    type="text",
+                    value=ProductsMovementListState.serial_range_from[catalog_id],
+                    on_change=lambda value: ProductsMovementListState.on_change_serial_range_from(catalog_id, value),
+                    size="2",
+                    width="20%",
+                ),
+                rx.input(
+                    placeholder="До",
+                    type="text",
+                    value=ProductsMovementListState.serial_range_to[catalog_id],
+                    on_change=lambda value: ProductsMovementListState.on_change_serial_range_to(catalog_id, value),
+                    size="2",
+                    width="20%",
+                ),
+                rx.button(
+                    "Заповнити серійні номери",
+                    type="button",
+                    size="2",
+                    on_click=ProductsMovementListState.fill_serial_range(catalog_id),
+                ),
+                width="100%",
+                spacing="2",
+            ),
+            rx.text(
+                rx.checkbox(
+                    checked=ProductsMovementListState.serial_range_hex[catalog_id],
+                    on_change=lambda value: ProductsMovementListState.on_change_serial_range_hex(catalog_id, value),
+                ),
+                " 16-та система числення (0-9, A-F)",
+                as_="label",
+                size="1",
+            ),
+            width="100%",
+            spacing="1",
         ),
     )
 

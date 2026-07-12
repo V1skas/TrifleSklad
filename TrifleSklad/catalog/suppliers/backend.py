@@ -152,7 +152,7 @@ class AddSupplierState(rx.State):
 
         flag, text, id = SupplierDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListSupplierState.on_load(), rx.redirect(f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -246,7 +246,7 @@ class EditSupplierState(rx.State):
 
         flag, text, id = SupplierDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListSupplierState.on_load(), rx.redirect(f"{routes.CATALOG_SUPPLIERS_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -353,7 +353,7 @@ class SupplierState(rx.State):
                 return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             flag, text = SupplierDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_SUPPLIERS)]
+                return [rx.toast.success(text), ListSupplierState.on_load(), rx.redirect(routes.CATALOG_SUPPLIERS)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

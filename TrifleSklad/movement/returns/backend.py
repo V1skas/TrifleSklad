@@ -130,7 +130,7 @@ class AddReturnsState(LookupCreatorsMixin, rx.State):
     status: str = ""
     comment: str = ""
 
-    # Джерело — площадки/відділи; призначення — склади.
+    # Джерело — площадки/відділи/клієнти; призначення — склади.
     list_source_storages: List[Tuple[str, str]] = []
     list_destination_storages: List[Tuple[str, str]] = []
 
@@ -140,9 +140,11 @@ class AddReturnsState(LookupCreatorsMixin, rx.State):
     # Backend only
     # ======================
     def _load_storages(self):
-        sources = StorageDAO.get_all_by_type(
-            StorageType.TECHNICAL_SITE
-        ) + StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
+        sources = (
+            StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE)
+            + StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
+            + StorageDAO.get_all_by_type(StorageType.CLIENT)
+        )
         self.list_source_storages = [(s.title, str(s.id)) for s in sources]
         self.list_destination_storages = [
             (s.title, str(s.id))
@@ -274,12 +276,12 @@ class AddReturnsState(LookupCreatorsMixin, rx.State):
         ):
             return rx.toast.error("Список товарів для повернення порожній!")
 
-        # Серверна перевірка типів місць: повернення з площадки/відділу на склад.
+        # Серверна перевірка типів місць: повернення з площадки/відділу/клієнта на склад.
         if not StorageDAO.is_type(
             int(self.id_incoming_storage),
-            (StorageType.TECHNICAL_SITE, StorageType.DEPARTMENT),
+            (StorageType.TECHNICAL_SITE, StorageType.DEPARTMENT, StorageType.CLIENT),
         ):
-            return rx.toast.error("Повернення можливе лише з площадки або відділу!")
+            return rx.toast.error("Повернення можливе лише з площадки, відділу або клієнта!")
         if not StorageDAO.is_type(
             int(self.id_destination_storage), StorageType.WAREHOUSE
         ):
@@ -319,6 +321,7 @@ class AddReturnsState(LookupCreatorsMixin, rx.State):
                 return rx.toast.success("Повернення проведено!")
             return [
                 rx.toast.success("Повернення проведено!"),
+                ListReturnsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -410,6 +413,7 @@ class EditReturnsState(rx.State):
         if flag:
             return [
                 rx.toast.success("Повернення змінено!"),
+                ListReturnsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

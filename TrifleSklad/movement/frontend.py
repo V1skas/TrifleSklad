@@ -13,6 +13,7 @@ import TrifleSklad.movement.issues as issues
 import TrifleSklad.movement.sale as sale
 import TrifleSklad.movement.returns as returns
 import TrifleSklad.movement.sale_returns as sale_returns
+import TrifleSklad.movement.client_issues as client_issues
 
 def admissions_tab() -> rx.Component:
     return rx.tabs.content(
@@ -63,6 +64,13 @@ def sale_returns_tab() -> rx.Component:
         value=MovementState.Tabs.SALE_RETURNS,
     )
 
+def client_issues_tab() -> rx.Component:
+    return rx.tabs.content(
+        client_issues.frontend.index(),
+
+        value=MovementState.Tabs.CLIENT_ISSUES,
+    )
+
 def index():
     return rx.hstack(
         sidebar(
@@ -94,6 +102,10 @@ def index():
                 AppState.get_user_actions.contains(ActionEnum.SALE_RETURNS_LIST),
                 sidebar_link("Повернення продажу", routes.MOVEMENT_SALE_RETURNS),
             ),
+            rx.cond(
+                AppState.get_user_actions.contains(ActionEnum.CLIENT_ISSUES_LIST),
+                sidebar_link("Видачі клієнту", routes.MOVEMENT_CLIENT_ISSUES),
+            ),
         ),
         workspace(
             admissions_tab(),
@@ -103,6 +115,7 @@ def index():
             sales_tab(),
             returns_tab(),
             sale_returns_tab(),
+            client_issues_tab(),
 
             size="4",
 

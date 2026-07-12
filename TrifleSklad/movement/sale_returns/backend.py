@@ -467,6 +467,7 @@ class AddSaleReturnsState(rx.State):
         if flag:
             return [
                 rx.toast.success("Повернення продажу проведено!"),
+                ListSaleReturnsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)
@@ -542,6 +543,7 @@ class EditSaleReturnsState(rx.State):
         if flag:
             return [
                 rx.toast.success("Повернення продажу змінено!"),
+                ListSaleReturnsState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

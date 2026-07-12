@@ -158,7 +158,7 @@ class AddStorageState(rx.State):
         
         flag, text, id = StorageDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_STORAGES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListStorageState.on_load(), rx.redirect(f"{routes.CATALOG_STORAGES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -265,7 +265,7 @@ class EditStorageState(rx.State):
         
         flag, text, id = StorageDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_STORAGES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListStorageState.on_load(), rx.redirect(f"{routes.CATALOG_STORAGES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -413,7 +413,7 @@ class StorageState(rx.State):
                 return rx.toast.error("Неможливо видалити склад, на якому є ТМЦ!")
             flag, text = StorageDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_STORAGES)]
+                return [rx.toast.success(text), ListStorageState.on_load(), rx.redirect(routes.CATALOG_STORAGES)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

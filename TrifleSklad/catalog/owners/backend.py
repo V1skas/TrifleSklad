@@ -80,7 +80,7 @@ class AddOwnerState(rx.State):
 
         flag, text, id = OwnerDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_OWNERS_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListOwnerState.on_load(), rx.redirect(f"{routes.CATALOG_OWNERS_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ==============
 
@@ -135,7 +135,7 @@ class EditOwnerState(rx.State):
 
         flag, text, id = OwnerDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_OWNERS_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListOwnerState.on_load(), rx.redirect(f"{routes.CATALOG_OWNERS_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -232,7 +232,7 @@ class OwnerState(rx.State):
 
             flag, text = OwnerDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_OWNERS)]
+                return [rx.toast.success(text), ListOwnerState.on_load(), rx.redirect(routes.CATALOG_OWNERS)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

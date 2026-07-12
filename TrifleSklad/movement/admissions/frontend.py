@@ -64,6 +64,30 @@ def create_category_dialog() -> rx.Component:
     )
 
 
+def duplicate_product_confirm_dialog() -> rx.Component:
+    # Вкладений діалог: товар з такою назвою+одиницею вже є в каталозі —
+    # питаємо, чи додати наявний до поставки замість створення дубля.
+    State = MovementProductCatalogAddEditFormState
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Такий товар вже є в каталозі"),
+            rx.text(
+                f"ТМЦ «{State.duplicate_product_title}» вже є в каталозі. Додати наявний товар до поставки?",
+            ),
+            rx.hstack(
+                rx.button("Ні", variant="outline", type="button", on_click=State.cancel_duplicate_product),
+                rx.spacer(),
+                rx.button("Так, додати", type="button", on_click=State.confirm_use_duplicate_product),
+                width="100%",
+                padding_top="0.5em",
+            ),
+            width="28em",
+        ),
+        open=State.is_duplicate_confirm_open,
+        on_open_change=State.set_duplicate_confirm_open,
+    )
+
+
 def create_product_dialog() -> rx.Component:
     # Вкладений діалог створення нового товару каталогу прямо з поставки.
     State = MovementProductCatalogAddEditFormState
@@ -105,6 +129,7 @@ def create_product_dialog() -> rx.Component:
                     width="100%",
                 ),
                 create_category_dialog(),
+                duplicate_product_confirm_dialog(),
                 rx.text("Одиниця виміру:", size="2"),
                 rx.input(
                     value=State.new_unit,
@@ -288,6 +313,48 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
                     header=rx.text("Серійні номери"),
                     content=rx.scroll_area(
                         rx.vstack(
+                            rx.hstack(
+                                rx.input(
+                                    placeholder="Маска, напр. СН-{n}",
+                                    value=MovementProductCatalogAddEditFormState.serial_mask,
+                                    on_change=MovementProductCatalogAddEditFormState.on_change_serial_mask,
+                                    size="1",
+                                    width="40%",
+                                ),
+                                rx.input(
+                                    placeholder="Від",
+                                    type="text",
+                                    value=MovementProductCatalogAddEditFormState.serial_range_from,
+                                    on_change=MovementProductCatalogAddEditFormState.on_change_serial_range_from,
+                                    size="1",
+                                    width="20%",
+                                ),
+                                rx.input(
+                                    placeholder="До",
+                                    type="text",
+                                    value=MovementProductCatalogAddEditFormState.serial_range_to,
+                                    on_change=MovementProductCatalogAddEditFormState.on_change_serial_range_to,
+                                    size="1",
+                                    width="20%",
+                                ),
+                                rx.button(
+                                    "Заповнити",
+                                    type="button",
+                                    size="1",
+                                    on_click=MovementProductCatalogAddEditFormState.fill_serial_range,
+                                ),
+                                width="100%",
+                                spacing="1",
+                            ),
+                            rx.text(
+                                rx.checkbox(
+                                    checked=MovementProductCatalogAddEditFormState.serial_range_hex,
+                                    on_change=MovementProductCatalogAddEditFormState.on_change_serial_range_hex,
+                                ),
+                                " 16-та система числення (0-9, A-F)",
+                                as_="label",
+                                size="1",
+                            ),
                             rx.foreach(
                                 MovementProductCatalogAddEditFormState.item_products_list,
                                 lambda item: rx.hstack(
@@ -310,7 +377,7 @@ def movement_product_catalog_add_edit_form() -> rx.Component:
 
                         padding="0.5em",
                         width="100%",
-                        height="8em",
+                        height="11em",
                     )
                 ),
 
@@ -481,13 +548,26 @@ def edit_admission_products_catalog_dialog() -> rx.Component:
                 default_value=EditAdmissionState.ProductCatalogDialogPages.EMPTY,
                 value=EditAdmissionState.product_catalog_dialog_page,
             ),
-            rx.hstack(
-                rx.spacer(),
-                rx.button("Закрити", variant="outline", on_click=EditAdmissionState.on_close_product_catalog_dialog),
+            rx.cond(EditAdmissionState.is_product_dialog_view_mode,
+                    rx.hstack(
+                        rx.button("Видалити", variant="outline", color_scheme="red",
+                                  on_click=EditAdmissionState.on_close_product_catalog_dialog),
+                        rx.spacer(),
+                        rx.button("Редагувати", type="button", on_click=EditAdmissionState.edit_product_catalog_dialog),
 
-                padding_top="1em",
+                        padding_top="1em",
 
-                width="100%",
+                        width="100%",
+                    ),
+                    rx.hstack(
+                        rx.button("Скасувати", variant="outline", on_click=EditAdmissionState.on_close_product_catalog_dialog),
+                        rx.spacer(),
+                        rx.button("Зберегти", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=EditAdmissionState.on_save_product_catalog_dialog),
+
+                        padding_top="1em",
+
+                        width="100%",
+                    ),
             ),
 
             width="30em"
@@ -495,6 +575,23 @@ def edit_admission_products_catalog_dialog() -> rx.Component:
 
         open=EditAdmissionState.is_open_product_catalog_dialog,
         on_open_change=EditAdmissionState.on_close_product_catalog_dialog,
+    )
+
+def edit_admission_add_product_button() -> rx.Component:
+    # Окремо від таблиці — має бути видимою і тоді, коли перелік ТМЦ порожній.
+    return rx.cond(
+        EditAdmissionState.can_edit_products,
+        rx.hstack(
+            rx.spacer(),
+            rx.button(
+                "Додати позицію",
+                type="button",
+                variant="soft",
+                size="2",
+                on_click=EditAdmissionState.add_product_catalog_dialog_open,
+            ),
+            width="100%",
+        ),
     )
 
 def edit_admission_products_catalog_table() -> rx.Component:
@@ -507,6 +604,10 @@ def edit_admission_products_catalog_table() -> rx.Component:
                     rx.table.column_header_cell("Залишок", color=rx.color("accent", 2)),
                     rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
                     rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
+                    rx.cond(
+                        EditAdmissionState.can_edit_products,
+                        rx.table.column_header_cell("Дії", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                    ),
                 ),
 
                 background_color=rx.color("accent", 9)
@@ -526,6 +627,30 @@ def edit_admission_products_catalog_table() -> rx.Component:
                         ),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
+                        rx.cond(
+                            EditAdmissionState.can_edit_products,
+                            rx.table.cell(
+                                rx.hstack(
+                                    rx.icon_button(
+                                        rx.icon("pencil", size=14),
+                                        type="button",
+                                        variant="soft",
+                                        size="1",
+                                        on_click=EditAdmissionState.edit_product_catalog_dialog_from_row(item[0]).stop_propagation,
+                                    ),
+                                    rx.icon_button(
+                                        rx.icon("trash-2", size=14),
+                                        type="button",
+                                        variant="soft",
+                                        color_scheme="red",
+                                        size="1",
+                                        on_click=EditAdmissionState.delete_product_catalog_row(item[0]).stop_propagation,
+                                    ),
+                                    spacing="1",
+                                ),
+                                width="1%", white_space="nowrap",
+                            ),
+                        ),
                         on_click=EditAdmissionState.view_product_catalog_dialog(item[0]),
                         cursor="pointer",
                         _hover={"background_color": rx.color("accent", 3)},
@@ -1233,6 +1358,7 @@ def edit_form() -> rx.Component:
                 ),
                 rx.text("*Товари з каталогу:"),
                 edit_admission_products_catalog_dialog(),
+                edit_admission_add_product_button(),
                 rx.cond(EditAdmissionState.has_item_movement_products_catalog,
                         edit_admission_products_catalog_table(),
                         rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),

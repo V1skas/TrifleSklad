@@ -5,7 +5,7 @@ from typing import Tuple
 from TrifleSklad import routes
 from TrifleSklad.state import AppState
 from TrifleSklad.actions import Action as ActionEnum
-from TrifleSklad.catalog.categories.backend import ViewCategoriesState, AddCategoriesState, EditCategoriesState, ListCategoriesState, CategoriesState
+from TrifleSklad.catalog.categories.backend import ViewCategoriesState, AddCategoriesState, EditCategoriesState, ListCategoriesState, CategoriesState, NONE
 
 from TrifleSklad.models import ProductCategory
 
@@ -13,6 +13,19 @@ def item_preview() -> rx.Component:
     return rx.vstack(
         rx.heading(ViewCategoriesState.item.title, size="7", width="100%"),
         rx.hstack(rx.text("Опис:"), rx.text(ViewCategoriesState.item.description, is_optional=True), width="100%"),
+        rx.cond(
+            ViewCategoriesState.item.id_parent,
+            rx.hstack(rx.text("Батьківська категорія:"), rx.text(ViewCategoriesState.parent_title), width="100%"),
+        ),
+        rx.cond(
+            ViewCategoriesState.children.length() > 0,
+            rx.vstack(
+                rx.text("Підкатегорії:"),
+                rx.foreach(ViewCategoriesState.children, lambda c: rx.text(f"— {c.title}")),
+                align="start",
+                width="100%",
+            ),
+        ),
 
         spacing="3",
 
@@ -77,8 +90,9 @@ def item_preview_tab_content() -> rx.Component:
 def table_row(item: ProductCategory) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(
-            item.title,
-            align="left"
+            rx.cond(item.id_parent, f"— {item.title}", item.title),
+            align="left",
+            padding_left=rx.cond(item.id_parent, "2em", "1em"),
         ),
         on_click=rx.redirect(f"{routes.CATALOG_CATEGORIES_VIEW_ID}{item.id}"),
         cursor="pointer",
@@ -149,6 +163,26 @@ def list_tab_content() -> rx.Component:
         value=CategoriesState.Pages.LIST,
     )
 
+def parent_select(list_parent_categories, value, on_change) -> rx.Component:
+    return rx.select.root(
+        rx.select.trigger(
+            placeholder="Без батьківської категорії",
+            width="100%",
+        ),
+        rx.select.content(
+            rx.select.item("— Без батьківської —", value=NONE),
+            rx.foreach(
+                list_parent_categories,
+                lambda category: rx.select.item(category[1], value=category[0]),
+            ),
+            width="100%",
+        ),
+        value=value,
+        on_change=on_change,
+        size="3",
+        width="100%",
+    )
+
 def add_form() -> rx.Component:
     return rx.box(
         rx.vstack(
@@ -156,6 +190,8 @@ def add_form() -> rx.Component:
             rx.input(id="title", required=True, size="3", value=AddCategoriesState.item.title, on_change=AddCategoriesState.on_change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", size="3", value=AddCategoriesState.item.description, on_change=AddCategoriesState.on_change_description),
+            rx.text("Батьківська категорія:"),
+            parent_select(AddCategoriesState.list_parent_categories, AddCategoriesState.parent_id, AddCategoriesState.on_change_parent),
 
             align="stretch"
         ),
@@ -171,6 +207,12 @@ def edit_form() -> rx.Component:
             rx.input(id="title", required=True, size="3", value=EditCategoriesState.item.title, on_change=EditCategoriesState.on_change_title),
             rx.text("Опис:"),
             rx.text_area(id="description", size="3", is_optional=True, value=EditCategoriesState.item.description, on_change=EditCategoriesState.on_change_description),
+            rx.text("Батьківська категорія:"),
+            rx.cond(
+                EditCategoriesState.can_set_parent,
+                parent_select(EditCategoriesState.list_parent_categories, EditCategoriesState.parent_id, EditCategoriesState.on_change_parent),
+                rx.text("Категорія має підкатегорії — батьківську призначити не можна", color=rx.color("gray", 10)),
+            ),
 
             align="stretch"
         ),

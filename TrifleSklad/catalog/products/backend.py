@@ -135,7 +135,7 @@ class AddProductsState(CategoryCreateMixin, rx.State):
         self.item = ProductCatalog()
 
     def _load_categories(self):
-        self.list_categories = [(str(item.id), item.title) for item in ProductCategoryDAO.get_all()]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
     
     def _load_all_units_cache(self):
         self.all_units_cache = ProductCatalogDAO.get_list_units()
@@ -236,12 +236,17 @@ class AddProductsState(CategoryCreateMixin, rx.State):
 
         if self.item.uniq and self.item.divisible:
             return rx.toast.error("Товар із серійним номером не може бути подільним!")
+        if self.item.divisible and (self.item.capacity is None or self.item.capacity <= 0):
+            return rx.toast.error("Для подільного ТМЦ потрібно вказати додатну місткість!")
         if self.item.uniq:
             self.item.capacity = 1
 
         flag, text, id = ProductCatalogDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]
+            # Освіжаємо список одразу тут — інакше при поверненні на список
+            # (через кнопку «Повернутись») можна побачити застарілі дані,
+            # якщо on_load цільової сторінки з якоїсь причини не спрацює.
+            return [rx.toast.success(text), ListProductsState.on_load(), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -256,7 +261,7 @@ class EditProductsState(CategoryCreateMixin, rx.State):
         self.item = ProductCatalogDAO.get_by_id_with_relationships(id)
 
     def _load_categories(self):
-        self.list_categories = [(str(item.id), item.title) for item in ProductCategoryDAO.get_all()]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         
     def _load_all_units_cache(self):
         self.all_units_cache = ProductCatalogDAO.get_list_units()
@@ -361,12 +366,14 @@ class EditProductsState(CategoryCreateMixin, rx.State):
 
         if self.item.uniq and self.item.divisible:
             return rx.toast.error("Товар із серійним номером не може бути подільним!")
+        if self.item.divisible and (self.item.capacity is None or self.item.capacity <= 0):
+            return rx.toast.error("Для подільного ТМЦ потрібно вказати додатну місткість!")
         if self.item.uniq:
             self.item.capacity = 1
 
         flag, text, id = ProductCatalogDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListProductsState.on_load(), rx.redirect(f"{routes.CATALOG_PRODUCTS_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ===============
 
@@ -424,7 +431,7 @@ class ListProductsState(rx.State):
         self.search_str = None
         self.filter_category_id = ALL
         self.list_categories = [
-            (c.title, str(c.id)) for c in ProductCategoryDAO.get_all()
+            (label, id) for id, label in ProductCategoryDAO.get_hierarchy_options()
         ]
         self._load_items()
 
@@ -534,7 +541,7 @@ class ProductsState(rx.State):
                 return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             flag, text = ProductCatalogDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.CATALOG_PRODUCTS)]
+                return [rx.toast.success(text), ListProductsState.on_load(), rx.redirect(routes.CATALOG_PRODUCTS)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення!")

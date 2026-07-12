@@ -17,9 +17,11 @@ from TrifleSklad.dao import (
     SupplierDAO,
 )
 from TrifleSklad.declared import (
+    ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS,
     MovementsStatus,
     MovementsType,
     StorageType,
+    generate_serial_range,
     movements_status_list,
     movements_type_list,
 )
@@ -86,7 +88,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # ======================
     @rx.var
     def category_options(self) -> List[Tuple[str, str]]:
-        return [(item.title, str(item.id)) for item in ProductCategoryDAO.get_all()]
+        return [(label, id) for id, label in ProductCategoryDAO.get_hierarchy_options()]
 
     @rx.var
     def category_chosen(self) -> bool:
@@ -102,11 +104,16 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
         if self.filter_category == "":
             return []
+        # Обрана категорія може бути батьківською — тоді допустимі й позиції
+        # усіх її підкатегорій.
+        allowed_category_ids = set(
+            str(i) for i in ProductCategoryDAO.get_self_and_children_ids(int(self.filter_category))
+        )
         term = self.search_catalog.strip().lower()
         return [
             (catalog.title, str(catalog.id))
             for catalog in self.cache_products_catalog_list
-            if str(catalog.id_category) == self.filter_category
+            if str(catalog.id_category) in allowed_category_ids
             and (term == "" or term in catalog.title.lower())
         ]
 
@@ -269,6 +276,52 @@ class MovementProductCatalogAddEditFormState(rx.State):
         if index < len(self.item.products):
             self.item.products[index].serial_number = value
 
+    # Заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}", 1..5)
+    # ======================
+    serial_mask: str = ""
+    serial_range_from: str = "1"
+    serial_range_to: str = "1"
+    serial_range_hex: bool = False
+
+    @rx.event
+    def on_change_serial_mask(self, value: str):
+        self.serial_mask = value
+
+    @rx.event
+    def on_change_serial_range_from(self, value: str):
+        self.serial_range_from = value
+
+    @rx.event
+    def on_change_serial_range_to(self, value: str):
+        self.serial_range_to = value
+
+    @rx.event
+    def on_change_serial_range_hex(self, value: bool):
+        self.serial_range_hex = value
+
+    @rx.event
+    def fill_serial_range(self):
+        empty_indexes = [
+            i for i, p in enumerate(self.item.products) if not p.serial_number
+        ]
+        if not empty_indexes:
+            return rx.toast.error("Усі серійні номери вже заповнені!")
+        values, error = generate_serial_range(
+            self.serial_mask, self.serial_range_from, self.serial_range_to,
+            len(empty_indexes), self.serial_range_hex,
+        )
+        if error is not None:
+            return rx.toast.error(error)
+        products = list(self.item.products)
+        for i, value in zip(empty_indexes, values):
+            products[i].serial_number = value
+        # Явне переприсвоєння — гарантує, що фронтенд побачить зміни одразу для
+        # всіх позицій (мутація елементів списку в циклі не завжди позначає
+        # реактивний var брудним для масового пакетного оновлення).
+        self.item.products = products
+        self.serial_mask = ""
+    # ======================
+
     @rx.event
     def on_change_price(self, value: str):
         # Зберігаємо рядок як є (не переформатовуємо), а у float парсимо лише для
@@ -348,6 +401,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
     new_uniq: bool = False
     new_capacity: str = "0"
 
+    # Підтвердження «такий товар вже є в каталозі — додати наявний?»
+    is_duplicate_confirm_open: bool = False
+    duplicate_product_id: int = -1
+    duplicate_product_category_id: str = ""
+    duplicate_product_title: str = ""
+
     def _reset_new_product(self):
         self.new_title = ""
         self.new_description = ""
@@ -356,14 +415,20 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.new_divisible = False
         self.new_uniq = False
         self.new_capacity = "0"
+        self.is_duplicate_confirm_open = False
+        self.duplicate_product_id = -1
+        self.duplicate_product_category_id = ""
+        self.duplicate_product_title = ""
 
     @rx.event
     def open_create_product(self):
-        self.list_categories = [
-            (str(item.id), item.title) for item in ProductCategoryDAO.get_all()
-        ]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self.units_cache = ProductCatalogDAO.get_list_units()
         self._reset_new_product()
+        # Якщо в діалозі позиції вже обрано категорію — підставляємо її одразу,
+        # щоб не змушувати користувача обирати те саме вдруге.
+        if self.filter_category != "":
+            self.new_id_category = self.filter_category
         self.is_create_open = True
 
     @rx.event
@@ -410,43 +475,14 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return
         self.new_divisible = value
 
-    @rx.event
-    async def create_product(self):
-        # Створення товару каталогу з поставки потребує права на додавання ТМЦ.
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.PRODUCTS_CREATE):
-            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
-        title = self.new_title.strip()
-        if title == "" or self.new_id_category == "":
-            return rx.toast.error("Вкажіть назву та категорію товару!")
-        if self.new_uniq and self.new_divisible:
-            return rx.toast.error("Товар із серійним номером не може бути подільним!")
-
-        capacity = (
-            1
-            if self.new_uniq
-            else (int(self.new_capacity) if self.new_capacity.isdigit() else 0)
-        )
-        product = ProductCatalog(
-            title=title,
-            description=self.new_description.strip() or None,
-            id_category=int(self.new_id_category),
-            unit=self.new_unit.strip(),
-            divisible=False if self.new_uniq else self.new_divisible,
-            uniq=self.new_uniq,
-            capacity=capacity,
-            count=0,
-        )
-        flag, text, new_id = ProductCatalogDAO.add_one(product)
-        if not flag:
-            return rx.toast.error(text)
-
-        # Новий товар одразу обираємо в поточному рядку поставки. Переставляємо
-        # фільтр категорії на категорію нового товару, щоб він був у переліку.
+    def _select_catalog_in_line(self, catalog_id: int, category_id: str):
+        """Обирає позицію каталогу в поточному рядку поставки — спільна логіка
+        для «товар щойно створено» та «обрано наявний дубль»."""
         self._load_products_catalog_list()
         self.search_catalog = ""
-        self.filter_category = str(int(self.new_id_category))
+        self.filter_category = category_id
         for catalog in self.cache_products_catalog_list:
-            if catalog.id == new_id:
+            if catalog.id == catalog_id:
                 self.id_product_catalog_in_cache = str(catalog.id)
                 self.item.product = catalog
                 self.item.id_product_catalog = catalog.id
@@ -459,9 +495,90 @@ class MovementProductCatalogAddEditFormState(rx.State):
                     unit.count = per_unit
                 break
 
+    @rx.event
+    async def create_product(self):
+        # Створення товару каталогу з поставки потребує права на додавання ТМЦ.
+        if not (await self.get_state(AppState)).has_permission(ActionEnum.PRODUCTS_CREATE):
+            return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
+        title = self.new_title.strip()
+        if title == "" or self.new_id_category == "":
+            return rx.toast.error("Вкажіть назву та категорію товару!")
+        if self.new_uniq and self.new_divisible:
+            return rx.toast.error("Товар із серійним номером не може бути подільним!")
+        if self.new_divisible and not (self.new_capacity.isdigit() and int(self.new_capacity) > 0):
+            return rx.toast.error("Для подільного ТМЦ потрібно вказати додатну місткість!")
+
+        unit = self.new_unit.strip()
+        existing = ProductCatalogDAO.get_by_title_and_unit(title, unit)
+        if existing is not None:
+            # Товар з такою назвою+одиницею вже є в каталозі — питаємо, чи додати
+            # наявний до поставки, замість того щоб просто відхилити створення.
+            self.duplicate_product_id = existing.id
+            self.duplicate_product_category_id = (
+                str(existing.id_category) if existing.id_category is not None else ""
+            )
+            self.duplicate_product_title = f"{existing.title} ({existing.unit})"
+            self.is_duplicate_confirm_open = True
+            return
+
+        capacity = (
+            1
+            if self.new_uniq
+            else (int(self.new_capacity) if self.new_capacity.isdigit() else 0)
+        )
+        product = ProductCatalog(
+            title=title,
+            description=self.new_description.strip() or None,
+            id_category=int(self.new_id_category),
+            unit=unit,
+            divisible=False if self.new_uniq else self.new_divisible,
+            uniq=self.new_uniq,
+            capacity=capacity,
+            count=0,
+        )
+        flag, text, new_id = ProductCatalogDAO.add_one(product)
+        if not flag:
+            return rx.toast.error(text)
+
+        # Новий товар одразу обираємо в поточному рядку поставки. Переставляємо
+        # фільтр категорії на категорію нового товару, щоб він був у переліку.
+        self._select_catalog_in_line(new_id, str(int(self.new_id_category)))
+
         self.is_create_open = False
         self._reset_new_product()
         return rx.toast.success("Товар створено та обрано!")
+
+    @rx.event
+    def cancel_duplicate_product(self):
+        self.is_duplicate_confirm_open = False
+        self.duplicate_product_id = -1
+        self.duplicate_product_category_id = ""
+        self.duplicate_product_title = ""
+
+    @rx.event
+    def set_duplicate_confirm_open(self, value: bool):
+        if not value:
+            self.cancel_duplicate_product()
+
+    @rx.event
+    def confirm_use_duplicate_product(self):
+        # Користувач погодився використати наявний товар замість створення дубля.
+        catalog_id = self.duplicate_product_id
+        self._select_catalog_in_line(catalog_id, self.duplicate_product_category_id)
+
+        self.is_duplicate_confirm_open = False
+        self.duplicate_product_id = -1
+        self.duplicate_product_category_id = ""
+        self.duplicate_product_title = ""
+
+        if self.item.id_product_catalog != catalog_id:
+            # Товар вже використовується в іншому рядку цієї поставки — виключений
+            # з кешу, тож обрати його повторно не можна.
+            return rx.toast.error("Цей товар вже додано до поставки в іншому рядку!")
+
+        self.is_create_open = False
+        self._reset_new_product()
+        return rx.toast.success("Обрано наявний товар!")
     # ======================
 
     # Створення нової категорії прямо з діалогу створення товару
@@ -509,9 +626,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return rx.toast.error(text)
 
         # Перезавантажуємо список і одразу обираємо нову категорію в новому товарі.
-        self.list_categories = [
-            (str(item.id), item.title) for item in ProductCategoryDAO.get_all()
-        ]
+        self.list_categories = ProductCategoryDAO.get_hierarchy_options()
         self.new_id_category = str(new_id)
         self.is_create_category_open = False
         self._reset_new_category()
@@ -993,11 +1108,13 @@ class AddAdmissionState(LookupCreatorsMixin, rx.State):
         form_state.set_item(
             self.item.movement.products_catalog[self.current_product_catalog_index]
         )
-        form_state.exclude_products_catalog_list = [
+        # Освіжаємо кеш каталогу так само, як при відкритті на додавання —
+        # інакше нові/щойно прив'язані до категорії товари не будуть видні.
+        form_state.set_exclude_products_catalog_list([
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
             if i != self.current_product_catalog_index
-        ]
+        ])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
 
@@ -1119,6 +1236,7 @@ class AddAdmissionState(LookupCreatorsMixin, rx.State):
             return rx.toast.success(text)
         return [
             rx.toast.success(text),
+            ListAdmissionState.on_load(),
             rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
         ]
 
@@ -1162,6 +1280,10 @@ class EditAdmissionState(rx.State):
     product_catalog_dialog_page: str = ""
     is_product_dialog_view_mode: bool = False
     # ======================
+
+    # Право + вікно редагування переліку ТМЦ — обчислюється один раз в on_load
+    # (потребує запиту до БД для перевірки конфліктів із пізнішими рухами).
+    _can_edit_products: bool = False
 
     app_state: Optional[AppState] = None
 
@@ -1239,10 +1361,24 @@ class EditAdmissionState(rx.State):
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
+
+        self._can_edit_products = False
+        if self.app_state.has_permission(ActionEnum.ADMISSIONS_EDIT_PRODUCTS):
+            try:
+                movement_date = date.fromisoformat(self.item.movement.date)
+                within_window = (date.today() - movement_date).days <= ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS
+            except ValueError:
+                within_window = False
+            if within_window and AdmissionDAO.can_edit_products(self.item.id):
+                self._can_edit_products = True
     # ======================
 
     # Getters for form fields
     # ======================
+    @rx.var
+    def can_edit_products(self) -> bool:
+        return self._can_edit_products
+
     @rx.var
     def id_destination_storage(self) -> str:
         return str(self.item.movement.id_destination_storage) if self.item is not None else ""
@@ -1446,7 +1582,7 @@ class EditAdmissionState(rx.State):
 
     @rx.event
     async def add_product_catalog_dialog_open(self):
-        if self.item is None:
+        if self.item is None or not self._can_edit_products:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
@@ -1460,24 +1596,32 @@ class EditAdmissionState(rx.State):
 
     @rx.event
     async def edit_product_catalog_dialog(self):
-        if self.item is None:
+        if self.item is None or not self._can_edit_products:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
         form_state.set_item(
             self.item.movement.products_catalog[self.current_product_catalog_index]
         )
-        form_state.exclude_products_catalog_list = [
+        # Освіжаємо кеш каталогу так само, як при відкритті на додавання —
+        # інакше нові/щойно прив'язані до категорії товари не будуть видні.
+        form_state.set_exclude_products_catalog_list([
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
             if i != self.current_product_catalog_index
-        ]
+        ])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
 
     @rx.event
+    async def edit_product_catalog_dialog_from_row(self, index: int):
+        # Кнопка «Редагувати» прямо в рядку таблиці (без проміжного перегляду).
+        self.current_product_catalog_index = index
+        await self.edit_product_catalog_dialog()
+
+    @rx.event
     async def on_save_product_catalog_dialog(self):
-        if self.item is None:
+        if self.item is None or not self._can_edit_products:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         if form_state.has_errors:
@@ -1496,6 +1640,21 @@ class EditAdmissionState(rx.State):
     @rx.event
     def on_close_product_catalog_dialog(self):
         self.is_open_product_catalog_dialog = False
+
+    @rx.event
+    def delete_product_catalog_row(self, index: int):
+        if self.item is None or not self._can_edit_products:
+            return rx.toast.error("У Вас немає дозволу на редагування переліку ТМЦ!")
+        if index < 0 or index >= len(self.item.movement.products_catalog):
+            return
+        pc = self.item.movement.products_catalog[index]
+        if pc.id is not None and pc.id > 0:
+            flag, text = AdmissionDAO.delete_product_line(pc.id)
+            if not flag:
+                return rx.toast.error(text)
+        del self.item.movement.products_catalog[index]
+        self._recompute_total()
+        return rx.toast.success("Позицію видалено!")
 
     @rx.event
     async def edit_one(self):
@@ -1520,6 +1679,7 @@ class EditAdmissionState(rx.State):
         if flag:
             return [
                 rx.toast.success(text),
+                ListAdmissionState.on_load(),
                 rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}"),
             ]
         return rx.toast.error(text)

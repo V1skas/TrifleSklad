@@ -102,7 +102,7 @@ class AddRoleState(rx.State):
         
         flag, text, id = RoleDAO.add_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListRoleState.on_load(), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ======================
 
@@ -164,7 +164,7 @@ class EditRoleState(rx.State):
 
         flag, text, id = RoleDAO.edit_one(self.item)
         if flag:
-            return [rx.toast.success(text), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
+            return [rx.toast.success(text), ListRoleState.on_load(), rx.redirect(f"{routes.ADMIN_ROLES_VIEW_ID}{id}")]
         return rx.toast.error(text)
     # ======================
 
@@ -257,7 +257,7 @@ class RoleState(rx.State):
 
             flag, text = RoleDAO.delete_one(id)
             if flag:
-                return [rx.toast.success(text), rx.redirect(routes.ADMIN_ROLES)]
+                return [rx.toast.success(text), ListRoleState.on_load(), rx.redirect(routes.ADMIN_ROLES)]
             else:
                 return [rx.toast.error(text)]
         return rx.toast.error("Не обрано запис для видалення")

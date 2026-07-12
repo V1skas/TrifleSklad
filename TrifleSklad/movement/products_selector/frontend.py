@@ -248,6 +248,15 @@ def filters_panel() -> rx.Component:
             width="100%",
             size="2",
         ),
+        rx.cond(
+            ProductsSelectorState.catalog_chosen,
+            rx.text(
+                ProductsSelectorState.total_available_label,
+                size="2",
+                weight="bold",
+                color=rx.color("accent", 11),
+            ),
+        ),
         rx.text("Пошук (s/n / ID):", size="2"),
         rx.debounce_input(
             rx.input(
@@ -351,6 +360,24 @@ def selector(*child, **prop) -> rx.Component:
             flex="1",
             min_height="0",
             align="stretch",
+        ),
+        rx.cond(
+            ProductsSelectorState.selected_total_units > 0,
+            rx.hstack(
+                rx.text(
+                    f"Обрано: {ProductsSelectorState.selected_total_units}",
+                    size="2",
+                    weight="bold",
+                ),
+                rx.foreach(
+                    ProductsSelectorState.selected_summary,
+                    lambda s: rx.badge(f"{s[0]}: {s[1]}", variant="soft"),
+                ),
+                spacing="2",
+                wrap="wrap",
+                width="100%",
+                flex_shrink="0",
+            ),
         ),
         *child,
         **prop,

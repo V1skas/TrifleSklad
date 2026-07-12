@@ -79,7 +79,7 @@ def item_preview() -> rx.Component:
     return rx.vstack(
         rx.hstack(rx.text("Дата:"), rx.text(ViewReturnsState.item.date)),
         rx.hstack(
-            rx.text("Звідки (площадка/відділ):"),
+            rx.text("Звідки (площадка/відділ/клієнт):"),
             rx.text(ViewReturnsState.item.incoming_storage.title),
         ),
         rx.hstack(
@@ -234,7 +234,7 @@ def add_form() -> rx.Component:
                 size="3",
                 width="100%",
             ),
-            rx.text("*Звідки (площадка/відділ):"),
+            rx.text("*Звідки (площадка/відділ/клієнт):"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
@@ -248,7 +248,7 @@ def add_form() -> rx.Component:
                 value=AddReturnsState.id_incoming_storage,
                 on_change=AddReturnsState.on_change_id_incoming_storage,
             ),
-            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити площадку/відділ", AddReturnsState.open_storage_create(StorageType.TECHNICAL_SITE, "incoming", True)),
+            create_lookup_button(ActionEnum.STORAGE_CREATE, "Створити площадку/відділ/клієнта", AddReturnsState.open_storage_create(StorageType.TECHNICAL_SITE, "incoming", True)),
             rx.text("*Склад призначення:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
@@ -341,7 +341,7 @@ def edit_form() -> rx.Component:
                 size="3",
                 disabled=True,
             ),
-            rx.text("Звідки (площадка/відділ):"),
+            rx.text("Звідки (площадка/відділ/клієнт):"),
             rx.input(
                 value=EditReturnsState.item.incoming_storage.title,
                 disabled=True,
