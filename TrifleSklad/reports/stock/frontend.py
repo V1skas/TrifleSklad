@@ -204,9 +204,23 @@ def table() -> rx.Component:
     )
 
 
+def search_box() -> rx.Component:
+    return rx.debounce_input(
+        rx.input(
+            rx.input.slot(rx.icon("search")),
+            placeholder="Пошук за назвою ТМЦ або серійним номером",
+            value=StockReportState.search_text,
+            on_change=StockReportState.on_change_search_text,
+            width="100%",
+        ),
+        debounce_timeout=400,
+    )
+
+
 def index() -> rx.Component:
     return rx.vstack(
         subpage_header("Звіти/Наявність ТМЦ"),
+        search_box(),
         filter_card(),
         rx.cond(
             StockReportState.has_rows,

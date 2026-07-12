@@ -17,9 +17,11 @@ from TrifleSklad.dao import (
     SupplierDAO,
 )
 from TrifleSklad.declared import (
+    ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS,
     MovementsStatus,
     MovementsType,
     StorageType,
+    generate_serial_range,
     movements_status_list,
     movements_type_list,
 )
@@ -273,6 +275,47 @@ class MovementProductCatalogAddEditFormState(rx.State):
     def on_change_serial_numbers(self, index: int, value: str):
         if index < len(self.item.products):
             self.item.products[index].serial_number = value
+
+    # Заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}", 1..5)
+    # ======================
+    serial_mask: str = ""
+    serial_range_from: str = "1"
+    serial_range_to: str = "1"
+    serial_range_hex: bool = False
+
+    @rx.event
+    def on_change_serial_mask(self, value: str):
+        self.serial_mask = value
+
+    @rx.event
+    def on_change_serial_range_from(self, value: str):
+        self.serial_range_from = value
+
+    @rx.event
+    def on_change_serial_range_to(self, value: str):
+        self.serial_range_to = value
+
+    @rx.event
+    def on_change_serial_range_hex(self, value: bool):
+        self.serial_range_hex = value
+
+    @rx.event
+    def fill_serial_range(self):
+        empty_indexes = [
+            i for i, p in enumerate(self.item.products) if not p.serial_number
+        ]
+        if not empty_indexes:
+            return rx.toast.error("Усі серійні номери вже заповнені!")
+        values, error = generate_serial_range(
+            self.serial_mask, self.serial_range_from, self.serial_range_to,
+            len(empty_indexes), self.serial_range_hex,
+        )
+        if error is not None:
+            return rx.toast.error(error)
+        for i, value in zip(empty_indexes, values):
+            self.item.products[i].serial_number = value
+        self.serial_mask = ""
+    # ======================
 
     @rx.event
     def on_change_price(self, value: str):
@@ -1233,6 +1276,10 @@ class EditAdmissionState(rx.State):
     is_product_dialog_view_mode: bool = False
     # ======================
 
+    # Право + вікно редагування переліку ТМЦ — обчислюється один раз в on_load
+    # (потребує запиту до БД для перевірки конфліктів із пізнішими рухами).
+    _can_edit_products: bool = False
+
     app_state: Optional[AppState] = None
 
     # Backend only
@@ -1309,10 +1356,24 @@ class EditAdmissionState(rx.State):
 
         if self.app_state is None:
             self.app_state = await self.get_state(AppState)
+
+        self._can_edit_products = False
+        if self.app_state.has_permission(ActionEnum.ADMISSIONS_EDIT_PRODUCTS):
+            try:
+                movement_date = date.fromisoformat(self.item.movement.date)
+                within_window = (date.today() - movement_date).days <= ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS
+            except ValueError:
+                within_window = False
+            if within_window and AdmissionDAO.can_edit_products(self.item.id):
+                self._can_edit_products = True
     # ======================
 
     # Getters for form fields
     # ======================
+    @rx.var
+    def can_edit_products(self) -> bool:
+        return self._can_edit_products
+
     @rx.var
     def id_destination_storage(self) -> str:
         return str(self.item.movement.id_destination_storage) if self.item is not None else ""
@@ -1516,7 +1577,7 @@ class EditAdmissionState(rx.State):
 
     @rx.event
     async def add_product_catalog_dialog_open(self):
-        if self.item is None:
+        if self.item is None or not self._can_edit_products:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
@@ -1530,7 +1591,7 @@ class EditAdmissionState(rx.State):
 
     @rx.event
     async def edit_product_catalog_dialog(self):
-        if self.item is None:
+        if self.item is None or not self._can_edit_products:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
@@ -1548,8 +1609,14 @@ class EditAdmissionState(rx.State):
         self.is_open_product_catalog_dialog = True
 
     @rx.event
+    async def edit_product_catalog_dialog_from_row(self, index: int):
+        # Кнопка «Редагувати» прямо в рядку таблиці (без проміжного перегляду).
+        self.current_product_catalog_index = index
+        await self.edit_product_catalog_dialog()
+
+    @rx.event
     async def on_save_product_catalog_dialog(self):
-        if self.item is None:
+        if self.item is None or not self._can_edit_products:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         if form_state.has_errors:
@@ -1568,6 +1635,21 @@ class EditAdmissionState(rx.State):
     @rx.event
     def on_close_product_catalog_dialog(self):
         self.is_open_product_catalog_dialog = False
+
+    @rx.event
+    def delete_product_catalog_row(self, index: int):
+        if self.item is None or not self._can_edit_products:
+            return rx.toast.error("У Вас немає дозволу на редагування переліку ТМЦ!")
+        if index < 0 or index >= len(self.item.movement.products_catalog):
+            return
+        pc = self.item.movement.products_catalog[index]
+        if pc.id is not None and pc.id > 0:
+            flag, text = AdmissionDAO.delete_product_line(pc.id)
+            if not flag:
+                return rx.toast.error(text)
+        del self.item.movement.products_catalog[index]
+        self._recompute_total()
+        return rx.toast.success("Позицію видалено!")
 
     @rx.event
     async def edit_one(self):

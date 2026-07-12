@@ -118,6 +118,33 @@ class ProductsSelectorState(rx.State):
     @rx.var
     def get_available_items(self) -> List[Tuple[int, Product]]:
         return [(item.id, item) for item in self.available]
+
+    @rx.var
+    def selected_total_units(self) -> int:
+        return len(self.selected)
+
+    @rx.var
+    def selected_summary(self) -> List[Tuple[str, str]]:
+        # Групуємо обране за позицією каталогу (selected може містити одиниці
+        # різних позицій з різними одиницями виміру, тож єдина сума неможлива).
+        totals: Dict[int, float] = {}
+        titles: Dict[int, str] = {}
+        units: Dict[int, str] = {}
+        divisible: Dict[int, bool] = {}
+        for p in self.selected:
+            if p.product_catalog is None:
+                continue
+            cid = p.product_catalog.id
+            titles[cid] = p.product_catalog.title
+            units[cid] = p.product_catalog.unit or ""
+            divisible[cid] = p.product_catalog.divisible
+            totals[cid] = totals.get(cid, 0) + self.split_intent.get(p.id, p.count)
+        result = []
+        for cid, title in titles.items():
+            qty = totals[cid]
+            qty_str = f"{qty:g}" if divisible[cid] else str(int(qty))
+            result.append((title, f"{qty_str} {units[cid]}".strip()))
+        return sorted(result, key=lambda t: t[0])
     # ======================
 
     # Backend only

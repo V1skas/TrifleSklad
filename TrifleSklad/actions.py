@@ -49,6 +49,7 @@ class Action(StrEnum):
     ADMISSIONS_EDIT = ("admissions:edit", "Редагування постачань", "Дозволяє редагувати постачання")
     ADMISSIONS_LIST = ("admissions:list", "Список постачань", "Дозволяє переглядати список постачань")
     ADMISSIONS_VIEW = ("admissions:view", "Перегляд постачань", "Дозволяє переглядати інформацію про постачання")
+    ADMISSIONS_EDIT_PRODUCTS = ("admissions:edit_products", "Редагування ТМЦ у поставках", "Дозволяє редагувати перелік ТМЦ у вже проведеному поставленні (в межах вікна редагування)")
 
     WRITE_OFFS_CREATE = ("write_offs:create", "Додавання списань", "Дозволяє створювати списання")
     WRITE_OFFS_DELETE = ("write_offs:delete", "Скасування списань", "Дозволяє скасовувати списання")

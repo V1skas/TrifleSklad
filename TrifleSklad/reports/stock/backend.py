@@ -49,6 +49,11 @@ class StockReportState(rx.State):
     search_catalog: str = ""
     search_storage: str = ""
 
+    # Пошук по самому звіту — за назвою позиції каталогу або серійним номером
+    # одиниці; на відміну від search_catalog/search_storage вище фільтрує самі
+    # рядки звіту, а не лише опції селектів.
+    search_text: str = ""
+
     # Модалка одиниць позиції: (id, serial, storage, owner, count)
     is_units_open: bool = False
     selected_title: str = ""
@@ -105,6 +110,7 @@ class StockReportState(rx.State):
             int(self.filter_owner) if self.filter_owner else None,
             self._excluded_types(),
             int(self.filter_category) if self.filter_category else None,
+            self.search_text or None,
         )
 
     # Dynamic variables
@@ -181,6 +187,7 @@ class StockReportState(rx.State):
         self.exclude_warehouse = False
         self.exclude_site = False
         self.exclude_department = False
+        self.search_text = ""
         self.is_units_open = False
         self.unit_rows = []
         self.selected_title = ""
@@ -195,6 +202,11 @@ class StockReportState(rx.State):
     @rx.event
     def on_change_search_storage(self, value: str):
         self.search_storage = value
+
+    @rx.event
+    def on_change_search_text(self, value: str):
+        self.search_text = value
+        self._reload()
 
     @rx.event
     def on_change_catalog(self, value: str):
@@ -244,6 +256,7 @@ class StockReportState(rx.State):
         self.exclude_warehouse = False
         self.exclude_site = False
         self.exclude_department = False
+        self.search_text = ""
         self._reload()
 
     @rx.event
@@ -254,6 +267,7 @@ class StockReportState(rx.State):
             int(self.filter_storage) if self.filter_storage else None,
             int(self.filter_owner) if self.filter_owner else None,
             self._excluded_types(),
+            self.search_text or None,
         )
         rows: List[Tuple[str, str, str, str, str]] = []
         for unit in units:

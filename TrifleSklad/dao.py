@@ -2021,11 +2021,13 @@ class ProductDAO:
         owner_id: Optional[int] = None,
         exclude_types: Optional[List[int]] = None,
         category_id: Optional[int] = None,
+        search: Optional[str] = None,
     ) -> List[tuple]:
         """Звіт «Наявність ТМЦ»: позиції каталогу, що зараз лежать на місцях
         зберігання, із сумарною кількістю та числом одиниць. Фільтри —
         за позицією каталогу, категорією, місцем зберігання, власником; exclude_types —
-        типи сховищ (склад/площадка/відділ), які треба виключити.
+        типи сховищ (склад/площадка/відділ), які треба виключити; search — вільний
+        пошук за назвою позиції каталогу або серійним номером одиниці.
         Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
         exclude_types = exclude_types or []
         statement = (
@@ -2055,6 +2057,17 @@ class ProductDAO:
             statement = statement.where(Product.id_owner == owner_id)
         if exclude_types:
             statement = statement.where(Storage.type.not_in(exclude_types))
+        if search:
+            term = search.strip()
+            if term:
+                like = f"%{term.lower()}%"
+                conditions = [
+                    func.lower(ProductCatalog.title).like(like),
+                    func.lower(func.coalesce(Product.serial_number, "")).like(like),
+                ]
+                if term.isdigit():
+                    conditions.append(Product.id == int(term))
+                statement = statement.where(or_(*conditions))
 
         with rx.session() as session:
             rows = session.exec(statement).all()
@@ -2070,6 +2083,7 @@ class ProductDAO:
         storage_id: Optional[int] = None,
         owner_id: Optional[int] = None,
         exclude_types: Optional[List[int]] = None,
+        search: Optional[str] = None,
     ) -> List[Product]:
         """Окремі одиниці ТМЦ для модалки звіту: всі живі одиниці позиції каталогу
         на місцях зберігання з тими ж фільтрами, що й у згрупованому звіті."""
@@ -2093,6 +2107,16 @@ class ProductDAO:
             statement = statement.where(Product.id_owner == owner_id)
         if exclude_types:
             statement = statement.where(Storage.type.not_in(exclude_types))
+        if search:
+            term = search.strip()
+            if term:
+                like = f"%{term.lower()}%"
+                conditions = [
+                    func.lower(func.coalesce(Product.serial_number, "")).like(like),
+                ]
+                if term.isdigit():
+                    conditions.append(Product.id == int(term))
+                statement = statement.where(or_(*conditions))
 
         with rx.session() as session:
             products = session.exec(statement).all()
@@ -3132,6 +3156,91 @@ class AdmissionDAO:
             return False, "Помилка! Постачання не може бути змінено.", -1
         except SQLAlchemyError as e:
             return False, "Системна помилка!", -1
+
+    @classmethod
+    def can_edit_products(cls, id: int) -> bool:
+        """Чи можна редагувати перелік ТМЦ цього поставлення — той самий
+        конфлікт-чек, що й у delete_one: жодна з одиниць цього поставлення не
+        повинна фігурувати в іншому русі (напр. вже переміщена/списана)."""
+        with rx.session() as session:
+            movements_products_catalog = session.exec(
+                select(MovementProductsCatalog).where(
+                    MovementProductsCatalog.id_movement == id
+                )
+            ).all()
+            if not movements_products_catalog:
+                return True
+            products_in_movement = session.exec(
+                select(MovementProducts).where(
+                    MovementProducts.id_movement_product.in_(
+                        [mpc.id for mpc in movements_products_catalog]
+                    )
+                )
+            ).all()
+            other_movements_with_current_products = session.exec(
+                select(MovementProducts)
+                .where(
+                    MovementProducts.id_product.in_(
+                        [pim.id_product for pim in products_in_movement]
+                    )
+                )
+                .where(
+                    MovementProducts.id_movement_product.not_in(
+                        [mpc.id for mpc in movements_products_catalog]
+                    )
+                )
+            ).all()
+            return len(other_movements_with_current_products) == 0
+
+    @classmethod
+    def delete_product_line(cls, id_movement_products_catalog: int) -> tuple[bool, str]:
+        """Видаляє один рядок переліку ТМЦ поставлення (позицію каталогу разом
+        з усіма її одиницями) — за умови, що жодна з одиниць цього рядка не
+        фігурує в іншому русі. Використовується при редагуванні поставлення."""
+        try:
+            with rx.session() as session:
+                mpc: Optional[MovementProductsCatalog] = session.get(
+                    MovementProductsCatalog, id_movement_products_catalog
+                )
+                if mpc is None:
+                    return False, "Помилка! Позицію не знайдено."
+
+                products_in_line: List[MovementProducts] = session.exec(
+                    select(MovementProducts).where(
+                        MovementProducts.id_movement_product == mpc.id
+                    )
+                ).all()
+                products: List[Product] = session.exec(
+                    select(Product).where(
+                        Product.id.in_([p.id_product for p in products_in_line])
+                    )
+                ).all()
+
+                other_movements_with_current_products = session.exec(
+                    select(MovementProducts)
+                    .where(
+                        MovementProducts.id_product.in_([p.id for p in products])
+                    )
+                    .where(MovementProducts.id_movement_product != mpc.id)
+                ).all()
+                if len(other_movements_with_current_products) > 0:
+                    return (
+                        False,
+                        "Помилка! Позицію не можна видалити, оскільки товар вже використовується в іншому русі.",
+                    )
+
+                for item in products_in_line:
+                    session.delete(item)
+                for item in products:
+                    session.delete(item)
+                session.delete(mpc)
+                session.commit()
+                return True, "Позицію видалено!"
+
+        except IntegrityError:
+            return False, "Помилка! Позицію не може бути видалено."
+        except SQLAlchemyError:
+            return False, "Системна помилка!"
 
     @classmethod
     def delete_one(cls, id: int) -> tuple[bool, str]:

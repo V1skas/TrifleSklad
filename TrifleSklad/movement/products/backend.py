@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple
 import reflex as rx
 
 from TrifleSklad.dao import ProductDAO
-from TrifleSklad.declared import sale_line_cost
+from TrifleSklad.declared import generate_serial_range, sale_line_cost
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
@@ -59,6 +59,10 @@ class ProductsMovementListState(rx.State):
         self.show_serial = False
         self.require_price = False
         self.prices = {}
+        self.serial_mask = ""
+        self.serial_range_from = "1"
+        self.serial_range_to = "1"
+        self.serial_range_hex = False
         # Скидаємо фільтри місця/власника, інакше кнопка «Додати» лишається
         # активною зі застарілими значеннями (і діалог показав би чужий ТМЦ),
         # доки користувач не обере склад і власника заново.
@@ -106,6 +110,51 @@ class ProductsMovementListState(rx.State):
             if product.id == product_id:
                 self.items[index].serial_number = value
                 break
+
+    # Заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}", 1..5)
+    # ======================
+    serial_mask: str = ""
+    serial_range_from: str = "1"
+    serial_range_to: str = "1"
+    serial_range_hex: bool = False
+
+    @rx.event
+    def on_change_serial_mask(self, value: str):
+        self.serial_mask = value
+
+    @rx.event
+    def on_change_serial_range_from(self, value: str):
+        self.serial_range_from = value
+
+    @rx.event
+    def on_change_serial_range_to(self, value: str):
+        self.serial_range_to = value
+
+    @rx.event
+    def on_change_serial_range_hex(self, value: bool):
+        self.serial_range_hex = value
+
+    @rx.event
+    def fill_serial_range(self):
+        empty_indexes = [
+            i
+            for i, p in enumerate(self.items)
+            if p.product_catalog is not None
+            and p.product_catalog.uniq
+            and not p.serial_number
+        ]
+        if not empty_indexes:
+            return rx.toast.error("Усі серійні номери вже заповнені!")
+        values, error = generate_serial_range(
+            self.serial_mask, self.serial_range_from, self.serial_range_to,
+            len(empty_indexes), self.serial_range_hex,
+        )
+        if error is not None:
+            return rx.toast.error(error)
+        for i, value in zip(empty_indexes, values):
+            self.items[i].serial_number = value
+        self.serial_mask = ""
+    # ======================
 
     @rx.var
     def is_view_mode(self) -> bool:

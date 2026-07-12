@@ -298,6 +298,58 @@ def total_section():
         ),
     )
 
+def serial_range_bar():
+    # Пакетне заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}").
+    return rx.cond(
+        ProductsMovementListState.serial_visible & ~ProductsMovementListState.is_view_mode & ProductsMovementListState.has_items,
+        rx.vstack(
+            rx.hstack(
+                rx.input(
+                    placeholder="Маска, напр. СН-{n}",
+                    value=ProductsMovementListState.serial_mask,
+                    on_change=ProductsMovementListState.on_change_serial_mask,
+                    size="2",
+                    width="40%",
+                ),
+                rx.input(
+                    placeholder="Від",
+                    type="text",
+                    value=ProductsMovementListState.serial_range_from,
+                    on_change=ProductsMovementListState.on_change_serial_range_from,
+                    size="2",
+                    width="20%",
+                ),
+                rx.input(
+                    placeholder="До",
+                    type="text",
+                    value=ProductsMovementListState.serial_range_to,
+                    on_change=ProductsMovementListState.on_change_serial_range_to,
+                    size="2",
+                    width="20%",
+                ),
+                rx.button(
+                    "Заповнити серійні номери",
+                    type="button",
+                    size="2",
+                    on_click=ProductsMovementListState.fill_serial_range,
+                ),
+                width="100%",
+                spacing="2",
+            ),
+            rx.text(
+                rx.checkbox(
+                    checked=ProductsMovementListState.serial_range_hex,
+                    on_change=ProductsMovementListState.on_change_serial_range_hex,
+                ),
+                " 16-та система числення (0-9, A-F)",
+                as_="label",
+                size="1",
+            ),
+            width="100%",
+            spacing="1",
+        ),
+    )
+
 def index(*args, **kwargs):
     return rx.vstack(
         rx.hstack(
@@ -314,6 +366,7 @@ def index(*args, **kwargs):
             width="100%"
         ),
         dialog(),
+        serial_range_bar(),
         rx.cond(ProductsMovementListState.has_items,
                 table(),
                 rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3")),
