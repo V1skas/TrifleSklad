@@ -92,6 +92,11 @@ def filter_card() -> rx.Component:
                     checked=StockReportState.exclude_department,
                     on_change=StockReportState.on_change_exclude_department,
                 ),
+                rx.checkbox(
+                    "Клієнти",
+                    checked=StockReportState.exclude_client,
+                    on_change=StockReportState.on_change_exclude_client,
+                ),
                 rx.spacer(),
                 rx.button(
                     "Скинути фільтри",

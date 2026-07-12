@@ -44,6 +44,7 @@ class StockReportState(rx.State):
     exclude_warehouse: bool = False
     exclude_site: bool = False
     exclude_department: bool = False
+    exclude_client: bool = False
 
     # Живий пошук усередині селектів позиції каталогу та місця зберігання.
     search_catalog: str = ""
@@ -69,6 +70,8 @@ class StockReportState(rx.State):
             excluded.append(StorageType.TECHNICAL_SITE)
         if self.exclude_department:
             excluded.append(StorageType.DEPARTMENT)
+        if self.exclude_client:
+            excluded.append(StorageType.CLIENT)
         return excluded
 
     def _load_filter_options(self):
@@ -187,6 +190,7 @@ class StockReportState(rx.State):
         self.exclude_warehouse = False
         self.exclude_site = False
         self.exclude_department = False
+        self.exclude_client = False
         self.search_text = ""
         self.is_units_open = False
         self.unit_rows = []
@@ -248,6 +252,12 @@ class StockReportState(rx.State):
         self._reload()
 
     @rx.event
+    def on_change_exclude_client(self, value: bool):
+        self.exclude_client = value
+        self._sync_storage_filter()
+        self._reload()
+
+    @rx.event
     def reset_filters(self):
         self.filter_catalog = ""
         self.filter_category = ""
@@ -256,6 +266,7 @@ class StockReportState(rx.State):
         self.exclude_warehouse = False
         self.exclude_site = False
         self.exclude_department = False
+        self.exclude_client = False
         self.search_text = ""
         self._reload()
 

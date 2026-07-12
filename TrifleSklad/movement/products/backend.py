@@ -59,10 +59,10 @@ class ProductsMovementListState(rx.State):
         self.show_serial = False
         self.require_price = False
         self.prices = {}
-        self.serial_mask = ""
-        self.serial_range_from = "1"
-        self.serial_range_to = "1"
-        self.serial_range_hex = False
+        self.serial_mask = {}
+        self.serial_range_from = {}
+        self.serial_range_to = {}
+        self.serial_range_hex = {}
         # Скидаємо фільтри місця/власника, інакше кнопка «Додати» лишається
         # активною зі застарілими значеннями (і діалог показав би чужий ТМЦ),
         # доки користувач не обере склад і власника заново.
@@ -111,49 +111,60 @@ class ProductsMovementListState(rx.State):
                 self.items[index].serial_number = value
                 break
 
-    # Заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}", 1..5)
+    # Заповнення серійних номерів діапазоном за маскою (напр. "СН-{n}", 1..5).
+    # Індивідуально для кожної позиції каталогу (ключ — id позиції каталогу),
+    # оскільки різний ТМЦ може мати різні правила формування серійних номерів.
     # ======================
-    serial_mask: str = ""
-    serial_range_from: str = "1"
-    serial_range_to: str = "1"
-    serial_range_hex: bool = False
+    serial_mask: Dict[int, str] = {}
+    serial_range_from: Dict[int, str] = {}
+    serial_range_to: Dict[int, str] = {}
+    serial_range_hex: Dict[int, bool] = {}
 
     @rx.event
-    def on_change_serial_mask(self, value: str):
-        self.serial_mask = value
+    def on_change_serial_mask(self, catalog_id: int, value: str):
+        self.serial_mask[catalog_id] = value
 
     @rx.event
-    def on_change_serial_range_from(self, value: str):
-        self.serial_range_from = value
+    def on_change_serial_range_from(self, catalog_id: int, value: str):
+        self.serial_range_from[catalog_id] = value
 
     @rx.event
-    def on_change_serial_range_to(self, value: str):
-        self.serial_range_to = value
+    def on_change_serial_range_to(self, catalog_id: int, value: str):
+        self.serial_range_to[catalog_id] = value
 
     @rx.event
-    def on_change_serial_range_hex(self, value: bool):
-        self.serial_range_hex = value
+    def on_change_serial_range_hex(self, catalog_id: int, value: bool):
+        self.serial_range_hex[catalog_id] = value
 
     @rx.event
-    def fill_serial_range(self):
+    def fill_serial_range(self, catalog_id: int):
         empty_indexes = [
             i
             for i, p in enumerate(self.items)
             if p.product_catalog is not None
+            and p.product_catalog.id == catalog_id
             and p.product_catalog.uniq
             and not p.serial_number
         ]
         if not empty_indexes:
             return rx.toast.error("Усі серійні номери вже заповнені!")
         values, error = generate_serial_range(
-            self.serial_mask, self.serial_range_from, self.serial_range_to,
-            len(empty_indexes), self.serial_range_hex,
+            self.serial_mask.get(catalog_id, ""),
+            self.serial_range_from.get(catalog_id, "1"),
+            self.serial_range_to.get(catalog_id, "1"),
+            len(empty_indexes),
+            self.serial_range_hex.get(catalog_id, False),
         )
         if error is not None:
             return rx.toast.error(error)
+        items = list(self.items)
         for i, value in zip(empty_indexes, values):
-            self.items[i].serial_number = value
-        self.serial_mask = ""
+            items[i].serial_number = value
+        # Явне переприсвоєння — гарантує, що фронтенд побачить зміни одразу для
+        # всіх позицій (мутація елементів списку в циклі не завжди позначає
+        # реактивний var брудним для масового пакетного оновлення).
+        self.items = items
+        self.serial_mask[catalog_id] = ""
     # ======================
 
     @rx.var
@@ -299,6 +310,17 @@ class ProductsMovementListState(rx.State):
                 and product.product_catalog.id not in self.prices
             ):
                 self.prices[product.product_catalog.id] = ""
+            # Ініціалізуємо поля діапазону s/n позиції (уніального ТМЦ), якщо їх ще немає.
+            if (
+                product.product_catalog is not None
+                and product.product_catalog.uniq
+                and product.product_catalog.id not in self.serial_range_from
+            ):
+                cid = product.product_catalog.id
+                self.serial_mask[cid] = ""
+                self.serial_range_from[cid] = "1"
+                self.serial_range_to[cid] = "1"
+                self.serial_range_hex[cid] = False
         self.close_dialog()
 
     @rx.event

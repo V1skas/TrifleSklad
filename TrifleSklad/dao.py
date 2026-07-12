@@ -13,6 +13,7 @@ from TrifleSklad.models import (
     Action,
     Admission,
     AuthToken,
+    ClientIssue,
     Issue,
     Movement,
     MovementProducts,
@@ -1793,6 +1794,34 @@ class ProductDAO:
             return products
 
     @classmethod
+    def get_stock_totals_by_owner_storage(
+        cls,
+        owner_id: int,
+        storage_id: int,
+        catalog_id: int,
+        exclude_ids: List[int],
+    ) -> tuple[int, int]:
+        """Загальна кількість доступного ТМЦ позиції каталогу на місці/власнику
+        для діалогу вибору: (кількість одиниць, сумарний залишок count — для
+        подільного це сумарний обсяг у одиницях виміру, для решти дорівнює
+        кількості одиниць). exclude_ids — одиниці, вже додані до руху (не
+        рахуються доступними); поточний вибір у діалозі в exclude_ids не входить."""
+        statement = (
+            select(func.count(Product.id), func.coalesce(func.sum(Product.count), 0))
+            .where(Product.id_storage == storage_id)
+            .where(Product.id_product_catalog == catalog_id)
+            .where(Product.is_deleted == False)
+        )
+        if owner_id != -1:
+            statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
+
+        with rx.session() as session:
+            units_count, measure_sum = session.exec(statement).one()
+            return int(units_count), int(measure_sum)
+
+    @classmethod
     def count_by_storage(cls, storage_id: int) -> int:
         statement = (
             select(func.count(Product.id))
@@ -3511,6 +3540,203 @@ class IssueDAO:
             return False, "Ошибка: Выдача не может быть изменена", -1
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}", -1
+
+
+class ClientIssueDAO:
+    @classmethod
+    def get_all(cls) -> List[ClientIssue]:
+        statement = select(ClientIssue)
+
+        with rx.session() as session:
+            client_issues = session.exec(statement).all()
+
+            if len(client_issues) > 0:
+                session.expunge_all()
+            return list(client_issues)
+
+    @classmethod
+    def get_all_with_all_relationship(cls) -> List[ClientIssue]:
+        statement = select(ClientIssue).options(
+            joinedload(ClientIssue.movement).options(
+                selectinload(Movement.products_catalog).options(
+                    joinedload(MovementProductsCatalog.product),
+                    selectinload(MovementProductsCatalog.products).options(
+                        joinedload(Product.product_catalog),
+                        joinedload(Product.owner),
+                        joinedload(Product.storage),
+                    ),
+                ),
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.incoming_owner),
+            ),
+            joinedload(ClientIssue.recipient),
+        )
+
+        with rx.session() as session:
+            client_issues = session.exec(statement).all()
+
+            if len(client_issues) > 0:
+                session.expunge_all()
+            return list(client_issues)
+
+    @classmethod
+    def get_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        date_from: str = "",
+        date_to: str = "",
+        statuses: Optional[List[int]] = None,
+        incoming_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        recipient: Optional[str] = None,
+        contract_number: Optional[str] = None,
+    ) -> tuple[int, List[ClientIssue]]:
+        conditions = movement_filter_conditions(
+            date_from, date_to, statuses,
+            incoming_storage=incoming_storage,
+            incoming_owner=incoming_owner,
+        )
+        movement_ids = select(Movement.id)
+        for cond in conditions:
+            movement_ids = movement_ids.where(cond)
+
+        client_issue_conditions = []
+        if recipient and recipient not in ("", "all"):
+            try:
+                client_issue_conditions.append(ClientIssue.id_recipient == int(recipient))
+            except (TypeError, ValueError):
+                pass
+        if contract_number:
+            client_issue_conditions.append(ClientIssue.contract_number.contains(contract_number))
+
+        with rx.session() as session:
+            count_stmt = select(func.count(ClientIssue.id)).where(ClientIssue.id.in_(movement_ids))
+            for cond in client_issue_conditions:
+                count_stmt = count_stmt.where(cond)
+            total = session.exec(count_stmt).one()
+            total_pages = max(1, math.ceil(total / limit))
+            skip = (max(1, page) - 1) * limit
+
+            statement = (
+                select(ClientIssue)
+                .options(
+                    joinedload(ClientIssue.movement).options(
+                        joinedload(Movement.incoming_storage),
+                        joinedload(Movement.incoming_owner),
+                        joinedload(Movement.destination_storage),
+                    ),
+                    joinedload(ClientIssue.recipient),
+                )
+                .where(ClientIssue.id.in_(movement_ids))
+            )
+            for cond in client_issue_conditions:
+                statement = statement.where(cond)
+            statement = (
+                statement.order_by(ClientIssue.id.desc()).offset(skip).limit(limit)
+            )
+            client_issues = session.exec(statement).all()
+            if len(client_issues) > 0:
+                session.expunge_all()
+            return total_pages, list(client_issues)
+
+    @classmethod
+    def get_by_id(cls, id: str) -> Optional[ClientIssue]:
+        statement = select(ClientIssue).where(ClientIssue.id == id)
+
+        with rx.session() as session:
+            client_issue = session.exec(statement).one_or_none()
+
+            if client_issue:
+                session.expunge(client_issue)
+            return client_issue
+
+    @classmethod
+    def get_by_id_with_all_relationship(cls, id: str) -> Optional[ClientIssue]:
+        statement = (
+            select(ClientIssue)
+            .options(
+                joinedload(ClientIssue.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products).options(
+                            joinedload(Product.product_catalog),
+                            joinedload(Product.owner),
+                            joinedload(Product.storage),
+                        ),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_owner),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(ClientIssue.recipient),
+            )
+            .where(ClientIssue.id == id)
+        )
+
+        with rx.session() as session:
+            client_issue = session.exec(statement).one_or_none()
+
+            if client_issue:
+                session.expunge(client_issue)
+            return client_issue
+
+    @classmethod
+    def get_by_id_with_movement_product_storage_owner_recipient(
+        cls, id: str
+    ) -> Optional[ClientIssue]:
+        statement = (
+            select(ClientIssue)
+            .options(
+                joinedload(ClientIssue.movement).options(
+                    selectinload(Movement.products_catalog).options(
+                        joinedload(MovementProductsCatalog.product),
+                        selectinload(MovementProductsCatalog.products),
+                    ),
+                    joinedload(Movement.incoming_storage),
+                    joinedload(Movement.incoming_owner),
+                    joinedload(Movement.destination_storage),
+                ),
+                joinedload(ClientIssue.recipient),
+            )
+            .where(ClientIssue.id == id)
+        )
+
+        with rx.session() as session:
+            client_issue = session.exec(statement).one_or_none()
+
+            if client_issue:
+                session.expunge(client_issue)
+            return client_issue
+
+    @classmethod
+    def add_one(cls, client_issue: ClientIssue) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
+                session.add(client_issue)
+                session.commit()
+                return True, "Видача клієнту успішно додана", client_issue.id
+
+        except IntegrityError as e:
+            return False, "Помилка: видача клієнту не може бути додана", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
+
+    @classmethod
+    def edit_one(cls, client_issue: ClientIssue) -> tuple[bool, str, int]:
+        try:
+            with rx.session() as session:
+                session.expire_on_commit = False
+                session.merge(client_issue)
+                session.commit()
+                return True, "Видача клієнту успішно змінена", client_issue.id
+
+        except IntegrityError as e:
+            return False, "Помилка: видача клієнту не може бути змінена", -1
+        except SQLAlchemyError as e:
+            return False, f"Помилка: {str(e)}", -1
 
 
 class SaleDAO:

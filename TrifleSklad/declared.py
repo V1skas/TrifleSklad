@@ -13,6 +13,7 @@ class MovementsType:
     SALE = 5
     RETURN = 6
     SALE_RETURN = 7
+    CLIENT_ISSUE = 8
 
 movements_type_list: Dict[int, str] = {
     MovementsType.ADMISSION: "Постачання",
@@ -22,16 +23,19 @@ movements_type_list: Dict[int, str] = {
     MovementsType.SALE: "Продаж",
     MovementsType.RETURN: "Повернення",
     MovementsType.SALE_RETURN: "Повернення продажу",
+    MovementsType.CLIENT_ISSUE: "Видача клієнту",
 }
 
 class StorageType:
     WAREHOUSE = 1
     TECHNICAL_SITE = 2
     DEPARTMENT = 3
+    CLIENT = 4
 
 storage_type_list: Dict[int, str] = {StorageType.WAREHOUSE: "Склад",
                      StorageType.TECHNICAL_SITE: "Тех. площадка",
-                     StorageType.DEPARTMENT: "Відділ"}
+                     StorageType.DEPARTMENT: "Відділ",
+                     StorageType.CLIENT: "Клієнт"}
 
 class MovementsStatus:
     CREATED = 0

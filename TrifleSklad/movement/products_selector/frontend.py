@@ -248,6 +248,15 @@ def filters_panel() -> rx.Component:
             width="100%",
             size="2",
         ),
+        rx.cond(
+            ProductsSelectorState.catalog_chosen,
+            rx.text(
+                ProductsSelectorState.total_available_label,
+                size="2",
+                weight="bold",
+                color=rx.color("accent", 11),
+            ),
+        ),
         rx.text("Пошук (s/n / ID):", size="2"),
         rx.debounce_input(
             rx.input(

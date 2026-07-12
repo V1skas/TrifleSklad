@@ -33,6 +33,12 @@ class ProductsSelectorState(rx.State):
     sel_capacity: int = 0
     sel_unit: str = ""
 
+    # Загальна доступна кількість обраної позиції каталогу на місці/власнику
+    # (одиниць і сумарного залишку) — довідково в діалозі, незалежно від того,
+    # скільки з них уже обрано/показано на поточній сторінці.
+    total_units: int = 0
+    total_measure: int = 0
+
     # Масовий вибір: кількість штук та обсяг у одиницях виміру (лише подільне).
     mass_count: str = ""
     mass_measure: str = ""
@@ -67,6 +73,8 @@ class ProductsSelectorState(rx.State):
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
+        self.total_units = 0
+        self.total_measure = 0
         self.mass_count = ""
         self.mass_measure = ""
         self.split_intent = {}
@@ -122,6 +130,16 @@ class ProductsSelectorState(rx.State):
     @rx.var
     def selected_total_units(self) -> int:
         return len(self.selected)
+
+    @rx.var
+    def total_available_label(self) -> str:
+        # Довідково: скільки всього доступно цієї позиції каталогу на обраному
+        # місці/власнику (незалежно від того, скільки вже обрано в діалозі).
+        if not self.catalog_chosen:
+            return ""
+        if self.sel_divisible:
+            return f"Всього доступно: {self.total_units} од. ({self.total_measure} {self.sel_unit})"
+        return f"Всього доступно: {self.total_units} од."
 
     @rx.var
     def selected_summary(self) -> List[Tuple[str, str]]:
@@ -216,6 +234,16 @@ class ProductsSelectorState(rx.State):
         self.sel_capacity = catalog.capacity
         self.sel_unit = catalog.unit
 
+    def _load_catalog_totals(self) -> None:
+        catalog_id = self._catalog_id_value()
+        if catalog_id == -1:
+            self.total_units = 0
+            self.total_measure = 0
+            return
+        self.total_units, self.total_measure = ProductDAO.get_stock_totals_by_owner_storage(
+            self.filter_by_owner, self.filter_by_storage, catalog_id, list(self.exclude_products)
+        )
+
     def _load_page(self, reset: bool) -> None:
         # Список вантажиться лише коли обрано позицію каталогу.
         catalog_id = self._catalog_id_value()
@@ -269,6 +297,8 @@ class ProductsSelectorState(rx.State):
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
+        self.total_units = 0
+        self.total_measure = 0
         self.mass_count = ""
         self.mass_measure = ""
         self.category_options = [
@@ -310,6 +340,8 @@ class ProductsSelectorState(rx.State):
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
+        self.total_units = 0
+        self.total_measure = 0
         self.catalog_options = []
         self.available = []
         self._offset = 0
@@ -335,6 +367,7 @@ class ProductsSelectorState(rx.State):
         self.filter_catalog = value
         self.filter_search = ""
         self._load_catalog_meta()
+        self._load_catalog_totals()
         self._sync_mass_fields()
         if self._catalog_id_value() == -1:
             self.available = []

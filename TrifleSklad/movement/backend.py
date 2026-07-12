@@ -10,6 +10,7 @@ from TrifleSklad.movement.issues.backend import IssueState
 from TrifleSklad.movement.sale.backend import SaleState
 from TrifleSklad.movement.returns.backend import ReturnsState
 from TrifleSklad.movement.sale_returns.backend import SaleReturnsState
+from TrifleSklad.movement.client_issues.backend import ClientIssueState
 
 class MovementState(AppState):
     class Tabs:
@@ -20,6 +21,7 @@ class MovementState(AppState):
         SALES = "sales"
         RETURNS = "returns"
         SALE_RETURNS = "sale_returns"
+        CLIENT_ISSUES = "client_issues"
 
     __tabs_events = {
         Tabs.ADMISSIONS: AdmissionState.on_load,
@@ -29,6 +31,7 @@ class MovementState(AppState):
         Tabs.SALES: SaleState.on_load,
         Tabs.RETURNS: ReturnsState.on_load,
         Tabs.SALE_RETURNS: SaleReturnsState.on_load,
+        Tabs.CLIENT_ISSUES: ClientIssueState.on_load,
     }
 
     current_tab: str = ""
@@ -37,7 +40,7 @@ class MovementState(AppState):
         tab = self.router.page.params.get("tab", "")
 
         if tab != "":
-            if tab not in [self.Tabs.ADMISSIONS, self.Tabs.WRITE_OFFS, self.Tabs.MOVEMENTS, self.Tabs.ISSUES, self.Tabs.SALES, self.Tabs.RETURNS, self.Tabs.SALE_RETURNS]:
+            if tab not in [self.Tabs.ADMISSIONS, self.Tabs.WRITE_OFFS, self.Tabs.MOVEMENTS, self.Tabs.ISSUES, self.Tabs.SALES, self.Tabs.RETURNS, self.Tabs.SALE_RETURNS, self.Tabs.CLIENT_ISSUES]:
                 return rx.redirect(routes.WELCOME)
 
             self.current_tab = tab
@@ -51,7 +54,8 @@ class MovementState(AppState):
             and not self.has_section_access("issues")
             and not self.has_section_access("sales")
             and not self.has_section_access("returns")
-            and not self.has_section_access("sale_returns")):
+            and not self.has_section_access("sale_returns")
+            and not self.has_section_access("client_issues")):
             return rx.redirect(routes.WELCOME)
         self.current_tab = ""
         result = self._check_path()

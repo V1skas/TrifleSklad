@@ -312,8 +312,13 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
         if error is not None:
             return rx.toast.error(error)
+        products = list(self.item.products)
         for i, value in zip(empty_indexes, values):
-            self.item.products[i].serial_number = value
+            products[i].serial_number = value
+        # Явне переприсвоєння — гарантує, що фронтенд побачить зміни одразу для
+        # всіх позицій (мутація елементів списку в циклі не завжди позначає
+        # реактивний var брудним для масового пакетного оновлення).
+        self.item.products = products
         self.serial_mask = ""
     # ======================
 
