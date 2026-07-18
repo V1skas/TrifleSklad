@@ -6,6 +6,7 @@ from TrifleSklad import routes
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.movement.products_selector.frontend import selector as products_selector
+from TrifleSklad.views.templates import controls
 
 
 def dialog():
@@ -68,7 +69,7 @@ def split_controls(item: Tuple[int, Product]):
         ),
         rx.cond(
             ProductsMovementListState.split_mode[item[1].id],
-            rx.input(
+            controls.input_field(
                 type="number",
                 min=1,
                 max=item[1].count - 1,
@@ -76,7 +77,6 @@ def split_controls(item: Tuple[int, Product]):
                 on_change=lambda value: ProductsMovementListState.set_split_amount(item[1].id, value),
                 placeholder="Обсяг",
                 width="6em",
-                size="1",
             ),
         ),
         spacing="2",
@@ -90,12 +90,11 @@ def serial_cell_input(item: Tuple[int, Product]):
     return rx.table.cell(
         rx.cond(
             item[1].product_catalog.uniq,
-            rx.input(
+            controls.input_field(
                 type="text",
                 value=item[1].serial_number,
                 on_change=lambda value: ProductsMovementListState.set_serial_number(item[1].id, value),
                 placeholder="Серійний номер",
-                size="1",
                 style=rx.cond(
                     item[1].serial_number,
                     {},
@@ -217,14 +216,13 @@ def group_fragment(group):
                 ProductsMovementListState.require_price,
                 rx.fragment(
                     rx.table.cell(
-                        rx.input(
+                        controls.input_field(
                             type="number",
                             min=0,
                             step="0.01",
                             value=ProductsMovementListState.prices[group[0]],
                             on_change=lambda value: ProductsMovementListState.set_price(group[0], value),
                             placeholder="Ціна за одиницю",
-                            size="1",
                             width="11em",
                         ),
                         width="1%", white_space="nowrap",
@@ -311,27 +309,24 @@ def serial_range_bar(group):
         ProductsMovementListState.serial_visible & ~ProductsMovementListState.is_view_mode & group[4],
         rx.vstack(
             rx.hstack(
-                rx.input(
+                controls.input_field(
                     placeholder="Маска, напр. СН-{n}",
                     value=ProductsMovementListState.serial_mask[catalog_id],
                     on_change=lambda value: ProductsMovementListState.on_change_serial_mask(catalog_id, value),
-                    size="2",
                     width="40%",
                 ),
-                rx.input(
+                controls.input_field(
                     placeholder="Від",
                     type="text",
                     value=ProductsMovementListState.serial_range_from[catalog_id],
                     on_change=lambda value: ProductsMovementListState.on_change_serial_range_from(catalog_id, value),
-                    size="2",
                     width="20%",
                 ),
-                rx.input(
+                controls.input_field(
                     placeholder="До",
                     type="text",
                     value=ProductsMovementListState.serial_range_to[catalog_id],
                     on_change=lambda value: ProductsMovementListState.on_change_serial_range_to(catalog_id, value),
-                    size="2",
                     width="20%",
                 ),
                 rx.button(
@@ -363,7 +358,7 @@ def index(*args, **kwargs):
             rx.heading("Товари:", size="3"),
             rx.spacer(),
             rx.cond(ProductsMovementListState.is_view_mode,
-                    rx.Component(),
+                    rx.fragment(),
                     rx.button("Додати",
                                 type="button",
                                 disabled=rx.cond(ProductsMovementListState.ability_open_dialog, False, True),

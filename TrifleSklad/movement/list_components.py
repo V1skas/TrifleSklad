@@ -1,6 +1,7 @@
 import reflex as rx
 
 from TrifleSklad.movement.list_mixin import ALL
+from TrifleSklad.views.templates import controls
 
 
 def filter_select(label: str, value, options, on_change) -> rx.Component:
@@ -133,7 +134,7 @@ def pagination(State) -> rx.Component:
     """Контроли сторінкування (Назад / номер / усього / Вперед)."""
     return rx.hstack(
         rx.button("Назад", variant="soft", on_click=State.current_page_decrement),
-        rx.input(
+        controls.input_field(
             value=State.get_current_page,
             on_change=State.on_change_current_page,
             type="number",

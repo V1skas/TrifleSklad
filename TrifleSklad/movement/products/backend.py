@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 
-from TrifleSklad.dao import ProductDAO
+from TrifleSklad.dao_legacy import ProductDAO
 from TrifleSklad.declared import generate_serial_range, sale_line_cost
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
@@ -45,12 +45,12 @@ class ProductsMovementListState(rx.State):
     require_price: bool = False
     prices: Dict[int, str] = {}
 
-    products_selector_state: Optional[ProductsSelectorState] = None
+    _products_selector_state: Optional[ProductsSelectorState] = None
 
     async def on_load(self):
         # FUTURE: обследовать работу, возможно есть способ лучше
-        self.products_selector_state = await self.get_state(ProductsSelectorState)
-        self.products_selector_state.clear()
+        self._products_selector_state = await self.get_state(ProductsSelectorState)
+        self._products_selector_state.clear()
         self.split_mode = {}
         self.split_amount = {}
         self.expanded_catalogs = {}
@@ -272,17 +272,17 @@ class ProductsMovementListState(rx.State):
     def open_dialog(self):
         # Спершу показуємо скелетон, потім (після yield) довантажуємо ТМЦ —
         # щоб користувач бачив процес завантаження, а не порожній діалог.
-        self.products_selector_state.is_loading = True
+        self._products_selector_state.is_loading = True
         # Скидаємо не лише items, а й службові індекси — інакше обчислювані
         # get_(un)selected_items впадуть на застарілих індексах під час дельти.
-        self.products_selector_state.reset_items()
+        self._products_selector_state.reset_items()
         self.dialog_open = True
         yield
         filter_products = [item.id for item in self.items]
-        self.products_selector_state.set_filter(
+        self._products_selector_state.set_filter(
             self.filter_by_owner, self.filter_by_storage, filter_products
         )
-        self.products_selector_state.is_loading = False
+        self._products_selector_state.is_loading = False
 
     @rx.event
     def close_dialog(self):
@@ -290,9 +290,9 @@ class ProductsMovementListState(rx.State):
 
     @rx.event
     def on_save_selected(self):
-        selected = self.products_selector_state.get_selected_items_only()
+        selected = self._products_selector_state.get_selected_items_only()
         # Намір авто-розділення решти (набір подільного ТМЦ за мірою): id → обсяг.
-        split_intent = self.products_selector_state.get_split_intent()
+        split_intent = self._products_selector_state.get_split_intent()
         self.items += selected
         # За замовчуванням — передати цілком; режим розділення вмикає користувач
         # або масовий набір за мірою (split_intent).

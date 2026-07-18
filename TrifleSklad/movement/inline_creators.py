@@ -17,7 +17,7 @@ from typing import List, Tuple
 import reflex as rx
 
 from TrifleSklad.actions import Action as ActionEnum
-from TrifleSklad.dao import (
+from TrifleSklad.dao_legacy import (
     NDSRateDAO,
     OwnerDAO,
     PaymentTypeDAO,

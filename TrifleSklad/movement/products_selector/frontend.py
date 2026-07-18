@@ -5,6 +5,7 @@ import reflex as rx
 from components.infinite_scroll import infinite_scroll
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ALL, ProductsSelectorState
+from TrifleSklad.views.templates import controls
 
 
 def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
@@ -158,11 +159,10 @@ def mass_select_panel() -> rx.Component:
             rx.text("Масовий вибір", size="2", weight="bold"),
             rx.text("Кількість одиниць:", size="2"),
             rx.hstack(
-                rx.input(
+                controls.input_field(
                     type="number",
                     min=0,
                     placeholder="0",
-                    size="2",
                     flex="1",
                     value=ProductsSelectorState.mass_count,
                     on_change=ProductsSelectorState.set_mass_count,
@@ -184,11 +184,10 @@ def mass_select_panel() -> rx.Component:
                         f"Обсяг ({ProductsSelectorState.sel_unit}):", size="2"
                     ),
                     rx.hstack(
-                        rx.input(
+                        controls.input_field(
                             type="number",
                             min=0,
                             placeholder="0",
-                            size="2",
                             flex="1",
                             value=ProductsSelectorState.mass_measure,
                             on_change=ProductsSelectorState.set_mass_measure,
@@ -259,11 +258,10 @@ def filters_panel() -> rx.Component:
         ),
         rx.text("Пошук (s/n / ID):", size="2"),
         rx.debounce_input(
-            rx.input(
+            controls.input_field(
                 rx.input.slot(rx.icon("search")),
                 placeholder="Введіть текст",
                 width="100%",
-                size="2",
                 disabled=~ProductsSelectorState.catalog_chosen,
                 value=ProductsSelectorState.filter_search,
                 on_change=ProductsSelectorState.change_filter_search,

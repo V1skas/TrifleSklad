@@ -1,0 +1,344 @@
+import reflex as rx
+
+from TrifleSklad import routes
+from TrifleSklad.actions import Action
+from TrifleSklad.declared import StorageType
+from TrifleSklad.models import Movement
+from TrifleSklad.movement.inline_creator_components import (
+    create_lookup_button,
+    owner_create_dialog,
+    storage_create_dialog,
+)
+from TrifleSklad.movement.list_components import filter_button, filter_card, filter_select, pagination
+from TrifleSklad.movement.products.frontend import index as products_widget
+from TrifleSklad.states.write_off import (
+    AddWriteOffState,
+    EditWriteOffState,
+    ListWriteOffState,
+    ViewWriteOffState,
+)
+from TrifleSklad.views.auth import require_login
+from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+
+
+def _table_row(item: Movement) -> rx.Component:
+    return rx.table.row(
+        rx.table.cell(rx.text(item.id)),
+        rx.table.row_header_cell(item.date, align="left"),
+        rx.table.cell(rx.text(item.incoming_storage.title)),
+        rx.table.cell(rx.text(item.incoming_owner.title)),
+        rx.table.cell(rx.text(ListWriteOffState.get_movement_statuses[item.status])),
+        on_click=rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{item.id}"),
+        cursor="pointer",
+        _hover={"background_color": rx.color("accent", 3)},
+    )
+
+
+def _table() -> rx.Component:
+    return rx.table.root(
+        rx.table.header(
+            rx.table.row(
+                rx.table.column_header_cell("№", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Дата", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Склад", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Власник", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Статус", color=rx.color("accent", 2)),
+            ),
+            background_color=rx.color("accent", 9),
+        ),
+        rx.table.body(rx.foreach(ListWriteOffState.items, _table_row)),
+        variant="surface",
+        width="100%",
+    )
+
+
+def list_page_content() -> rx.Component:
+    return rx.vstack(
+        rx.cond(ListWriteOffState.has_items, _table(), controls.empty_placeholder()),
+        pagination(ListWriteOffState),
+        spacing="3",
+        width="100%",
+    )
+
+
+@require_login
+def list_page() -> rx.Component:
+    return page_wrapper(
+        header_subpage(
+            "Списання",
+            filter_button(ListWriteOffState),
+            rx.cond(
+                ListWriteOffState.get_user_actions.contains(Action.WRITE_OFFS_CREATE),
+                controls.button_primary("Створити", on_click=ListWriteOffState.on_click_add),
+            ),
+            width="100%",
+        ),
+        rx.skeleton(list_page_content(), loading=ListWriteOffState.in_progress, height="100%"),
+        filter_panel=filter_card(
+            ListWriteOffState,
+            filter_select(
+                "Склад",
+                ListWriteOffState.filter_incoming_storage,
+                ListWriteOffState.list_warehouses,
+                ListWriteOffState.on_change_filter_incoming_storage,
+            ),
+            filter_select(
+                "Власник",
+                ListWriteOffState.filter_incoming_owner,
+                ListWriteOffState.list_owners,
+                ListWriteOffState.on_change_filter_incoming_owner,
+            ),
+        ),
+        on_mount=ListWriteOffState.on_load,
+    )
+
+
+def _add_form() -> rx.Component:
+    return rx.vstack(
+        rx.text("*Дата:", weight="medium"),
+        controls.input_field(
+            value=AddWriteOffState.current_date,
+            on_change=AddWriteOffState.on_change_date,
+            type="date",
+            required=True,
+            width="100%",
+        ),
+        rx.text("*Склад:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.vstack(
+                    rx.hstack(
+                        rx.button(
+                            "Пошук",
+                            type="button",
+                            on_click=AddWriteOffState.on_click_search_name_incoming_storage,
+                        ),
+                        controls.input_field(
+                            value=AddWriteOffState.search_name_incoming_storage,
+                            on_change=AddWriteOffState.on_change_search_name_incoming_storage,
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                        ),
+                        width="100%",
+                    ),
+                    rx.foreach(
+                        AddWriteOffState.list_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
+                ),
+                width="100%",
+            ),
+            required=True,
+            value=AddWriteOffState.id_incoming_storage,
+            on_change=AddWriteOffState.on_change_id_incoming_storage,
+        ),
+        create_lookup_button(
+            Action.STORAGE_CREATE,
+            "Створити склад",
+            AddWriteOffState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
+        ),
+        storage_create_dialog(AddWriteOffState),
+        rx.text("*Власник:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    AddWriteOffState.list_owners,
+                    lambda owner: rx.select.item(owner[0], value=owner[1]),
+                ),
+                width="100%",
+            ),
+            required=True,
+            value=AddWriteOffState.id_incoming_owner,
+            on_change=AddWriteOffState.on_change_id_incoming_owner,
+        ),
+        create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddWriteOffState.open_owner_create("")),
+        owner_create_dialog(AddWriteOffState),
+        products_widget(width="100%"),
+        rx.text("*Статус:", weight="medium"),
+        rx.select(
+            AddWriteOffState.editable_statuses,
+            placeholder="Оберіть зі списку",
+            required=True,
+            value=AddWriteOffState.status,
+            on_change=AddWriteOffState.on_change_status,
+        ),
+        rx.text("Коментар:", weight="medium"),
+        controls.text_area_field(value=AddWriteOffState.comment, on_change=AddWriteOffState.on_change_comment, width="100%"),
+        spacing="3",
+        align="stretch",
+        width="100%",
+    )
+
+
+@require_login
+def add_page() -> rx.Component:
+    return page_wrapper(
+        header_subpage(
+            "Списання/Додавання",
+            controls.button_secondary("Зберегти і продовжити", on_click=AddWriteOffState.add_one(True)),
+            controls.button_primary("Зберегти", on_click=AddWriteOffState.add_one(False)),
+            left=controls.button_back(routes.MOVEMENT_WRITE_OFFS, label="Скасувати"),
+            width="100%",
+        ),
+        _add_form(),
+        on_mount=AddWriteOffState.on_load,
+    )
+
+
+def _edit_form() -> rx.Component:
+    return rx.vstack(
+        rx.text("*Дата:", weight="medium"),
+        controls.input_field(value=EditWriteOffState.item.date, type="date", required=True, disabled=True, width="100%"),
+        rx.text("*Склад:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    EditWriteOffState.list_storages,
+                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                ),
+                width="100%",
+            ),
+            required=True,
+            disabled=True,
+            value=EditWriteOffState.id_incoming_storage,
+            on_change=EditWriteOffState.on_change_id_incoming_storage,
+        ),
+        rx.text("*Власник:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    EditWriteOffState.list_owners,
+                    lambda owner: rx.select.item(owner[0], value=owner[1]),
+                ),
+                width="100%",
+            ),
+            required=True,
+            disabled=True,
+            value=EditWriteOffState.id_incoming_owner,
+            on_change=EditWriteOffState.on_change_id_incoming_owner,
+        ),
+        products_widget(width="100%"),
+        rx.text("*Статус:", weight="medium"),
+        rx.select(
+            EditWriteOffState.editable_statuses,
+            placeholder="Оберіть зі списку",
+            required=True,
+            value=EditWriteOffState.status,
+            on_change=EditWriteOffState.on_change_status,
+        ),
+        rx.text("Коментар:", weight="medium"),
+        controls.text_area_field(value=EditWriteOffState.item.comment, on_change=EditWriteOffState.on_change_comment, width="100%"),
+        spacing="3",
+        align="stretch",
+        width="100%",
+    )
+
+
+@require_login
+def edit_page() -> rx.Component:
+    return page_wrapper(
+        header_subpage(
+            "Списання/Редагування",
+            controls.button_primary("Зберегти", on_click=EditWriteOffState.edit_one),
+            left=controls.button_back(routes.MOVEMENT_WRITE_OFFS, label="Скасувати"),
+            width="100%",
+        ),
+        rx.skeleton(_edit_form(), loading=EditWriteOffState.in_process, height="100%"),
+    )
+
+
+def _cancel_conflict_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Скасування неможливе"),
+            rx.dialog.description(
+                "Товар із цього списання бере участь у наведених нижче рухах. "
+                "Спочатку скасуйте пізніші рухи."
+            ),
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell("№"),
+                        rx.table.column_header_cell("Тип"),
+                        rx.table.column_header_cell("Дата"),
+                        rx.table.column_header_cell("Статус"),
+                    ),
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        ViewWriteOffState.cancel_conflict_rows,
+                        lambda row: rx.table.row(
+                            rx.table.cell(row[0]),
+                            rx.table.cell(row[1]),
+                            rx.table.cell(row[2]),
+                            rx.table.cell(row[3]),
+                            on_click=rx.redirect(row[4]),
+                            cursor="pointer",
+                            _hover={"background_color": rx.color("accent", 3)},
+                        ),
+                    ),
+                ),
+                variant="surface",
+                width="100%",
+                margin_top="1em",
+            ),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button("Закрити", on_click=ViewWriteOffState.set_cancel_conflict_dialog_open(False)),
+                ),
+                justify="end",
+                margin_top="1em",
+            ),
+            max_width="42em",
+        ),
+        open=ViewWriteOffState.is_cancel_conflict_dialog_open,
+        on_open_change=ViewWriteOffState.set_cancel_conflict_dialog_open,
+    )
+
+
+def view_page_content() -> rx.Component:
+    return rx.vstack(
+        _cancel_conflict_dialog(),
+        rx.hstack(rx.text("Дата:", weight="medium"), rx.text(ViewWriteOffState.item.date)),
+        rx.hstack(rx.text("Склад:", weight="medium"), rx.text(ViewWriteOffState.item.incoming_storage.title)),
+        rx.hstack(rx.text("Власник:", weight="medium"), rx.text(ViewWriteOffState.item.incoming_owner.title)),
+        products_widget(width="100%"),
+        rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewWriteOffState.item_status)),
+        rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewWriteOffState.item.comment)),
+        spacing="3",
+        align="stretch",
+        width="100%",
+    )
+
+
+@require_login
+def view_page() -> rx.Component:
+    return page_wrapper(
+        header_subpage(
+            "Списання/Перегляд",
+            rx.cond(
+                ViewWriteOffState.get_user_actions.contains(Action.WRITE_OFFS_DELETE)
+                & (ViewWriteOffState.current_is_canceled == False),
+                controls.delete_with_confirm(
+                    title="Підтвердження скасування",
+                    trigger_label="Скасувати",
+                    description="Скасувати це списання? Товар буде повернено у залишки.",
+                    on_confirm=ViewWriteOffState.on_click_cancel,
+                ),
+            ),
+            rx.cond(
+                ViewWriteOffState.get_user_actions.contains(Action.WRITE_OFFS_EDIT)
+                & (ViewWriteOffState.current_is_canceled == False),
+                controls.button_primary("Редагувати", on_click=ViewWriteOffState.on_click_edit),
+            ),
+            left=controls.button_back(routes.MOVEMENT_WRITE_OFFS, label="Повернутись"),
+            width="100%",
+        ),
+        rx.skeleton(view_page_content(), loading=ViewWriteOffState.in_process, height="100%"),
+    )

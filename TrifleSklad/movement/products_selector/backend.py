@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 
 import reflex as rx
 
-from TrifleSklad.dao import ProductCatalogDAO, ProductDAO
+from TrifleSklad.dao_legacy import ProductCatalogDAO, ProductDAO
 from TrifleSklad.models import Product
 
 
@@ -383,6 +383,14 @@ class ProductsSelectorState(rx.State):
     def change_filter_search(self, value: str):
         self.filter_search = value
         return ProductsSelectorState.apply_filters
+
+    @rx.event
+    def set_mass_count(self, value: str):
+        self.mass_count = value
+
+    @rx.event
+    def set_mass_measure(self, value: str):
+        self.mass_measure = value
 
     @rx.event
     def apply_mass_count(self):
