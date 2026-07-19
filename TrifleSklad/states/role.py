@@ -81,8 +81,11 @@ class AddRoleState(AppState):
         if not self.has_permission(ActionEnum.ROLES_CREATE):
             yield rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
             return
-        if len(self.item.actions) == 0 or self.item.title == "":
-            yield rx.toast.warning("Заповніть всі обов'язкові поля!")
+        if self.item.title == "":
+            yield rx.toast.warning("Вкажіть назву ролі!")
+            return
+        if len(self.item.actions) == 0:
+            yield rx.toast.warning("Оберіть хоча б одне право для ролі!")
             return
         try:
             self.item = RoleService().add_one(self.item)
@@ -151,8 +154,11 @@ class EditRoleState(AppState):
         if not self.has_permission(ActionEnum.ROLES_EDIT):
             yield rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
             return
-        if len(self.item.actions) == 0 or self.item.title == "":
-            yield rx.toast.warning("Заповніть всі обов'язкові поля!")
+        if self.item.title == "":
+            yield rx.toast.warning("Вкажіть назву ролі!")
+            return
+        if len(self.item.actions) == 0:
+            yield rx.toast.warning("Оберіть хоча б одне право для ролі!")
             return
         try:
             self.item = RoleService().edit_one(self.item)

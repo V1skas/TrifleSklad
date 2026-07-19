@@ -315,8 +315,11 @@ class AddWriteOffState(LookupCreatorsMixin, AppState):
         if not self.has_permission(Action.WRITE_OFFS_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if self.id_incoming_storage == "" or self.id_incoming_owner == "":
-            yield rx.toast.error("Не обрано склад або власника!")
+        if self.id_incoming_storage == "":
+            yield rx.toast.error("Не обрано склад!")
+            return
+        if self.id_incoming_owner == "":
+            yield rx.toast.error("Не обрано власника!")
             return
         if self._products_movement_list_state is None or len(self._products_movement_list_state.items) == 0:
             yield rx.toast.error("Список товарів для списання порожній!")

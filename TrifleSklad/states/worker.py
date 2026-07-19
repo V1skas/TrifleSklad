@@ -93,8 +93,11 @@ class AddWorkerState(AppState):
         if not self.has_permission(Action.WORKERS_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if not self.item.fio or self.item.position is None:
-            yield rx.toast.warning("Будь ласка, заповніть всі обов'язкові поля")
+        if not self.item.fio:
+            yield rx.toast.warning("Вкажіть ПІБ співробітника!")
+            return
+        if self.item.position is None:
+            yield rx.toast.warning("Вкажіть посаду співробітника!")
             return
         try:
             self.item = WorkerService().add_one(self.item)
@@ -176,8 +179,11 @@ class EditWorkerState(AppState):
         if not self.has_permission(Action.WORKERS_EDIT):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if not self.item.fio or self.item.position is None:
-            yield rx.toast.warning("Будь ласка, заповніть всі обов'язкові поля")
+        if not self.item.fio:
+            yield rx.toast.warning("Вкажіть ПІБ співробітника!")
+            return
+        if self.item.position is None:
+            yield rx.toast.warning("Вкажіть посаду співробітника!")
             return
         try:
             self.item = WorkerService().edit_one(self.item)

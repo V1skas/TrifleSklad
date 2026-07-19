@@ -427,8 +427,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
         if not (await self.get_state(AppState)).has_permission(Action.PRODUCTS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         title = self.new_title.strip()
-        if title == "" or self.new_id_category == "":
-            return rx.toast.error("Вкажіть назву та категорію товару!")
+        if title == "":
+            return rx.toast.error("Вкажіть назву товару!")
+        if self.new_id_category == "":
+            return rx.toast.error("Оберіть категорію товару!")
         if self.new_uniq and self.new_divisible:
             return rx.toast.error("Товар із серійним номером не може бути подільним!")
         if self.new_divisible and not (self.new_capacity.isdigit() and int(self.new_capacity) > 0):
@@ -1089,8 +1091,11 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
         if not self.has_permission(Action.ADMISSIONS_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
-            yield rx.toast.error("Не обрано склад або власника призначення!")
+        if self.item.movement.id_destination_storage <= 0:
+            yield rx.toast.error("Не обрано склад призначення!")
+            return
+        if self.item.movement.id_destination_owner <= 0:
+            yield rx.toast.error("Не обрано власника призначення!")
             return
         if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number):
             yield rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
@@ -1509,8 +1514,11 @@ class EditAdmissionState(AppState):
         if self.item is None:
             yield rx.toast.error("Запис не завантажено!")
             return
-        if self.item.movement.id_destination_storage <= 0 or self.item.movement.id_destination_owner <= 0:
-            yield rx.toast.error("Не обрано склад або власника призначення!")
+        if self.item.movement.id_destination_storage <= 0:
+            yield rx.toast.error("Не обрано склад призначення!")
+            return
+        if self.item.movement.id_destination_owner <= 0:
+            yield rx.toast.error("Не обрано власника призначення!")
             return
         if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number, exclude_id=self.item.id):
             yield rx.toast.error("Постачання з таким номером накладної оплати вже існує!")

@@ -145,8 +145,11 @@ class AddStorageState(AppState):
         if not self.has_permission(Action.STORAGE_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if not self.item.title or self.item.type is None:
-            yield rx.toast.warning("Обов'язкові поля повинні бути заповнені!")
+        if not self.item.title:
+            yield rx.toast.warning("Вкажіть назву!")
+            return
+        if self.item.type is None:
+            yield rx.toast.warning("Оберіть тип!")
             return
         if self.item.id_responsible not in [int(w[0]) for w in self.list_workers]:
             yield rx.toast.warning("Відповідальний вказаний некоректно!")
@@ -241,8 +244,11 @@ class EditStorageState(AppState):
         if not self.has_permission(Action.STORAGE_EDIT):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if not self.item.title or self.item.type is None:
-            yield rx.toast.warning("Обов'язкові поля повинні бути заповнені!")
+        if not self.item.title:
+            yield rx.toast.warning("Вкажіть назву!")
+            return
+        if self.item.type is None:
+            yield rx.toast.warning("Оберіть тип!")
             return
         if self.item.id_responsible not in [int(w[0]) for w in self.list_workers]:
             yield rx.toast.warning("Відповідальний вказаний некоректно!")

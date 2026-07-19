@@ -525,12 +525,14 @@ class AddSaleState(LookupCreatorsMixin, AppState):
         if not self.has_permission(Action.SALES_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if (
-            self.id_incoming_storage == ""
-            or self.id_incoming_owner == ""
-            or self.id_responsible == ""
-        ):
-            yield rx.toast.error("Не обрано склад, власника або відповідального!")
+        if self.id_incoming_storage == "":
+            yield rx.toast.error("Не обрано склад!")
+            return
+        if self.id_incoming_owner == "":
+            yield rx.toast.error("Не обрано власника!")
+            return
+        if self.id_responsible == "":
+            yield rx.toast.error("Не обрано відповідального!")
             return
         if (
             self._products_movement_list_state is None

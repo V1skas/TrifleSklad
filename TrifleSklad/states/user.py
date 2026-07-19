@@ -110,8 +110,14 @@ class AddUserState(AppState):
         if not self.has_permission(ActionEnum.USERS_CREATE):
             yield rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
             return
-        if self.item.login is None or self.password == "" or self.item.id_worker is None:
-            yield rx.toast.warning("Заповніть всі обов'язкові поля!")
+        if self.item.login is None:
+            yield rx.toast.warning("Вкажіть логін!")
+            return
+        if self.password == "":
+            yield rx.toast.warning("Вкажіть пароль!")
+            return
+        if self.item.id_worker is None:
+            yield rx.toast.warning("Оберіть співробітника!")
             return
         if len(self.item.roles) == 0 and len(self.item.actions) == 0:
             yield rx.toast.warning("Користувач має мати доступ хоча б до однієї дії або мати роль!")
@@ -203,7 +209,7 @@ class EditUserState(AppState):
             yield rx.toast.error("У вас недостатньо прав для виконання цієї дії!")
             return
         if self.item.id_worker is None:
-            yield rx.toast.warning("Заповніть всі обов'язкові поля!")
+            yield rx.toast.warning("Оберіть співробітника!")
             return
         if len(self.item.roles) == 0 and len(self.item.actions) == 0:
             yield rx.toast.warning("Користувач має мати доступ хоча б до однієї дії або мати роль!")

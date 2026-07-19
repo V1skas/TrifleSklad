@@ -253,8 +253,11 @@ class AddProductsState(CategoryCreateMixin, AppState):
         if not self.has_permission(Action.PRODUCTS_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if not self.item.title or self.item.id_category is None:
-            yield rx.toast.warning("Усі обов'язкові поля мають бути заповненими!")
+        if not self.item.title:
+            yield rx.toast.warning("Вкажіть назву товару!")
+            return
+        if self.item.id_category is None:
+            yield rx.toast.warning("Оберіть категорію товару!")
             return
         if self.item.uniq and self.item.divisible:
             yield rx.toast.warning("Товар із серійним номером не може бути подільним!")
@@ -376,8 +379,11 @@ class EditProductsState(CategoryCreateMixin, AppState):
         if not self.has_permission(Action.PRODUCTS_EDIT):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if not self.item.title or self.item.id_category is None:
-            yield rx.toast.warning("Усі обов'язкові поля мають бути заповненими!")
+        if not self.item.title:
+            yield rx.toast.warning("Вкажіть назву товару!")
+            return
+        if self.item.id_category is None:
+            yield rx.toast.warning("Оберіть категорію товару!")
             return
         if self.item.uniq and self.item.divisible:
             yield rx.toast.warning("Товар із серійним номером не може бути подільним!")

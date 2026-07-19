@@ -559,9 +559,17 @@ class AddIssueState(LookupCreatorsMixin, AppState):
         if not self.has_permission(Action.ISSUES_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
-            or self.item.id_recipient == -1 or self._products_selector_state is None or len(self._products_selector_state.items) == 0:
-            yield rx.toast.error("Не всі обов'язкові поля заповнені!")
+        if self.item.movement.id_incoming_storage == -1:
+            yield rx.toast.error("Не обрано склад відправлення!")
+            return
+        if self.item.movement.id_incoming_owner == -1:
+            yield rx.toast.error("Не обрано власника відправлення!")
+            return
+        if self.item.id_recipient == -1:
+            yield rx.toast.error("Не обрано отримувача!")
+            return
+        if self._products_selector_state is None or len(self._products_selector_state.items) == 0:
+            yield rx.toast.error("Список ТМЦ для видачі порожній!")
             return
         if self.item.movement.id_destination_storage == -1:
             yield rx.toast.error("Не обрано майданчик призначення!")
@@ -814,9 +822,17 @@ class EditIssueState(AppState):
         if self.item is None:
             yield rx.toast.error("Запис не завантажено!")
             return
-        if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
-            or self.item.id_recipient == -1 or self._products_selector_state is None or len(self._products_selector_state.items) == 0:
-            yield rx.toast.error("Не всі обов'язкові поля заповнені!")
+        if self.item.movement.id_incoming_storage == -1:
+            yield rx.toast.error("Не обрано склад відправлення!")
+            return
+        if self.item.movement.id_incoming_owner == -1:
+            yield rx.toast.error("Не обрано власника відправлення!")
+            return
+        if self.item.id_recipient == -1:
+            yield rx.toast.error("Не обрано отримувача!")
+            return
+        if self._products_selector_state is None or len(self._products_selector_state.items) == 0:
+            yield rx.toast.error("Список ТМЦ для видачі порожній!")
             return
         if self.item.movement.status == MovementsStatus.CANCELED:
             yield rx.toast.error("Скасування виконується кнопкою «Скасувати», а не через редагування!")

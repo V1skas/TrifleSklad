@@ -365,11 +365,17 @@ class AddMovementsState(LookupCreatorsMixin, AppState):
         if not self.has_permission(Action.MOVEMENTS_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if self.id_incoming_owner == "" or self.id_incoming_storage == "":
-            yield rx.toast.error("Не обрано власника або склад відправлення!")
+        if self.id_incoming_storage == "":
+            yield rx.toast.error("Не обрано склад відправлення!")
             return
-        if self.id_destination_owner == "" or self.id_destination_storage == "":
-            yield rx.toast.error("Не обрано власника або склад призначення!")
+        if self.id_incoming_owner == "":
+            yield rx.toast.error("Не обрано власника відправлення!")
+            return
+        if self.id_destination_storage == "":
+            yield rx.toast.error("Не обрано склад призначення!")
+            return
+        if self.id_destination_owner == "":
+            yield rx.toast.error("Не обрано власника призначення!")
             return
         if not StorageDAO.is_type(int(self.id_incoming_storage), StorageType.WAREHOUSE) \
                 or not StorageDAO.is_type(int(self.id_destination_storage), StorageType.WAREHOUSE):

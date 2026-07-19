@@ -316,8 +316,10 @@ class _RequestFormState(rx.State, mixin=True):
     def _validate(self) -> Optional[str]:
         if len(self.positions) == 0:
             return "Додайте хоча б одну позицію ТМЦ!"
-        if self.is_issue_type and (self.id_responsible == "" or self.id_destination_storage == ""):
-            return "Для видачі оберіть отримувача та призначення!"
+        if self.is_issue_type and self.id_responsible == "":
+            return "Для видачі оберіть отримувача!"
+        if self.is_issue_type and self.id_destination_storage == "":
+            return "Для видачі оберіть призначення!"
         return None
 
 
@@ -650,8 +652,11 @@ class ProcessRequestsState(AppState):
         if self.item is None:
             yield rx.toast.error("Заявку не завантажено!")
             return
-        if self.id_incoming_storage == "" or self.id_incoming_owner == "":
-            yield rx.toast.error("Оберіть склад і власника!")
+        if self.id_incoming_storage == "":
+            yield rx.toast.error("Оберіть склад!")
+            return
+        if self.id_incoming_owner == "":
+            yield rx.toast.error("Оберіть власника!")
             return
         if not self.is_issue and self.id_responsible == "":
             yield rx.toast.error("Оберіть відповідального за продаж!")

@@ -288,8 +288,11 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
         if not self.has_permission(Action.RETURNS_CREATE):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
             return
-        if self.id_incoming_storage == "" or self.id_destination_storage == "":
-            yield rx.toast.error("Не обрано місце повернення або склад призначення!")
+        if self.id_incoming_storage == "":
+            yield rx.toast.error("Не обрано місце повернення!")
+            return
+        if self.id_destination_storage == "":
+            yield rx.toast.error("Не обрано склад призначення!")
             return
         if self._products_movement_list_state is None or len(self._products_movement_list_state.items) == 0:
             yield rx.toast.error("Список товарів для повернення порожній!")
