@@ -1,6 +1,6 @@
 from typing import Optional, Sequence
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, update
 
 from TrifleSklad.models import NDSRate
 
@@ -21,6 +21,15 @@ class NdsRateDao:
         return session.exec(statement).one_or_none()
 
     @staticmethod
+    def get_default_id(session: Session) -> Optional[int]:
+        statement = (
+            select(NDSRate.id)
+            .where(NDSRate.is_default == True)
+            .where(NDSRate.is_deleted == False)
+        )
+        return session.exec(statement).first()
+
+    @staticmethod
     def exists_by_title(title: str, session: Session, exclude_id: Optional[int] = None) -> bool:
         statement = (
             select(NDSRate)
@@ -30,6 +39,13 @@ class NdsRateDao:
         if exclude_id is not None:
             statement = statement.where(NDSRate.id != exclude_id)
         return session.exec(statement).one_or_none() is not None
+
+    @staticmethod
+    def clear_default(session: Session, exclude_id: Optional[int] = None) -> None:
+        statement = update(NDSRate).where(NDSRate.is_deleted == False)
+        if exclude_id is not None:
+            statement = statement.where(NDSRate.id != exclude_id)
+        session.exec(statement.values(is_default=False))
 
     @staticmethod
     def add_one(item: NDSRate, session: Session) -> NDSRate:

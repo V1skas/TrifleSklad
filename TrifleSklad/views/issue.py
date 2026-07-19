@@ -200,19 +200,11 @@ def _add_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=AddIssueState.on_click_search_name_destination_storage,
-                        ),
-                        controls.input_field(
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                            value=AddIssueState.search_name_destination_storage,
-                            on_change=AddIssueState.on_change_search_name_destination_storage,
-                        ),
+                    controls.search_field(
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
+                        value=AddIssueState.search_name_destination_storage,
+                        on_change=AddIssueState.on_change_search_name_destination_storage,
                     ),
                     rx.foreach(
                         AddIssueState.list_destination_storages,
@@ -331,19 +323,11 @@ def _edit_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=EditIssueState.on_click_search_name_destination_storage,
-                        ),
-                        controls.input_field(
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                            value=EditIssueState.search_name_destination_storage,
-                            on_change=EditIssueState.on_change_search_name_destination_storage,
-                        ),
+                    controls.search_field(
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
+                        value=EditIssueState.search_name_destination_storage,
+                        on_change=EditIssueState.on_change_search_name_destination_storage,
                     ),
                     rx.foreach(
                         EditIssueState.list_destination_storages,

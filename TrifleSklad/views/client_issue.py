@@ -161,19 +161,11 @@ def _add_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=AddClientIssueState.on_click_search_name_destination_storage,
-                        ),
-                        controls.input_field(
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                            value=AddClientIssueState.search_name_destination_storage,
-                            on_change=AddClientIssueState.on_change_search_name_destination_storage,
-                        ),
+                    controls.search_field(
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
+                        value=AddClientIssueState.search_name_destination_storage,
+                        on_change=AddClientIssueState.on_change_search_name_destination_storage,
                     ),
                     rx.foreach(
                         AddClientIssueState.list_destination_storages,
@@ -193,9 +185,8 @@ def _add_form() -> rx.Component:
             AddClientIssueState.open_storage_create(StorageType.CLIENT, "destination", False),
         ),
         storage_create_dialog(AddClientIssueState),
-        rx.text("*Номер договору:", weight="medium"),
+        rx.text("Номер договору:", weight="medium"),
         controls.input_field(
-            required=True,
             width="100%",
             value=AddClientIssueState.item.contract_number,
             on_change=AddClientIssueState.on_change_contract_number,
@@ -306,19 +297,11 @@ def _edit_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=EditClientIssueState.on_click_search_name_destination_storage,
-                        ),
-                        controls.input_field(
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                            value=EditClientIssueState.search_name_destination_storage,
-                            on_change=EditClientIssueState.on_change_search_name_destination_storage,
-                        ),
+                    controls.search_field(
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
+                        value=EditClientIssueState.search_name_destination_storage,
+                        on_change=EditClientIssueState.on_change_search_name_destination_storage,
                     ),
                     rx.foreach(
                         EditClientIssueState.list_destination_storages,
@@ -333,9 +316,8 @@ def _edit_form() -> rx.Component:
             value=EditClientIssueState.id_destination_storage,
             on_change=EditClientIssueState.on_change_id_destination_storage,
         ),
-        rx.text("*Номер договору:", weight="medium"),
+        rx.text("Номер договору:", weight="medium"),
         controls.input_field(
-            required=True,
             width="100%",
             value=EditClientIssueState.item.contract_number,
             on_change=EditClientIssueState.on_change_contract_number,

@@ -125,18 +125,10 @@ def _add_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=AddMovementsState.on_click_search_name_incoming_storage,
-                        ),
-                        controls.input_field(
-                            value=AddMovementsState.search_name_incoming_storage,
-                            on_change=AddMovementsState.on_change_search_name_incoming_storage,
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                        ),
+                    controls.search_field(
+                        value=AddMovementsState.search_name_incoming_storage,
+                        on_change=AddMovementsState.on_change_search_name_incoming_storage,
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
                     ),
                     rx.foreach(
@@ -177,18 +169,10 @@ def _add_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=AddMovementsState.on_click_search_name_destination_storage,
-                        ),
-                        controls.input_field(
-                            value=AddMovementsState.search_name_destination_storage,
-                            on_change=AddMovementsState.on_change_search_name_destination_storage,
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                        ),
+                    controls.search_field(
+                        value=AddMovementsState.search_name_destination_storage,
+                        on_change=AddMovementsState.on_change_search_name_destination_storage,
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
                     ),
                     rx.foreach(

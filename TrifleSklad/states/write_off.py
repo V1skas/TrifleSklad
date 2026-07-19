@@ -245,6 +245,7 @@ class AddWriteOffState(LookupCreatorsMixin, AppState):
     @rx.event
     def on_change_search_name_incoming_storage(self, value: str):
         self.search_name_incoming_storage = value
+        self._load_list_storages()
 
     @rx.event
     def on_click_search_name_incoming_storage(self):
@@ -452,6 +453,7 @@ class EditWriteOffState(AppState):
     @rx.event
     def on_change_search_name_incoming_storage(self, value: str):
         self.search_name_incoming_storage = value
+        self._load_list_storages()
 
     @rx.event
     def on_click_search_name_incoming_storage(self):

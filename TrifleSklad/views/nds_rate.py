@@ -63,7 +63,9 @@ def list_page() -> rx.Component:
     )
 
 
-def _form_fields(title, rate, description, set_title, set_rate, set_description) -> rx.Component:
+def _form_fields(
+    title, rate, description, is_default, set_title, set_rate, set_description, set_is_default
+) -> rx.Component:
     return rx.vstack(
         rx.text("*Назва", weight="medium"),
         controls.input_field(value=title, on_change=set_title, placeholder="Назва", width="100%"),
@@ -71,6 +73,12 @@ def _form_fields(title, rate, description, set_title, set_rate, set_description)
         controls.input_field(value=rate, on_change=set_rate, placeholder="0", width="100%"),
         rx.text("Опис", weight="medium"),
         controls.text_area_field(value=description, on_change=set_description, placeholder="Опис", width="100%"),
+        rx.hstack(
+            rx.switch(checked=is_default, on_change=set_is_default),
+            rx.text("За замовчуванням для рухів"),
+            align="center",
+            spacing="2",
+        ),
         spacing="3",
         align="stretch",
         width="100%",
@@ -82,9 +90,11 @@ def add_page_content() -> rx.Component:
         AddNdsRateState.title,
         AddNdsRateState.rate,
         AddNdsRateState.description,
+        AddNdsRateState.is_default,
         AddNdsRateState.set_title,
         AddNdsRateState.set_rate,
         AddNdsRateState.set_description,
+        AddNdsRateState.set_is_default,
     )
 
 
@@ -107,9 +117,11 @@ def edit_page_content() -> rx.Component:
         EditNdsRateState.title,
         EditNdsRateState.rate,
         EditNdsRateState.description,
+        EditNdsRateState.is_default,
         EditNdsRateState.set_title,
         EditNdsRateState.set_rate,
         EditNdsRateState.set_description,
+        EditNdsRateState.set_is_default,
     )
 
 
@@ -131,6 +143,11 @@ def view_page_content() -> rx.Component:
         rx.hstack(rx.text("Назва:", weight="medium"), rx.text(ViewNdsRateState.title), width="100%"),
         rx.hstack(rx.text("Ставка:", weight="medium"), rx.text(ViewNdsRateState.rate, "%"), width="100%"),
         rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewNdsRateState.description), width="100%"),
+        rx.hstack(
+            rx.text("За замовчуванням для рухів:", weight="medium"),
+            rx.text(rx.cond(ViewNdsRateState.is_default, "Так", "Ні")),
+            width="100%",
+        ),
         spacing="3",
         align="stretch",
         width="100%",

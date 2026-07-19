@@ -109,18 +109,10 @@ def _add_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=AddWriteOffState.on_click_search_name_incoming_storage,
-                        ),
-                        controls.input_field(
-                            value=AddWriteOffState.search_name_incoming_storage,
-                            on_change=AddWriteOffState.on_change_search_name_incoming_storage,
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                        ),
+                    controls.search_field(
+                        value=AddWriteOffState.search_name_incoming_storage,
+                        on_change=AddWriteOffState.on_change_search_name_incoming_storage,
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
                     ),
                     rx.foreach(

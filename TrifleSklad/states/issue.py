@@ -415,6 +415,7 @@ class AddIssueState(LookupCreatorsMixin, AppState):
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
         self.search_name_destination_storage = value
+        self._load_destination_storages()
 
     @rx.event
     def on_click_search_name_destination_storage(self):
@@ -747,6 +748,7 @@ class EditIssueState(AppState):
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
         self.search_name_destination_storage = value
+        self._load_destination_storages()
 
     @rx.event
     def on_click_search_name_destination_storage(self):

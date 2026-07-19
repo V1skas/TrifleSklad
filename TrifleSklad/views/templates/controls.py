@@ -197,6 +197,21 @@ def text_area_field(*args, **prop):
     return rx.text_area(*args, **prop)
 
 
+# Затримка «гарячого» пошуку (мс): поле фільтрує по вводу, але з паузою, щоб
+# не смикати фільтрацію/запити на кожне натискання клавіші.
+SEARCH_DEBOUNCE_MS = 800
+
+
+def search_field(*args, debounce_timeout: int = SEARCH_DEBOUNCE_MS, **prop):
+    """Поле «гарячого» пошуку: input_field, обгорнутий у debounce з паузою.
+    Використовуй скрізь, де пошук/фільтрація має спрацьовувати по вводу, а не
+    по натисканню кнопки."""
+    return rx.debounce_input(
+        input_field(*args, **prop),
+        debounce_timeout=debounce_timeout,
+    )
+
+
 def button_image_primary(name_icon: str = "package", icon_size: int = 20, *args, **prop):
     return button_primary(
         rx.icon(name_icon, size=icon_size),

@@ -52,14 +52,13 @@ def _list_table() -> rx.Component:
 def list_page_content() -> rx.Component:
     return rx.vstack(
         rx.hstack(
-            controls.input_field(
+            controls.search_field(
                 placeholder="Пошук за назвою / серійним номером / id",
                 value=ListUnitsReportState.get_search_str,
                 on_change=ListUnitsReportState.on_change_search_str,
                 flex="1",
                 min_width="0",
             ),
-            rx.button("Пошук", on_click=ListUnitsReportState.on_click_search, flex_shrink="0"),
             rx.select.root(
                 # width/flex_shrink — на trigger, не на root (rx.select.root
                 # не рендерить власний стилізовний DOM-елемент).

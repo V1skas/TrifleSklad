@@ -366,6 +366,7 @@ class AddClientIssueState(LookupCreatorsMixin, AppState):
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
         self.search_name_destination_storage = value
+        self._load_destination_storages()
 
     @rx.event
     def on_click_search_name_destination_storage(self):
@@ -534,9 +535,6 @@ class AddClientIssueState(LookupCreatorsMixin, AppState):
             return
         if self.item.movement.id_destination_storage == -1:
             yield rx.toast.error("Не обрано клієнта!")
-            return
-        if self.item.contract_number.strip() == "":
-            yield rx.toast.error("Не вказано номер договору!")
             return
         if self.item.installation_address.strip() == "":
             yield rx.toast.error("Не вказано адресу встановлення!")
@@ -715,6 +713,7 @@ class EditClientIssueState(AppState):
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
         self.search_name_destination_storage = value
+        self._load_destination_storages()
 
     @rx.event
     def on_click_search_name_destination_storage(self):
@@ -793,9 +792,6 @@ class EditClientIssueState(AppState):
         if self.item.movement.id_incoming_storage == -1 or self.item.movement.id_incoming_owner == -1 \
             or self.item.id_recipient == -1 or self._products_selector_state is None or len(self._products_selector_state.items) == 0:
             yield rx.toast.error("Не всі обов'язкові поля заповнені!")
-            return
-        if self.item.contract_number.strip() == "":
-            yield rx.toast.error("Не вказано номер договору!")
             return
         if self.item.installation_address.strip() == "":
             yield rx.toast.error("Не вказано адресу встановлення!")

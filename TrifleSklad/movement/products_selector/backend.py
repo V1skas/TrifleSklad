@@ -105,6 +105,8 @@ class ProductsSelectorState(rx.State):
         if len(self.available) > 0:
             return True
         catalog_id = self._catalog_id_value()
+        if catalog_id == -1:
+            return len(self.selected) > 0
         return any(
             item.product_catalog is not None
             and item.product_catalog.id == catalog_id
@@ -113,9 +115,11 @@ class ProductsSelectorState(rx.State):
 
     @rx.var
     def get_selected_items(self) -> List[Tuple[int, Product]]:
-        # Показуємо лише обрані одиниці поточної позиції каталогу (повний перелік
-        # selected лишається для повернення назовні). index — id одиниці.
+        # Без обраної позиції каталогу показуємо всі обрані одиниці; з обраною —
+        # лише її. Повний перелік selected завжди лишається для повернення назовні.
         catalog_id = self._catalog_id_value()
+        if catalog_id == -1:
+            return [(item.id, item) for item in self.selected]
         return [
             (item.id, item)
             for item in self.selected
@@ -245,13 +249,8 @@ class ProductsSelectorState(rx.State):
         )
 
     def _load_page(self, reset: bool) -> None:
-        # Список вантажиться лише коли обрано позицію каталогу.
-        catalog_id = self._catalog_id_value()
-        if catalog_id == -1:
-            self.available = []
-            self._offset = 0
-            self.has_more = False
-            return
+        # Список доступний одразу: без обраної позиції — усі ТМЦ місця/власника,
+        # звужені за категорією та текстовим пошуком.
         if reset:
             self._offset = 0
             self.available = []
@@ -260,7 +259,8 @@ class ProductsSelectorState(rx.State):
             storage_id=self.filter_by_storage,
             exclude_ids=self._excluded_ids(),
             search=self.filter_search,
-            catalog_id=catalog_id,
+            catalog_id=self._catalog_id_value(),
+            category_id=self._category_id_value(),
             offset=self._offset,
             limit=self._limit,
         )
@@ -286,8 +286,8 @@ class ProductsSelectorState(rx.State):
         products: List[int] = [],
     ) -> None:
         """Ініціалізація діалогу: задає місце/власника, перелік виключень,
-        завантажує опції категорій. Список одиниць не вантажиться, доки не
-        обрано позицію каталогу."""
+        завантажує опції категорій/каталогу та повний список одиниць. Усі
+        фільтри доступні одразу, каскад не блокує."""
         self.filter_by_owner = owner
         self.filter_by_storage = storage
         self.exclude_products = products
@@ -305,10 +305,10 @@ class ProductsSelectorState(rx.State):
             (title, str(cid))
             for cid, title in ProductDAO.get_categories_by_owner_storage(owner, storage)
         ]
-        self.catalog_options = []
-        self.available = []
+        self._reload_catalog_options()
         self._offset = 0
         self.has_more = False
+        self._load_page(reset=True)
     # ======================
 
     # Action handlers
@@ -342,38 +342,35 @@ class ProductsSelectorState(rx.State):
         self.sel_unit = ""
         self.total_units = 0
         self.total_measure = 0
-        self.catalog_options = []
-        self.available = []
-        self._offset = 0
-        self.has_more = False
+        self._reload_catalog_options()
+        self.is_loading = True
+        yield
+        self._load_page(reset=True)
+        self.is_loading = False
 
     @rx.event
     def change_filter_category(self, value: str):
         self.filter_category = value
-        # Скидаємо обрану позицію та список — каскад починається спочатку.
+        # Скидаємо обрану позицію каталогу; список звужуємо до категорії.
         self.filter_catalog = ALL
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
         self.mass_count = ""
         self.mass_measure = ""
-        self.available = []
-        self._offset = 0
-        self.has_more = False
         self._reload_catalog_options()
+        self.is_loading = True
+        yield
+        self._load_page(reset=True)
+        self.is_loading = False
 
     @rx.event
     def change_filter_catalog(self, value: str):
+        # Текстовий пошук не скидаємо — доступний одразу й переживає зміну позиції.
         self.filter_catalog = value
-        self.filter_search = ""
         self._load_catalog_meta()
         self._load_catalog_totals()
         self._sync_mass_fields()
-        if self._catalog_id_value() == -1:
-            self.available = []
-            self._offset = 0
-            self.has_more = False
-            return
         self.is_loading = True
         yield
         self._load_page(reset=True)

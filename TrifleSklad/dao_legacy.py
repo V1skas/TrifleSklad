@@ -1213,6 +1213,7 @@ class ProductDAO:
         exclude_ids: List[int],
         search: str = "",
         catalog_id: int = -1,
+        category_id: int = -1,
         min_remaining: Optional[int] = None,
         fullness: str = "all",
         offset: int = 0,
@@ -1245,6 +1246,10 @@ class ProductDAO:
             statement = statement.where(Product.id.not_in(exclude_ids))
         if catalog_id != -1:
             statement = statement.where(Product.id_product_catalog == catalog_id)
+        if category_id != -1:
+            statement = statement.where(
+                ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(category_id))
+            )
         if min_remaining is not None:
             statement = statement.where(Product.count >= min_remaining)
         if fullness == "full":
@@ -1254,10 +1259,11 @@ class ProductDAO:
         if search:
             term = search.strip()
             if term:
-                # Пошук лише за серійним номером / id: назву каталогу не шукаємо,
-                # бо позиція вже обрана у каскаді категорія→каталог.
+                # Пошук за назвою позиції каталогу / серійним номером / id —
+                # доступний одразу, незалежно від того, чи обрано позицію.
                 like = f"%{term.lower()}%"
                 conditions = [
+                    func.lower(ProductCatalog.title).like(like),
                     func.lower(func.coalesce(Product.serial_number, "")).like(like),
                 ]
                 if term.isdigit():
@@ -2484,6 +2490,17 @@ class NDSRateDAO:
             return rate
 
     @classmethod
+    def get_default_id(cls) -> Optional[int]:
+        """Id ставки ПДВ за замовчуванням."""
+        statement = (
+            select(NDSRate.id)
+            .where(NDSRate.is_default == True)
+            .where(NDSRate.is_deleted == False)
+        )
+        with rx.session() as session:
+            return session.exec(statement).first()
+
+    @classmethod
     def add_one(cls, nds_rate: NDSRate) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
@@ -3541,6 +3558,7 @@ class SaleDAO:
 
                 sale: Sale = Sale(
                     id_responsible=form_data["id_responsible"],
+                    client_info=form_data.get("client_info"),
                     movement=movement,
                 )
 
@@ -3571,6 +3589,8 @@ class SaleDAO:
                     movement.status = form_data["status"]
                 if "comment" in form_data:
                     movement.comment = form_data["comment"]
+                if "client_info" in form_data:
+                    sale.client_info = form_data["client_info"]
 
                 session.commit()
                 return True, "Продаж успішно змінено", sale.id

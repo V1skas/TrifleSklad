@@ -128,6 +128,14 @@ class ViewSaleState(AppState):
         )
 
     @rx.var
+    def client_info(self) -> str:
+        return (
+            self.item.client_info
+            if self.item is not None and self.item.client_info is not None
+            else ""
+        )
+
+    @rx.var
     def current_is_canceled(self) -> bool:
         return (
             self.item is not None
@@ -282,6 +290,7 @@ class AddSaleState(LookupCreatorsMixin, AppState):
     search_responsible: str = ""
     status: str = ""
     comment: str = ""
+    client_info: str = ""
 
     list_storages: List[Tuple[str, str]] = []
     list_owners: List[Tuple[str, str]] = []
@@ -379,6 +388,7 @@ class AddSaleState(LookupCreatorsMixin, AppState):
         self.search_name_incoming_storage = ""
         self.search_responsible = ""
         self.comment = ""
+        self.client_info = ""
         self.selected_request_id = ""
         self.request_positions = []
 
@@ -418,6 +428,7 @@ class AddSaleState(LookupCreatorsMixin, AppState):
         self.search_responsible = ""
         self.status = ""
         self.comment = ""
+        self.client_info = ""
         self.selected_request_id = ""
         self.request_positions = []
 
@@ -491,9 +502,6 @@ class AddSaleState(LookupCreatorsMixin, AppState):
     @rx.event
     def on_change_search_name_incoming_storage(self, value: str):
         self.search_name_incoming_storage = value
-
-    @rx.event
-    def on_click_search_name_incoming_storage(self):
         self._load_list_storages()
 
     @rx.event
@@ -507,6 +515,10 @@ class AddSaleState(LookupCreatorsMixin, AppState):
     @rx.event
     def on_change_comment(self, value: str):
         self.comment = value
+
+    @rx.event
+    def on_change_client_info(self, value: str):
+        self.client_info = value
 
     @rx.event
     async def add_one(self, keep: bool = False):
@@ -550,6 +562,7 @@ class AddSaleState(LookupCreatorsMixin, AppState):
             "id_incoming_owner": int(self.id_incoming_owner),
             "status": self._status_index(),
             "comment": self.comment,
+            "client_info": self.client_info,
             "movement_products_list": products_list,
             "prices": prices,
             "id_user": self.user.login,
@@ -612,6 +625,14 @@ class EditSaleState(AppState):
         return movements_status_list
 
     @rx.var
+    def client_info(self) -> str:
+        return (
+            self.item.client_info
+            if self.item is not None and self.item.client_info is not None
+            else ""
+        )
+
+    @rx.var
     def editable_statuses(self) -> List[str]:
         return [
             status
@@ -666,6 +687,11 @@ class EditSaleState(AppState):
             self.item.movement.comment = value
 
     @rx.event
+    def on_change_client_info(self, value: str):
+        if self.item is not None:
+            self.item.client_info = value
+
+    @rx.event
     def edit_one(self):
         if not self.has_permission(Action.SALES_EDIT):
             yield rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
@@ -688,6 +714,7 @@ class EditSaleState(AppState):
             "id": self.item.id,
             "status": status_index,
             "comment": self.item.movement.comment,
+            "client_info": self.item.client_info,
         }
         flag, text, id = SaleDAO.edit_one(form_data)
         if flag:

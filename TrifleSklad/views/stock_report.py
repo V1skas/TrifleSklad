@@ -168,15 +168,12 @@ def _table() -> rx.Component:
 
 
 def _search_box() -> rx.Component:
-    return rx.debounce_input(
-        controls.input_field(
-            rx.input.slot(rx.icon("search")),
-            placeholder="Пошук за назвою ТМЦ або серійним номером",
-            value=StockReportState.search_text,
-            on_change=StockReportState.on_change_search_text,
-            width="100%",
-        ),
-        debounce_timeout=400,
+    return controls.search_field(
+        rx.input.slot(rx.icon("search")),
+        placeholder="Пошук за назвою ТМЦ або серійним номером",
+        value=StockReportState.search_text,
+        on_change=StockReportState.on_change_search_text,
+        width="100%",
     )
 
 

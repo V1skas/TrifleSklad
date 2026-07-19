@@ -34,6 +34,8 @@ class NdsRateService:
             with rx.session() as session:
                 if NdsRateDao.exists_by_title(item.title, session):
                     raise ServiceError("Ставка ПДВ з такою назвою вже існує!")
+                if item.is_default:
+                    NdsRateDao.clear_default(session)
                 NdsRateDao.add_one(item, session)
                 session.commit()
                 session.refresh(item)
@@ -50,6 +52,8 @@ class NdsRateService:
             with rx.session() as session:
                 if NdsRateDao.exists_by_title(item.title, session, exclude_id=item.id):
                     raise ServiceError("Ставка ПДВ з такою назвою вже існує!")
+                if item.is_default:
+                    NdsRateDao.clear_default(session, exclude_id=item.id)
                 merged = NdsRateDao.edit_one(item, session)
                 session.commit()
                 session.refresh(merged)

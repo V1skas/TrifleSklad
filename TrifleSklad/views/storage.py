@@ -45,7 +45,7 @@ def _table() -> rx.Component:
 def list_page_content() -> rx.Component:
     return rx.vstack(
         rx.hstack(
-            controls.input_field(
+            controls.search_field(
                 rx.input.slot(rx.icon("search")),
                 value=ListStorageState.filter_title,
                 on_change=ListStorageState.set_filter_title,
@@ -53,7 +53,7 @@ def list_page_content() -> rx.Component:
                 flex="1",
                 min_width="0",
             ),
-            controls.input_field(
+            controls.search_field(
                 value=ListStorageState.filter_address,
                 on_change=ListStorageState.set_filter_address,
                 placeholder="Пошук за адресою...",

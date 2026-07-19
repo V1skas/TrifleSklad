@@ -314,6 +314,7 @@ class NDSRate(rx.Model, table=True):
     title: str = Field(nullable=False, unique=True)
     rate: float = Field(default=0.0, nullable=False)
     description: Optional[str] = Field(nullable=True)
+    is_default: bool = Field(default=False, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
 
@@ -368,6 +369,7 @@ class Sale(rx.Model, table=True):
     # Table columns
     id: int = Field(primary_key=True, foreign_key="movements.id")
     id_responsible: int = Field(foreign_key="workers.id", nullable=False)
+    client_info: Optional[str] = Field(default=None, nullable=True)
 
     # Relationship
     responsible: Optional[Worker] = Relationship(back_populates="sales")

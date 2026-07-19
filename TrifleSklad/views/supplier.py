@@ -43,7 +43,7 @@ def _table() -> rx.Component:
 
 def list_page_content() -> rx.Component:
     return rx.vstack(
-        controls.input_field(
+        controls.search_field(
             rx.input.slot(rx.icon("search")),
             value=ListSupplierState.filter_title,
             on_change=ListSupplierState.set_filter_title,

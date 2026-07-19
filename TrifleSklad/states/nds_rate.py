@@ -60,6 +60,10 @@ class AddNdsRateState(AppState):
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
 
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
+
     @rx.event
     def set_title(self, value: str):
         self.item.title = value
@@ -78,6 +82,10 @@ class AddNdsRateState(AppState):
     @rx.event
     def set_description(self, value: str):
         self.item.description = value if value != "" else None
+
+    @rx.event
+    def set_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def on_save(self):
@@ -149,9 +157,17 @@ class EditNdsRateState(AppState):
         except ValueError:
             pass
 
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
+
     @rx.event
     def set_description(self, value: str):
         self.item.description = value if value != "" else None
+
+    @rx.event
+    def set_is_default(self, value: bool):
+        self.item.is_default = value
 
     @rx.event
     def on_save(self):
@@ -186,6 +202,10 @@ class ViewNdsRateState(AppState):
     @rx.var
     def description(self) -> str:
         return self.item.description if self.item is not None and self.item.description is not None else ""
+
+    @rx.var
+    def is_default(self) -> bool:
+        return bool(self.item.is_default) if self.item is not None else False
 
     @rx.event
     def on_load(self, id: str = ""):

@@ -127,10 +127,8 @@ class ListProductsState(AppState):
 
     @rx.event
     def set_search_str(self, value: str):
+        # Гарячий пошук: фільтруємо одразу по вводу (з debounce у полі).
         self.search_str = value if value != "" else None
-
-    @rx.event
-    def on_click_search(self):
         self._current_page = 1
         self._load_items()
 

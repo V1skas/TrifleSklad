@@ -168,18 +168,10 @@ def _add_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
             rx.select.content(
                 rx.vstack(
-                    rx.hstack(
-                        rx.button(
-                            "Пошук",
-                            type="button",
-                            on_click=AddSaleState.on_click_search_name_incoming_storage,
-                        ),
-                        controls.input_field(
-                            value=AddSaleState.search_name_incoming_storage,
-                            on_change=AddSaleState.on_change_search_name_incoming_storage,
-                            placeholder="Введіть назву для пошуку",
-                            width="100%",
-                        ),
+                    controls.search_field(
+                        value=AddSaleState.search_name_incoming_storage,
+                        on_change=AddSaleState.on_change_search_name_incoming_storage,
+                        placeholder="Введіть назву для пошуку",
                         width="100%",
                     ),
                     rx.foreach(
@@ -251,6 +243,8 @@ def _add_form() -> rx.Component:
         ),
         rx.text("Коментар:", weight="medium"),
         controls.text_area_field(value=AddSaleState.comment, on_change=AddSaleState.on_change_comment, width="100%"),
+        rx.text("Інформація про клієнта:", weight="medium"),
+        controls.text_area_field(value=AddSaleState.client_info, on_change=AddSaleState.on_change_client_info, width="100%"),
         spacing="3",
         align="stretch",
         width="100%",
@@ -329,6 +323,8 @@ def _edit_form() -> rx.Component:
         ),
         rx.text("Коментар:", weight="medium"),
         controls.text_area_field(value=EditSaleState.item.movement.comment, on_change=EditSaleState.on_change_comment, width="100%"),
+        rx.text("Інформація про клієнта:", weight="medium"),
+        controls.text_area_field(value=EditSaleState.client_info, on_change=EditSaleState.on_change_client_info, width="100%"),
         spacing="3",
         align="stretch",
         width="100%",
@@ -492,6 +488,7 @@ def view_page_content() -> rx.Component:
         rx.text(f"Відповідальний: {ViewSaleState.item.responsible.fio}"),
         rx.text(f"Статус: {ViewSaleState.item_status}"),
         rx.text(f"Коментар: {ViewSaleState.item.movement.comment}"),
+        rx.text(f"Інформація про клієнта: {ViewSaleState.client_info}"),
         rx.text("Продані позиції (натисніть для деталізації):", width="100%"),
         _positions_table(),
         rx.hstack(

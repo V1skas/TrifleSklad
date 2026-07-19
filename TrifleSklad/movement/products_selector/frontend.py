@@ -243,7 +243,6 @@ def filters_panel() -> rx.Component:
             ),
             value=ProductsSelectorState.filter_catalog,
             on_change=ProductsSelectorState.change_filter_catalog,
-            disabled=ProductsSelectorState.filter_category == ALL,
             width="100%",
             size="2",
         ),
@@ -256,17 +255,13 @@ def filters_panel() -> rx.Component:
                 color=rx.color("accent", 11),
             ),
         ),
-        rx.text("Пошук (s/n / ID):", size="2"),
-        rx.debounce_input(
-            controls.input_field(
-                rx.input.slot(rx.icon("search")),
-                placeholder="Введіть текст",
-                width="100%",
-                disabled=~ProductsSelectorState.catalog_chosen,
-                value=ProductsSelectorState.filter_search,
-                on_change=ProductsSelectorState.change_filter_search,
-            ),
-            debounce_timeout=400,
+        rx.text("Пошук (назва / s/n / ID):", size="2"),
+        controls.search_field(
+            rx.input.slot(rx.icon("search")),
+            placeholder="Введіть текст",
+            width="100%",
+            value=ProductsSelectorState.filter_search,
+            on_change=ProductsSelectorState.change_filter_search,
         ),
         mass_select_panel(),
         rx.button(
@@ -315,34 +310,21 @@ def selector(*child, **prop) -> rx.Component:
             # Праворуч — список одиниць ТМЦ.
             rx.card(
                 rx.cond(
-                    ProductsSelectorState.catalog_chosen,
+                    ProductsSelectorState.is_loading,
+                    selector_skeleton(),
                     rx.cond(
-                        ProductsSelectorState.is_loading,
-                        selector_skeleton(),
-                        rx.cond(
-                            ProductsSelectorState.has_items,
-                            selector_list(),
-                            rx.center(
-                                rx.text(
-                                    "ТМЦ не знайдено",
-                                    color=rx.color("accent", 8),
-                                    user_select="none",
-                                    size="3",
-                                ),
-                                width="100%",
-                                height="100%",
+                        ProductsSelectorState.has_items,
+                        selector_list(),
+                        rx.center(
+                            rx.text(
+                                "ТМЦ не знайдено",
+                                color=rx.color("accent", 8),
+                                user_select="none",
+                                size="3",
                             ),
+                            width="100%",
+                            height="100%",
                         ),
-                    ),
-                    rx.center(
-                        rx.text(
-                            "Оберіть категорію та позицію каталогу",
-                            color=rx.color("accent", 8),
-                            user_select="none",
-                            size="3",
-                        ),
-                        width="100%",
-                        height="100%",
                     ),
                 ),
                 padding="1em",

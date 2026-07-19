@@ -786,6 +786,10 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
         default_payment = PaymentTypeDAO.get_default_id()
         if default_payment is not None:
             self.item.id_payment_type = default_payment
+        if self.item.id_nds_rate is None:
+            default_nds_rate = NDSRateDAO.get_default_id()
+            if default_nds_rate is not None:
+                self.item.id_nds_rate = default_nds_rate
 
     @rx.var
     def id_destination_storage(self) -> str:
@@ -859,6 +863,7 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
         self.search_name_destination_storage = value
+        self._load_storages()
 
     @rx.event
     def on_click_search_name_destination_storage(self):
@@ -1332,6 +1337,7 @@ class EditAdmissionState(AppState):
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
         self.search_name_destination_storage = value
+        self._load_storages()
 
     @rx.event
     def on_click_search_name_destination_storage(self):
