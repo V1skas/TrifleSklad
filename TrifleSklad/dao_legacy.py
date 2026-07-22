@@ -8,6 +8,42 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select, func, or_, update
 
+from TrifleSklad.audit import record_action
+from TrifleSklad.audit.actions.movement import (
+    AdmissionCreated,
+    AdmissionDeleted,
+    AdmissionUpdated,
+    ClientIssueCreated,
+    ClientIssueUpdated,
+    IssueCreated,
+    IssueUpdated,
+    SaleCreated,
+    SaleReturnCreated,
+    SaleReturnUpdated,
+    SaleUpdated,
+    movement_actions_for,
+)
+from TrifleSklad.audit.actions.request import (
+    RequestCreated,
+    RequestDeleted,
+    RequestUpdated,
+    request_position_label,
+    request_position_title,
+)
+from TrifleSklad.audit.actions.nds_rate import NdsRateCreated
+from TrifleSklad.audit.actions.owner import OwnerCreated
+from TrifleSklad.audit.actions.payment_type import PaymentTypeCreated
+from TrifleSklad.audit.actions.storage import StorageCreated
+from TrifleSklad.audit.actions.supplier import SupplierCreated
+from TrifleSklad.audit.actions.worker import WorkerCreated
+from TrifleSklad.audit.base import LineChange
+from TrifleSklad.audit.labels import (
+    diff_position_lines,
+    movement_position_label,
+    movement_position_title,
+    movement_view,
+    snapshot_position_lines,
+)
 from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus, sale_line_cost
 from TrifleSklad.models import (
     Admission,
@@ -79,7 +115,7 @@ class WorkerDAO:
             return session.exec(statement).first()
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def add_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         worker = Worker(**form_data)
 
         try:
@@ -101,6 +137,8 @@ class WorkerDAO:
                     )
 
                 session.add(worker)
+                session.flush()
+                record_action(session, actor_login, worker.id, WorkerCreated.for_create(worker, session))
                 session.commit()
                 session.refresh(worker)
                 return True, "Співробітника додано!", worker.id
@@ -810,7 +848,7 @@ class StorageDAO:
             return session.exec(statement).first()
 
     @classmethod
-    def add_one(cls, storage: Storage) -> tuple[bool, str, int]:
+    def add_one(cls, storage: Storage, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -832,6 +870,8 @@ class StorageDAO:
                     )
 
                 session.add(storage)
+                session.flush()
+                record_action(session, actor_login, storage.id, StorageCreated.for_create(storage, session))
                 session.commit()
                 session.refresh(storage)
                 return True, "Склад успішно додано!", storage.id
@@ -953,7 +993,7 @@ class OwnerDAO:
             return session.exec(statement).first()
 
     @classmethod
-    def add_one(cls, owner: Owner) -> tuple[bool, str, int]:
+    def add_one(cls, owner: Owner, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -977,6 +1017,8 @@ class OwnerDAO:
                     )
 
                 session.add(owner)
+                session.flush()
+                record_action(session, actor_login, owner.id, OwnerCreated.for_create(owner, session))
                 session.commit()
                 session.refresh(owner)
                 return True, "Власника успішно додано!", owner.id
@@ -1081,7 +1123,7 @@ class SupplierDAO:
             return session.exec(statement).all()
 
     @classmethod
-    def add_one(cls, supplier: Supplier) -> tuple[bool, str, int]:
+    def add_one(cls, supplier: Supplier, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -1098,6 +1140,8 @@ class SupplierDAO:
                     )
 
                 session.add(supplier)
+                session.flush()
+                record_action(session, actor_login, supplier.id, SupplierCreated.for_create(supplier, session))
                 session.commit()
                 session.refresh(supplier)
                 return True, "Постачальника додано!", supplier.id
@@ -2049,7 +2093,7 @@ class MovementDAO:
             return movement
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def add_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 movement: Movement = Movement()
@@ -2094,6 +2138,18 @@ class MovementDAO:
                 movement.products_catalog = movement_products_catalog
 
                 session.add(movement)
+                session.flush()
+
+                Created, _, _ = movement_actions_for(movement.type)
+                position_lines = diff_position_lines(
+                    None, movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, movement.id, Created.for_create(movement, session, lines=position_lines)
+                )
+
                 session.commit()
 
                 return True, "Движение товара успешно добавлено", movement.id
@@ -2104,7 +2160,7 @@ class MovementDAO:
             return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 movement = session.get(Movement, form_data["id"])
@@ -2112,8 +2168,15 @@ class MovementDAO:
                 if movement is None:
                     return False, "Ошибка: Движение товара не найдено", -1
 
+                _, Updated, _ = movement_actions_for(movement.type)
+                old_snapshot = Updated.snapshot(movement)
+
                 for key, value in form_data.items():
                     setattr(movement, key, value)
+
+                record_action(
+                    session, actor_login, movement.id, Updated.from_diff(old_snapshot, movement, session)
+                )
 
                 session.commit()
                 session.refresh(movement)
@@ -2125,7 +2188,7 @@ class MovementDAO:
             return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
-    def cancel_movement(cls, id: int) -> tuple[bool, str]:
+    def cancel_movement(cls, id: int, actor_login: str) -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 movement = session.get(Movement, id)
@@ -2133,7 +2196,14 @@ class MovementDAO:
                 if movement is None:
                     return False, "Ошибка: Движение товара не найдено"
 
+                _, Updated, _ = movement_actions_for(movement.type)
+                old_snapshot = Updated.snapshot(movement)
+
                 movement.status = MovementsStatus.CANCELED
+
+                record_action(
+                    session, actor_login, movement.id, Updated.from_diff(old_snapshot, movement, session)
+                )
 
                 session.commit()
                 return True, "Движение товара успешно отменено"
@@ -2372,7 +2442,7 @@ class PaymentTypeDAO:
             return session.exec(statement).first()
 
     @classmethod
-    def add_one(cls, payment_type: PaymentType) -> tuple[bool, str, int]:
+    def add_one(cls, payment_type: PaymentType, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -2396,6 +2466,10 @@ class PaymentTypeDAO:
                     )
 
                 session.add(payment_type)
+                session.flush()
+                record_action(
+                    session, actor_login, payment_type.id, PaymentTypeCreated.for_create(payment_type, session)
+                )
                 session.commit()
                 session.refresh(payment_type)
                 return True, "Тип оплати додано!", payment_type.id
@@ -2501,7 +2575,7 @@ class NDSRateDAO:
             return session.exec(statement).first()
 
     @classmethod
-    def add_one(cls, nds_rate: NDSRate) -> tuple[bool, str, int]:
+    def add_one(cls, nds_rate: NDSRate, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 statement = (
@@ -2518,6 +2592,8 @@ class NDSRateDAO:
                     )
 
                 session.add(nds_rate)
+                session.flush()
+                record_action(session, actor_login, nds_rate.id, NdsRateCreated.for_create(nds_rate, session))
                 session.commit()
                 session.refresh(nds_rate)
                 return True, "Ставку ПДВ додано!", nds_rate.id
@@ -2775,11 +2851,23 @@ class AdmissionDAO:
             return session.exec(statement).first() is not None
 
     @classmethod
-    def add_one(cls, movement: Admission) -> tuple[bool, str, int]:
+    def add_one(cls, movement: Admission, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
                 session.add(movement)
+                session.flush()
+
+                position_lines = diff_position_lines(
+                    None, movement.movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, movement.id,
+                    AdmissionCreated.for_create(movement_view(movement), session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Постачання успішно додано!", movement.id
 
@@ -2789,10 +2877,27 @@ class AdmissionDAO:
             return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, admission: Admission) -> tuple[bool, str, int]:
+    def edit_one(cls, admission: Admission, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
-                session.merge(admission)
+                old_admission = session.get(Admission, admission.id)
+                if old_admission is None:
+                    return False, "Помилка! Постачання не знайдено.", -1
+                old_snapshot = AdmissionUpdated.snapshot(movement_view(old_admission))
+                old_positions = snapshot_position_lines(old_admission.movement.products_catalog)
+
+                merged = session.merge(admission)
+
+                position_lines = diff_position_lines(
+                    old_positions, merged.movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, merged.id,
+                    AdmissionUpdated.from_diff(old_snapshot, movement_view(merged), session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Постачання успішно змінено!", admission.id
 
@@ -2837,7 +2942,7 @@ class AdmissionDAO:
             return len(other_movements_with_current_products) == 0
 
     @classmethod
-    def delete_product_line(cls, id_movement_products_catalog: int) -> tuple[bool, str]:
+    def delete_product_line(cls, id_movement_products_catalog: int, actor_login: str) -> tuple[bool, str]:
         """Видаляє один рядок переліку ТМЦ поставлення (позицію каталогу разом
         з усіма її одиницями) — за умови, що жодна з одиниць цього рядка не
         фігурує в іншому русі. Використовується при редагуванні поставлення."""
@@ -2873,6 +2978,13 @@ class AdmissionDAO:
                         "Помилка! Позицію не можна видалити, оскільки товар вже використовується в іншому русі.",
                     )
 
+                removed_line = LineChange(
+                    kind="removed",
+                    title=movement_position_title(mpc, session),
+                    old=movement_position_label(mpc, session),
+                )
+                record_action(session, actor_login, mpc.id_movement, AdmissionUpdated(lines=[removed_line]))
+
                 for item in products_in_line:
                     session.delete(item)
                 for item in products:
@@ -2887,7 +2999,7 @@ class AdmissionDAO:
             return False, "Системна помилка!"
 
     @classmethod
-    def delete_one(cls, id: int) -> tuple[bool, str]:
+    def delete_one(cls, id: int, actor_login: str) -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 admission: Admission = session.get(Admission, id)
@@ -2938,6 +3050,19 @@ class AdmissionDAO:
                         False,
                         "Помилка! Постачання не може бути видалено, оскільки товари вже використовуються в інших рухах.",
                     )
+
+                deleted_action = AdmissionDeleted.for_delete(
+                    movement_view(admission), session,
+                    lines=[
+                        LineChange(
+                            kind="removed",
+                            title=movement_position_title(mpc, session),
+                            old=movement_position_label(mpc, session),
+                        )
+                        for mpc in movements_products_catalog
+                    ],
+                )
+                record_action(session, actor_login, id, deleted_action)
 
                 for item in products_in_movement:
                     session.delete(item)
@@ -3129,11 +3254,23 @@ class IssueDAO:
             return issue
 
     @classmethod
-    def add_one(cls, issue: Issue) -> tuple[bool, str, int]:
+    def add_one(cls, issue: Issue, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
                 session.add(issue)
+                session.flush()
+
+                position_lines = diff_position_lines(
+                    None, issue.movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, issue.id,
+                    IssueCreated.for_create(movement_view(issue), session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Выдача успешно добавлена", issue.id
 
@@ -3143,11 +3280,22 @@ class IssueDAO:
             return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
-    def edit_one(cls, issue: Issue) -> tuple[bool, str, int]:
+    def edit_one(cls, issue: Issue, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
-                session.merge(issue)
+                old_issue = session.get(Issue, issue.id)
+                if old_issue is None:
+                    return False, "Ошибка: Выдача не найдена", -1
+                old_snapshot = IssueUpdated.snapshot(movement_view(old_issue))
+
+                merged = session.merge(issue)
+
+                record_action(
+                    session, actor_login, merged.id,
+                    IssueUpdated.from_diff(old_snapshot, movement_view(merged), session),
+                )
+
                 session.commit()
                 return True, "Выдача успешно изменена", issue.id
 
@@ -3326,11 +3474,23 @@ class ClientIssueDAO:
             return client_issue
 
     @classmethod
-    def add_one(cls, client_issue: ClientIssue) -> tuple[bool, str, int]:
+    def add_one(cls, client_issue: ClientIssue, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
                 session.add(client_issue)
+                session.flush()
+
+                position_lines = diff_position_lines(
+                    None, client_issue.movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, client_issue.id,
+                    ClientIssueCreated.for_create(movement_view(client_issue), session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Видача клієнту успішно додана", client_issue.id
 
@@ -3340,11 +3500,22 @@ class ClientIssueDAO:
             return False, f"Помилка: {str(e)}", -1
 
     @classmethod
-    def edit_one(cls, client_issue: ClientIssue) -> tuple[bool, str, int]:
+    def edit_one(cls, client_issue: ClientIssue, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
-                session.merge(client_issue)
+                old_client_issue = session.get(ClientIssue, client_issue.id)
+                if old_client_issue is None:
+                    return False, "Помилка: видачу клієнту не знайдено", -1
+                old_snapshot = ClientIssueUpdated.snapshot(movement_view(old_client_issue))
+
+                merged = session.merge(client_issue)
+
+                record_action(
+                    session, actor_login, merged.id,
+                    ClientIssueUpdated.from_diff(old_snapshot, movement_view(merged), session),
+                )
+
                 session.commit()
                 return True, "Видача клієнту успішно змінена", client_issue.id
 
@@ -3486,7 +3657,7 @@ class SaleDAO:
             return sale
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def add_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         """Створює продаж: будує поліморфний Movement (тип SALE), його позиції
         (MovementProductsCatalog з ціною за позицією) і дочірній запис Sale.
         `movement_products_list` — підсумковий перелік одиниць ТМЦ, `prices` —
@@ -3563,6 +3734,18 @@ class SaleDAO:
                 )
 
                 session.add(sale)
+                session.flush()
+
+                position_lines = diff_position_lines(
+                    None, movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, sale.id,
+                    SaleCreated.for_create(movement_view(sale), session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Продаж успішно додано", sale.id
 
@@ -3572,7 +3755,7 @@ class SaleDAO:
             return False, f"Помилка: {str(e)}", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         """Редагування продажу: змінюються лише статус і коментар руху
         (склад/власник/позиції продажу не редагуються)."""
         try:
@@ -3585,12 +3768,19 @@ class SaleDAO:
                 if movement is None:
                     return False, "Помилка: Рух товару не знайдено", -1
 
+                old_snapshot = SaleUpdated.snapshot(movement_view(sale))
+
                 if "status" in form_data:
                     movement.status = form_data["status"]
                 if "comment" in form_data:
                     movement.comment = form_data["comment"]
                 if "client_info" in form_data:
                     sale.client_info = form_data["client_info"]
+
+                record_action(
+                    session, actor_login, sale.id,
+                    SaleUpdated.from_diff(old_snapshot, movement_view(sale), session),
+                )
 
                 session.commit()
                 return True, "Продаж успішно змінено", sale.id
@@ -3729,7 +3919,7 @@ class SaleReturnDAO:
             return list(products)
 
     @classmethod
-    def add_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def add_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         """Створює повернення продажу: Movement (тип SALE_RETURN) із позиціями
         (price = компенсація за позицію, total_cost = Σ компенсацій) і дочірній
         SaleReturn. Повернені одиниці відновлюються (undelete) і переміщуються на
@@ -3813,6 +4003,18 @@ class SaleReturnDAO:
                     session.add(product)
 
                 session.add(sale_return)
+                session.flush()
+
+                position_lines = diff_position_lines(
+                    None, movement.products_catalog, session,
+                    key=lambda x: x.id_product_catalog,
+                    title=movement_position_title, label=movement_position_label,
+                )
+                record_action(
+                    session, actor_login, sale_return.id,
+                    SaleReturnCreated.for_create(movement_view(sale_return), session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Повернення продажу успішно додано", sale_return.id
 
@@ -3822,7 +4024,7 @@ class SaleReturnDAO:
             return False, f"Помилка: {str(e)}", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         """Редагування повернення продажу: лише статус і коментар руху."""
         try:
             with rx.session() as session:
@@ -3834,10 +4036,17 @@ class SaleReturnDAO:
                 if movement is None:
                     return False, "Помилка: Рух товару не знайдено", -1
 
+                old_snapshot = SaleReturnUpdated.snapshot(movement_view(sale_return))
+
                 if "status" in form_data:
                     movement.status = form_data["status"]
                 if "comment" in form_data:
                     movement.comment = form_data["comment"]
+
+                record_action(
+                    session, actor_login, sale_return.id,
+                    SaleReturnUpdated.from_diff(old_snapshot, movement_view(sale_return), session),
+                )
 
                 session.commit()
                 return True, "Повернення продажу успішно змінено", sale_return.id
@@ -3940,11 +4149,26 @@ class RequestDAO:
             return request
 
     @classmethod
-    def add_one(cls, request: Request) -> tuple[bool, str, int]:
+    def add_one(cls, request: Request, actor_login: str) -> tuple[bool, str, int]:
         try:
             with rx.session() as session:
                 session.expire_on_commit = False
                 session.add(request)
+                session.flush()
+
+                new_positions = [
+                    (rpc.id_product_catalog, rpc.count, rpc.part_amount)
+                    for rpc in (request.products_catalog or [])
+                ]
+                position_lines = diff_position_lines(
+                    None, new_positions, session,
+                    key=lambda x: x[0], title=request_position_title, label=request_position_label,
+                )
+                record_action(
+                    session, actor_login, request.id,
+                    RequestCreated.for_create(request, session, lines=position_lines),
+                )
+
                 session.commit()
                 return True, "Заявку успішно створено!", request.id
 
@@ -3954,7 +4178,7 @@ class RequestDAO:
             return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, form_data: dict) -> tuple[bool, str, int]:
+    def edit_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         """Редагування заявки (лише невиконаної): тип/отримувач/призначення/
         коментар + перелік позицій. Позиції повністю перестворюються."""
         try:
@@ -3965,6 +4189,8 @@ class RequestDAO:
                 if request.status == RequestStatus.COMPLETED:
                     return False, "Помилка: виконану заявку не можна редагувати", -1
 
+                old_snapshot = RequestUpdated.snapshot(request)
+
                 for key in (
                     "type",
                     "id_responsible",
@@ -3974,12 +4200,15 @@ class RequestDAO:
                     if key in form_data:
                         setattr(request, key, form_data[key])
 
+                position_lines: List = []
                 if "positions" in form_data:
-                    for old in session.exec(
+                    old_rows = session.exec(
                         select(RequestProductsCatalog).where(
                             RequestProductsCatalog.id_request == request.id
                         )
-                    ).all():
+                    ).all()
+                    old_positions = [(r.id_product_catalog, r.count, r.part_amount) for r in old_rows]
+                    for old in old_rows:
                         session.delete(old)
                     for catalog_id, count, part in form_data["positions"]:
                         session.add(
@@ -3990,6 +4219,15 @@ class RequestDAO:
                                 part_amount=(part or None),
                             )
                         )
+                    position_lines = diff_position_lines(
+                        old_positions, form_data["positions"], session,
+                        key=lambda x: x[0], title=request_position_title, label=request_position_label,
+                    )
+
+                record_action(
+                    session, actor_login, request.id,
+                    RequestUpdated.from_diff(old_snapshot, request, session, lines=position_lines),
+                )
 
                 session.commit()
                 return True, "Заявку успішно змінено!", request.id
@@ -4000,14 +4238,18 @@ class RequestDAO:
             return False, "Системна помилка!", -1
 
     @classmethod
-    def mark_completed(cls, id: int, id_movement: int) -> tuple[bool, str]:
+    def mark_completed(cls, id: int, id_movement: int, actor_login: str) -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 request = session.get(Request, id)
                 if request is None:
                     return False, "Помилка: заявку не знайдено"
+                old_snapshot = RequestUpdated.snapshot(request)
                 request.status = RequestStatus.COMPLETED
                 request.id_movement = id_movement
+                record_action(
+                    session, actor_login, request.id, RequestUpdated.from_diff(old_snapshot, request, session)
+                )
                 session.commit()
                 return True, "Заявку виконано"
 
@@ -4015,7 +4257,7 @@ class RequestDAO:
             return False, "Системна помилка!"
 
     @classmethod
-    def revert_completion_by_movement(cls, id_movement: int) -> tuple[bool, str]:
+    def revert_completion_by_movement(cls, id_movement: int, actor_login: str) -> tuple[bool, str]:
         """Повертає заявку, сформовану в рух `id_movement`, у стан «Нова»
         (та відв'язує від руху) — викликається при скасуванні цього руху."""
         try:
@@ -4025,8 +4267,12 @@ class RequestDAO:
                 ).first()
                 if request is None:
                     return True, "Заявку для руху не знайдено"
+                old_snapshot = RequestUpdated.snapshot(request)
                 request.status = RequestStatus.NEW
                 request.id_movement = None
+                record_action(
+                    session, actor_login, request.id, RequestUpdated.from_diff(old_snapshot, request, session)
+                )
                 session.commit()
                 return True, "Заявку повернуто у стан «Нова»"
 
@@ -4034,7 +4280,7 @@ class RequestDAO:
             return False, "Системна помилка!"
 
     @classmethod
-    def delete_one(cls, id: int) -> tuple[bool, str]:
+    def delete_one(cls, id: int, actor_login: str) -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 request = session.get(Request, id)
@@ -4042,7 +4288,9 @@ class RequestDAO:
                     return False, "Помилка: заявку не знайдено"
                 if request.status == RequestStatus.COMPLETED:
                     return False, "Помилка: виконану заявку не можна видалити"
+                deleted_action = RequestDeleted.for_delete(request, session)
                 request.is_deleted = True
+                record_action(session, actor_login, id, deleted_action)
                 session.commit()
                 return True, "Заявку видалено"
 

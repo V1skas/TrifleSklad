@@ -2,6 +2,8 @@ from typing import Optional, Sequence
 
 import reflex as rx
 
+from TrifleSklad.audit import record_action
+from TrifleSklad.audit.actions.payment_type import PaymentTypeCreated, PaymentTypeDeleted, PaymentTypeUpdated
 from TrifleSklad.dao.payment_type import PaymentTypeDao
 from TrifleSklad.models import PaymentType
 from TrifleSklad.services.errors import ServiceError
@@ -29,7 +31,7 @@ class PaymentTypeService:
             print(f"[PaymentTypeService][get_by_id][ERROR] {e}")
             raise
 
-    def add_one(self, item: PaymentType) -> PaymentType:
+    def add_one(self, item: PaymentType, actor_login: str) -> PaymentType:
         try:
             with rx.session() as session:
                 if PaymentTypeDao.exists_by_title(item.title, session):
@@ -37,6 +39,8 @@ class PaymentTypeService:
                 if item.is_default:
                     PaymentTypeDao.clear_default(session)
                 PaymentTypeDao.add_one(item, session)
+                session.flush()
+                record_action(session, actor_login, item.id, PaymentTypeCreated.for_create(item, session))
                 session.commit()
                 session.refresh(item)
                 session.expunge(item)
@@ -47,14 +51,18 @@ class PaymentTypeService:
             print(f"[PaymentTypeService][add_one][ERROR] {e}")
             raise
 
-    def edit_one(self, item: PaymentType) -> PaymentType:
+    def edit_one(self, item: PaymentType, actor_login: str) -> PaymentType:
         try:
             with rx.session() as session:
                 if PaymentTypeDao.exists_by_title(item.title, session, exclude_id=item.id):
                     raise ServiceError("Тип оплати з такою назвою вже існує!")
+                old_snapshot = PaymentTypeUpdated.snapshot(PaymentTypeDao.get_by_id(item.id, session))
                 if item.is_default:
                     PaymentTypeDao.clear_default(session, exclude_id=item.id)
                 merged = PaymentTypeDao.edit_one(item, session)
+                record_action(
+                    session, actor_login, item.id, PaymentTypeUpdated.from_diff(old_snapshot, merged, session)
+                )
                 session.commit()
                 session.refresh(merged)
                 session.expunge(merged)
@@ -65,7 +73,7 @@ class PaymentTypeService:
             print(f"[PaymentTypeService][edit_one][ERROR] {e}")
             raise
 
-    def delete_one(self, id: int) -> bool:
+    def delete_one(self, id: int, actor_login: str) -> bool:
         try:
             with rx.session() as session:
                 item = PaymentTypeDao.get_by_id(id, session)
@@ -73,6 +81,7 @@ class PaymentTypeService:
                     return False
                 item.is_deleted = True
                 PaymentTypeDao.edit_one(item, session)
+                record_action(session, actor_login, id, PaymentTypeDeleted.for_delete(item, session))
                 session.commit()
                 return True
         except Exception as e:

@@ -9,6 +9,7 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.product_catalog import ProductCatalogService
 from TrifleSklad.services.product_category import ProductCategoryService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 
 ALL = "all"
 
@@ -56,7 +57,7 @@ class CategoryCreateMixin(rx.State, mixin=True):
 
         category = ProductCategory(title=title, description=self.new_category_description.strip() or None)
         try:
-            new_category = ProductCategoryService().add_one(category)
+            new_category = ProductCategoryService().add_one(category, self.user.login)
         except ServiceError as e:
             return rx.toast.error(str(e))
         except Exception:
@@ -268,7 +269,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
         if self.item.uniq:
             self.item.capacity = 1
         try:
-            self.item = ProductCatalogService().add_one(self.item)
+            self.item = ProductCatalogService().add_one(self.item, self.user.login)
             yield rx.toast.success("Товар додано!")
             yield rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -394,7 +395,7 @@ class EditProductsState(CategoryCreateMixin, AppState):
         if self.item.uniq:
             self.item.capacity = 1
         try:
-            self.item = ProductCatalogService().edit_one(self.item)
+            self.item = ProductCatalogService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Товар успішно змінено!")
             yield rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -403,7 +404,11 @@ class EditProductsState(CategoryCreateMixin, AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewProductsState(AppState):
+class ViewProductsState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "products"
+    HISTORY_ACTION = Action.PRODUCTS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.PRODUCTS_HISTORY_DETAIL
+
     item: Optional[ProductCatalog] = None
     in_process: bool = True
 
@@ -453,6 +458,8 @@ class ViewProductsState(AppState):
             if self.item is None:
                 yield rx.redirect(routes.CATALOG_PRODUCTS)
                 yield rx.toast.error("Запис не знайдено!")
+                return
+            self._load_history(self.item.id)
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -470,7 +477,7 @@ class ViewProductsState(AppState):
             return
         if self.item is None:
             return
-        if ProductCatalogService().delete_one(self.item.id):
+        if ProductCatalogService().delete_one(self.item.id, self.user.login):
             yield rx.toast.success("Товар видалено!")
             yield ListProductsState.on_load()
             yield rx.redirect(routes.CATALOG_PRODUCTS)

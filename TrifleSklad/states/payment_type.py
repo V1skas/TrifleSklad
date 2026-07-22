@@ -8,6 +8,7 @@ from TrifleSklad.models import PaymentType
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.payment_type import PaymentTypeService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 
 
 class ListPaymentTypeState(AppState):
@@ -81,7 +82,7 @@ class AddPaymentTypeState(AppState):
             yield rx.toast.warning("Поле назви повинно бути заповненим!")
             return
         try:
-            self.item = PaymentTypeService().add_one(self.item)
+            self.item = PaymentTypeService().add_one(self.item, self.user.login)
             yield rx.toast.success("Тип оплати додано!")
             yield rx.redirect(routes.CATALOG_PAYMENT_TYPES_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -148,7 +149,7 @@ class EditPaymentTypeState(AppState):
             yield rx.toast.warning("Поле назви повинно бути заповненим!")
             return
         try:
-            self.item = PaymentTypeService().edit_one(self.item)
+            self.item = PaymentTypeService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Тип оплати змінено!")
             yield rx.redirect(routes.CATALOG_PAYMENT_TYPES_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -157,7 +158,11 @@ class EditPaymentTypeState(AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewPaymentTypeState(AppState):
+class ViewPaymentTypeState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "payment_types"
+    HISTORY_ACTION = Action.PAYMENT_TYPE_HISTORY
+    HISTORY_DETAIL_ACTION = Action.PAYMENT_TYPE_HISTORY_DETAIL
+
     item: Optional[PaymentType] = None
     in_process: bool = True
 
@@ -187,6 +192,8 @@ class ViewPaymentTypeState(AppState):
             if self.item is None:
                 yield rx.redirect(routes.CATALOG_PAYMENT_TYPES)
                 yield rx.toast.error("Запис не було знайдено")
+                return
+            self._load_history(self.item.id)
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -204,7 +211,7 @@ class ViewPaymentTypeState(AppState):
             return
         if self.item is None:
             return
-        if PaymentTypeService().delete_one(self.item.id):
+        if PaymentTypeService().delete_one(self.item.id, self.user.login):
             yield rx.toast.success("Тип оплати видалено!")
             yield ListPaymentTypeState.on_load()
             yield rx.redirect(routes.CATALOG_PAYMENT_TYPES)

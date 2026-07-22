@@ -2,6 +2,8 @@ from typing import Optional, Sequence
 
 import reflex as rx
 
+from TrifleSklad.audit import record_action
+from TrifleSklad.audit.actions.owner import OwnerCreated, OwnerDeleted, OwnerUpdated
 from TrifleSklad.dao.owner import OwnerDao
 from TrifleSklad.dao_legacy import ProductDAO
 from TrifleSklad.models import Owner
@@ -30,7 +32,7 @@ class OwnerService:
             print(f"[OwnerService][get_by_id][ERROR] {e}")
             raise
 
-    def add_one(self, item: Owner) -> Owner:
+    def add_one(self, item: Owner, actor_login: str) -> Owner:
         try:
             with rx.session() as session:
                 if OwnerDao.exists_by_title(item.title, session):
@@ -38,6 +40,8 @@ class OwnerService:
                 if item.is_default:
                     OwnerDao.clear_default(session)
                 OwnerDao.add_one(item, session)
+                session.flush()
+                record_action(session, actor_login, item.id, OwnerCreated.for_create(item, session))
                 session.commit()
                 session.refresh(item)
                 session.expunge(item)
@@ -48,14 +52,16 @@ class OwnerService:
             print(f"[OwnerService][add_one][ERROR] {e}")
             raise
 
-    def edit_one(self, item: Owner) -> Owner:
+    def edit_one(self, item: Owner, actor_login: str) -> Owner:
         try:
             with rx.session() as session:
                 if OwnerDao.exists_by_title(item.title, session, exclude_id=item.id):
                     raise ServiceError("Власник з такою назвою вже існує!")
+                old_snapshot = OwnerUpdated.snapshot(OwnerDao.get_by_id(item.id, session))
                 if item.is_default:
                     OwnerDao.clear_default(session, exclude_id=item.id)
                 merged = OwnerDao.edit_one(item, session)
+                record_action(session, actor_login, item.id, OwnerUpdated.from_diff(old_snapshot, merged, session))
                 session.commit()
                 session.refresh(merged)
                 session.expunge(merged)
@@ -66,7 +72,7 @@ class OwnerService:
             print(f"[OwnerService][edit_one][ERROR] {e}")
             raise
 
-    def delete_one(self, id: int) -> bool:
+    def delete_one(self, id: int, actor_login: str) -> bool:
         try:
             # Тимчасова залежність від dao_legacy — заміниться на нативний
             # ProductDao, коли products переїде на нові шари (в цій же хвилі).
@@ -78,6 +84,7 @@ class OwnerService:
                     return False
                 item.is_deleted = True
                 OwnerDao.edit_one(item, session)
+                record_action(session, actor_login, id, OwnerDeleted.for_delete(item, session))
                 session.commit()
                 return True
         except ServiceError:

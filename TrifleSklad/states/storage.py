@@ -10,6 +10,7 @@ from TrifleSklad.models import Storage
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.storage import StorageService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 
 
 class ListStorageState(AppState):
@@ -155,7 +156,7 @@ class AddStorageState(AppState):
             yield rx.toast.warning("Відповідальний вказаний некоректно!")
             return
         try:
-            self.item = StorageService().add_one(self.item)
+            self.item = StorageService().add_one(self.item, self.user.login)
             yield rx.toast.success("Склад успішно додано!")
             yield rx.redirect(routes.CATALOG_STORAGES_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -254,7 +255,7 @@ class EditStorageState(AppState):
             yield rx.toast.warning("Відповідальний вказаний некоректно!")
             return
         try:
-            self.item = StorageService().edit_one(self.item)
+            self.item = StorageService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Склад успішно змінено!")
             yield rx.redirect(routes.CATALOG_STORAGES_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -263,7 +264,11 @@ class EditStorageState(AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewStorageState(AppState):
+class ViewStorageState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "storage"
+    HISTORY_ACTION = Action.STORAGE_HISTORY
+    HISTORY_DETAIL_ACTION = Action.STORAGE_HISTORY_DETAIL
+
     item: Optional[Storage] = None
     in_process: bool = True
 
@@ -305,6 +310,8 @@ class ViewStorageState(AppState):
             if self.item is None:
                 yield rx.redirect(routes.CATALOG_STORAGES)
                 yield rx.toast.error("Запис не було знайдено")
+                return
+            self._load_history(self.item.id)
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -323,7 +330,7 @@ class ViewStorageState(AppState):
         if self.item is None:
             return
         try:
-            if StorageService().delete_one(self.item.id):
+            if StorageService().delete_one(self.item.id, self.user.login):
                 yield rx.toast.success("Склад видалено!")
                 yield ListStorageState.on_load()
                 yield rx.redirect(routes.CATALOG_STORAGES)

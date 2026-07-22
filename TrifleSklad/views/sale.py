@@ -22,6 +22,7 @@ from TrifleSklad.states.sale import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import (
     NESTED_DETAIL_TABLE,
     NESTED_DETAIL_TD,
@@ -496,6 +497,7 @@ def view_page_content() -> rx.Component:
             rx.heading(f"Загальна вартість: {ViewSaleState.total_cost}", size="4"),
             width="100%",
         ),
+        history_block(ViewSaleState),
         spacing="3",
         align="stretch",
         width="100%",

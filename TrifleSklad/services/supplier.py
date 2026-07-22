@@ -2,6 +2,8 @@ from typing import Optional, Sequence
 
 import reflex as rx
 
+from TrifleSklad.audit import record_action
+from TrifleSklad.audit.actions.supplier import SupplierCreated, SupplierDeleted, SupplierUpdated
 from TrifleSklad.dao.supplier import SupplierDao
 from TrifleSklad.models import Supplier
 from TrifleSklad.services.errors import ServiceError
@@ -29,12 +31,14 @@ class SupplierService:
             print(f"[SupplierService][get_by_id][ERROR] {e}")
             raise
 
-    def add_one(self, item: Supplier) -> Supplier:
+    def add_one(self, item: Supplier, actor_login: str) -> Supplier:
         try:
             with rx.session() as session:
                 if SupplierDao.exists_by_title(item.title, session):
                     raise ServiceError("Постачальник з такою назвою вже існує!")
                 SupplierDao.add_one(item, session)
+                session.flush()
+                record_action(session, actor_login, item.id, SupplierCreated.for_create(item, session))
                 session.commit()
                 session.refresh(item)
                 session.expunge(item)
@@ -45,12 +49,14 @@ class SupplierService:
             print(f"[SupplierService][add_one][ERROR] {e}")
             raise
 
-    def edit_one(self, item: Supplier) -> Supplier:
+    def edit_one(self, item: Supplier, actor_login: str) -> Supplier:
         try:
             with rx.session() as session:
                 if SupplierDao.exists_by_title(item.title, session, exclude_id=item.id):
                     raise ServiceError("Постачальник з такою назвою вже існує!")
+                old_snapshot = SupplierUpdated.snapshot(SupplierDao.get_by_id(item.id, session))
                 merged = SupplierDao.edit_one(item, session)
+                record_action(session, actor_login, item.id, SupplierUpdated.from_diff(old_snapshot, merged, session))
                 session.commit()
                 session.refresh(merged)
                 session.expunge(merged)
@@ -61,7 +67,7 @@ class SupplierService:
             print(f"[SupplierService][edit_one][ERROR] {e}")
             raise
 
-    def delete_one(self, id: int) -> bool:
+    def delete_one(self, id: int, actor_login: str) -> bool:
         try:
             with rx.session() as session:
                 item = SupplierDao.get_by_id(id, session)
@@ -69,6 +75,7 @@ class SupplierService:
                     return False
                 item.is_deleted = True
                 SupplierDao.edit_one(item, session)
+                record_action(session, actor_login, id, SupplierDeleted.for_delete(item, session))
                 session.commit()
                 return True
         except Exception as e:

@@ -15,6 +15,7 @@ from TrifleSklad.states.request import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -339,6 +340,7 @@ def view_page_content() -> rx.Component:
                 spacing="2",
             ),
         ),
+        history_block(ViewRequestsState),
         spacing="3", align="stretch", width="100%",
     )
 

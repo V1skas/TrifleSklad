@@ -36,6 +36,7 @@ from TrifleSklad.models import (
 from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -1107,7 +1108,7 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
                 product.id_storage = self.item.movement.id_destination_storage
                 product.id_owner = self.item.movement.id_destination_owner
 
-        flag, text, id = AdmissionDAO.add_one(self.item)
+        flag, text, id = AdmissionDAO.add_one(self.item, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -1499,7 +1500,7 @@ class EditAdmissionState(AppState):
             return
         pc = self.item.movement.products_catalog[index]
         if pc.id is not None and pc.id > 0:
-            flag, text = AdmissionDAO.delete_product_line(pc.id)
+            flag, text = AdmissionDAO.delete_product_line(pc.id, self.user.login)
             if not flag:
                 return rx.toast.error(text)
         del self.item.movement.products_catalog[index]
@@ -1530,7 +1531,7 @@ class EditAdmissionState(AppState):
                 product.id_storage = self.item.movement.id_destination_storage
                 product.id_owner = self.item.movement.id_destination_owner
 
-        flag, text, id = AdmissionDAO.edit_one(self.item)
+        flag, text, id = AdmissionDAO.edit_one(self.item, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListAdmissionState.on_load()
@@ -1539,7 +1540,11 @@ class EditAdmissionState(AppState):
         yield rx.toast.error(text)
 
 
-class ViewAdmissionState(AppState):
+class ViewAdmissionState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "admissions"
+    HISTORY_ACTION = Action.ADMISSIONS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.ADMISSIONS_HISTORY_DETAIL
+
     item: Admission = Admission(
         id_payment_type=-1,
         id_supplier=-1,
@@ -1583,6 +1588,7 @@ class ViewAdmissionState(AppState):
         self.item = item
         self.dialog_open = False
         self.current_product_catalog_index = -1
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -1702,7 +1708,7 @@ class ViewAdmissionState(AppState):
             yield rx.toast.error("Видалення неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = AdmissionDAO.delete_one(self.item.id)
+        flag, text = AdmissionDAO.delete_one(self.item.id, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield rx.redirect(routes.MOVEMENT_ADMISSIONS)

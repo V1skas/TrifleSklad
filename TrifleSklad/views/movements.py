@@ -19,6 +19,7 @@ from TrifleSklad.states.movements import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -394,6 +395,7 @@ def view_page_content() -> rx.Component:
         products_widget(width="100%"),
         rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewMovementsState.item_status)),
         rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewMovementsState.item.comment)),
+        history_block(ViewMovementsState),
         spacing="3",
         align="stretch",
         width="100%",

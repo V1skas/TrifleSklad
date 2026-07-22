@@ -11,6 +11,7 @@ from TrifleSklad.states.supplier import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -134,6 +135,7 @@ def view_page_content() -> rx.Component:
         rx.hstack(rx.text("Контактна особа:", weight="medium"), rx.text(ViewSupplierState.contact_person), width="100%"),
         rx.hstack(rx.text("Контактний телефон:", weight="medium"), rx.text(ViewSupplierState.contact_phone), width="100%"),
         rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewSupplierState.description), width="100%"),
+        history_block(ViewSupplierState),
         spacing="3",
         align="stretch",
         width="100%",

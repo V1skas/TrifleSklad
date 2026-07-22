@@ -33,6 +33,7 @@ from TrifleSklad.models import (
 )
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 # Типи заявки, які підтримуються (відділи/площадки = виды видачі).
@@ -361,7 +362,7 @@ class AddRequestsState(_RequestFormState, AppState):
             status=RequestStatus.NEW,
             products_catalog=self._build_positions(),
         )
-        flag, text, id = RequestDAO.add_one(request)
+        flag, text, id = RequestDAO.add_one(request, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListRequestsState.on_load()
@@ -427,7 +428,7 @@ class EditRequestsState(_RequestFormState, AppState):
             "comment": self.comment or None,
             "positions": [(cid, count, part) for cid, _title, count, part in self.positions],
         }
-        flag, text, id = RequestDAO.edit_one(form_data)
+        flag, text, id = RequestDAO.edit_one(form_data, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListRequestsState.on_load()
@@ -436,7 +437,11 @@ class EditRequestsState(_RequestFormState, AppState):
             yield rx.toast.error(text)
 
 
-class ViewRequestsState(AppState):
+class ViewRequestsState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "requests"
+    HISTORY_ACTION = ActionEnum.REQUESTS_HISTORY
+    HISTORY_DETAIL_ACTION = ActionEnum.REQUESTS_HISTORY_DETAIL
+
     item: Optional[Request] = None
     in_process: bool = True
 
@@ -512,6 +517,8 @@ class ViewRequestsState(AppState):
         if self.item is None:
             yield rx.redirect(routes.CATALOG_REQUESTS)
             yield rx.toast.error("Заявку не знайдено!")
+            return
+        self._load_history(self.item.id)
 
     @rx.event
     def on_click_edit(self):
@@ -532,7 +539,7 @@ class ViewRequestsState(AppState):
             return
         if self.item is None:
             return
-        flag, text = RequestDAO.delete_one(self.item.id)
+        flag, text = RequestDAO.delete_one(self.item.id, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListRequestsState.on_load()
@@ -705,7 +712,7 @@ class ProcessRequestsState(AppState):
                     products_catalog=movement_products_catalog,
                 ),
             )
-            flag, text, movement_id = IssueDAO.add_one(issue)
+            flag, text, movement_id = IssueDAO.add_one(issue, login)
             if not flag:
                 yield rx.toast.error(text)
                 return
@@ -734,7 +741,7 @@ class ProcessRequestsState(AppState):
                 "prices": prices,
                 "id_user": login,
             }
-            flag, text, movement_id = SaleDAO.add_one(form_data)
+            flag, text, movement_id = SaleDAO.add_one(form_data, login)
             if not flag:
                 yield rx.toast.error(text)
                 return
@@ -742,7 +749,7 @@ class ProcessRequestsState(AppState):
             ProductDAO.update_serial_numbers(serials)
             ProductDAO.delete_list(list_id_products)
 
-        RequestDAO.mark_completed(self.item.id, movement_id)
+        RequestDAO.mark_completed(self.item.id, movement_id, login)
         yield rx.toast.success("Заявку виконано, рух сформовано!")
         yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(self.item.id))
 

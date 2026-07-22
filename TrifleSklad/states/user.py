@@ -10,6 +10,7 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.user import UserService
 from TrifleSklad.states.actions_picker import ActionsPickerState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.states.role_selector import RoleSelectorState
 
 
@@ -123,7 +124,7 @@ class AddUserState(AppState):
             yield rx.toast.warning("Користувач має мати доступ хоча б до однієї дії або мати роль!")
             return
         try:
-            self.item = UserService().add_one(self.item, self.password)
+            self.item = UserService().add_one(self.item, self.user.login, self.password)
             yield rx.toast.success("Користувача додано!")
             yield rx.redirect(routes.ADMIN_USERS_VIEW_ID + str(self.item.login))
         except ServiceError as e:
@@ -215,7 +216,7 @@ class EditUserState(AppState):
             yield rx.toast.warning("Користувач має мати доступ хоча б до однієї дії або мати роль!")
             return
         try:
-            self.item = UserService().edit_one(self.item, self.password)
+            self.item = UserService().edit_one(self.item, self.user.login, self.password)
             yield rx.toast.success("Інформацію про користувача змінено!")
             yield rx.redirect(routes.ADMIN_USERS_VIEW_ID + str(self.item.login))
         except ServiceError as e:
@@ -224,7 +225,11 @@ class EditUserState(AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewUserState(AppState):
+class ViewUserState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "users"
+    HISTORY_ACTION = ActionEnum.USERS_HISTORY
+    HISTORY_DETAIL_ACTION = ActionEnum.USERS_HISTORY_DETAIL
+
     item: Optional[User] = None
     in_process: bool = True
 
@@ -250,6 +255,8 @@ class ViewUserState(AppState):
             if self.item is None:
                 yield rx.redirect(routes.ADMIN_USERS)
                 yield rx.toast.error("Запис не знайдено!")
+                return
+            self._load_history(self.item.login)
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -267,7 +274,7 @@ class ViewUserState(AppState):
             return
         if self.item is None:
             return
-        if UserService().delete_one(self.item.login):
+        if UserService().delete_one(self.item.login, self.user.login):
             yield rx.toast.success("Користувача видалено!")
             yield ListUserState.on_load()
             yield rx.redirect(routes.ADMIN_USERS)

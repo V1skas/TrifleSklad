@@ -12,6 +12,7 @@ from TrifleSklad.states.sale_returns import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import (
     NESTED_DETAIL_TABLE,
     NESTED_DETAIL_TD,
@@ -183,6 +184,7 @@ def view_page_content() -> rx.Component:
         ),
         rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewSaleReturnsState.item_status)),
         rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewSaleReturnsState.item.movement.comment)),
+        history_block(ViewSaleReturnsState),
         spacing="3",
         align="stretch",
         width="100%",

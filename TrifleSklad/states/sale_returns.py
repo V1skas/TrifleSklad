@@ -20,6 +20,7 @@ from TrifleSklad.declared import (
 from TrifleSklad.models import Movement, Product, SaleReturn
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -61,7 +62,11 @@ class ListSaleReturnsState(MovementListFilterMixin, AppState):
         return rx.redirect(routes.MOVEMENT_SALE_RETURNS_ADD)
 
 
-class ViewSaleReturnsState(AppState):
+class ViewSaleReturnsState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "sale_returns"
+    HISTORY_ACTION = Action.SALE_RETURNS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.SALE_RETURNS_HISTORY_DETAIL
+
     item: Optional[SaleReturn] = None
     in_process: bool = True
 
@@ -171,6 +176,7 @@ class ViewSaleReturnsState(AppState):
             index: True
             for index in range(len(self.item.movement.products_catalog))
         }
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -197,7 +203,7 @@ class ViewSaleReturnsState(AppState):
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -478,7 +484,7 @@ class AddSaleReturnsState(AppState):
             "id_user": self.user.login,
         }
 
-        flag, text, id = SaleReturnDAO.add_one(form_data)
+        flag, text, id = SaleReturnDAO.add_one(form_data, self.user.login)
         if flag:
             yield rx.toast.success("Повернення продажу проведено!")
             yield ListSaleReturnsState.on_load()
@@ -560,7 +566,7 @@ class EditSaleReturnsState(AppState):
             "status": status_index,
             "comment": self.item.movement.comment,
         }
-        flag, text, id = SaleReturnDAO.edit_one(form_data)
+        flag, text, id = SaleReturnDAO.edit_one(form_data, self.user.login)
         if flag:
             yield rx.toast.success("Повернення продажу змінено!")
             yield ListSaleReturnsState.on_load()

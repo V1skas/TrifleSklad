@@ -17,6 +17,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -60,7 +61,11 @@ class ListReturnsState(MovementListFilterMixin, AppState):
         return rx.redirect(routes.MOVEMENT_RETURNS_ADD)
 
 
-class ViewReturnsState(AppState):
+class ViewReturnsState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "returns"
+    HISTORY_ACTION = Action.RETURNS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.RETURNS_HISTORY_DETAIL
+
     item: Optional[Movement] = None
     in_process: bool = True
 
@@ -119,6 +124,7 @@ class ViewReturnsState(AppState):
                 product.product_catalog = product_category.product
                 all_products.append(product)
         self._products_movement_list_state.items = all_products
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -148,7 +154,7 @@ class ViewReturnsState(AppState):
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -327,7 +333,7 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
         }
 
         list_id_products: List[int] = [p.id for p in products_list]
-        flag, text, id = MovementDAO.add_one(form_data)
+        flag, text, id = MovementDAO.add_one(form_data, self.user.login)
         if flag:
             ProductDAO.update_storage(list_id_products, int(self.id_destination_storage))
             if keep:
@@ -428,7 +434,7 @@ class EditReturnsState(AppState):
             "status": status_index,
             "comment": self.item.comment,
         }
-        flag, text, id = MovementDAO.edit_one(form_data)
+        flag, text, id = MovementDAO.edit_one(form_data, self.user.login)
         if flag:
             yield rx.toast.success("Повернення змінено!")
             yield ListReturnsState.on_load()

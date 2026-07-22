@@ -27,6 +27,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -108,7 +109,11 @@ class ListSaleState(MovementListFilterMixin, AppState):
         self._reload()
 
 
-class ViewSaleState(AppState):
+class ViewSaleState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "sales"
+    HISTORY_ACTION = Action.SALES_HISTORY
+    HISTORY_DETAIL_ACTION = Action.SALES_HISTORY_DETAIL
+
     item: Optional[Sale] = None
     in_process: bool = True
 
@@ -245,6 +250,7 @@ class ViewSaleState(AppState):
                 product.product_catalog = product_category.product
                 all_products.append(product)
         self._products_movement_list_state.items = all_products
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -268,13 +274,13 @@ class ViewSaleState(AppState):
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
 
         ProductDAO.undelete_list(list_id_products)
-        RequestDAO.revert_completion_by_movement(self.item.id)
+        RequestDAO.revert_completion_by_movement(self.item.id, self.user.login)
         yield rx.toast.success("Продаж скасовано!")
         yield ListSaleState.on_load()
         yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{self.item.id}")
@@ -571,13 +577,13 @@ class AddSaleState(LookupCreatorsMixin, AppState):
         }
 
         list_id_products: List[int] = [p.id for p in products_list]
-        flag, text, id = SaleDAO.add_one(form_data)
+        flag, text, id = SaleDAO.add_one(form_data, self.user.login)
         if flag:
             serials = {p.id: p.serial_number for p in products_list}
             ProductDAO.update_serial_numbers(serials)
             ProductDAO.delete_list(list_id_products)
             if self.selected_request_id != "":
-                RequestDAO.mark_completed(int(self.selected_request_id), id)
+                RequestDAO.mark_completed(int(self.selected_request_id), id, self.user.login)
             if keep:
                 await self._reset_for_continue()
                 yield rx.toast.success("Продаж проведено!")
@@ -718,7 +724,7 @@ class EditSaleState(AppState):
             "comment": self.item.movement.comment,
             "client_info": self.item.client_info,
         }
-        flag, text, id = SaleDAO.edit_one(form_data)
+        flag, text, id = SaleDAO.edit_one(form_data, self.user.login)
         if flag:
             yield rx.toast.success("Продаж змінено!")
             yield ListSaleState.on_load()

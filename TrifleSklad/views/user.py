@@ -8,6 +8,7 @@ from TrifleSklad.views.actions_picker import actions_picker
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.role_selector import role_selector
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -303,6 +304,7 @@ def view_page_content() -> rx.Component:
             width="100%",
             max_height="16em",
         ),
+        history_block(ViewUserState),
         spacing="3",
         align="stretch",
         width="100%",

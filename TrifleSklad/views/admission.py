@@ -26,6 +26,7 @@ from TrifleSklad.states.admission import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -697,6 +698,7 @@ def view_page_content() -> rx.Component:
         rx.hstack(rx.text("Курс долара:", weight="medium"), rx.text(ViewAdmissionState.item.dollar_rate)),
         rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewAdmissionState.item_status)),
         rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewAdmissionState.item.movement.comment)),
+        history_block(ViewAdmissionState),
         spacing="3",
         align="stretch",
         width="100%",

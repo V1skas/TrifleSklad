@@ -22,6 +22,7 @@ from TrifleSklad.states.issue import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -452,6 +453,7 @@ def view_page_content() -> rx.Component:
         rx.text(f"Статус: {ViewIssueState.item_status}"),
         rx.text(f"Коментар: {ViewIssueState.item.movement.comment}"),
         products_widget(width="100%"),
+        history_block(ViewIssueState),
         spacing="3",
         align="stretch",
         width="100%",

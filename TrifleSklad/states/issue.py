@@ -32,6 +32,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -129,7 +130,11 @@ class ListIssueState(MovementListFilterMixin, AppState):
         return movements_status_list
 
 
-class ViewIssueState(AppState):
+class ViewIssueState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "issues"
+    HISTORY_ACTION = Action.ISSUES_HISTORY
+    HISTORY_DETAIL_ACTION = Action.ISSUES_HISTORY_DETAIL
+
     item: Issue = Issue(
         id_recipient=-1,
         movement=Movement(
@@ -175,6 +180,7 @@ class ViewIssueState(AppState):
                 product.product_catalog = product_category.product
                 all_products.append(product)
         self._products_selector_state.items = all_products
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -229,14 +235,14 @@ class ViewIssueState(AppState):
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
 
         ProductDAO.undelete_list(list_id_products)
         MovementDAO.restore_products_to_previous_location(list_id_products, self.item.id)
-        RequestDAO.revert_completion_by_movement(self.item.id)
+        RequestDAO.revert_completion_by_movement(self.item.id, self.user.login)
         yield rx.toast.success("Видачу скасовано!")
         yield ListIssueState.on_load()
         yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{self.item.id}")
@@ -615,7 +621,7 @@ class AddIssueState(LookupCreatorsMixin, AppState):
         self.item.movement.products_catalog = movement_products_catalog
 
         list_id_products: List[int] = [p.id for p in products_list]
-        flag, text, id = IssueDAO.add_one(self.item)
+        flag, text, id = IssueDAO.add_one(self.item, self.user.login)
         if flag:
             serials = {
                 p.id: p.serial_number
@@ -629,7 +635,7 @@ class AddIssueState(LookupCreatorsMixin, AppState):
                 int(self.item.movement.id_destination_storage),
             )
             if self.selected_request_id != "":
-                RequestDAO.mark_completed(int(self.selected_request_id), id)
+                RequestDAO.mark_completed(int(self.selected_request_id), id, self.user.login)
             if keep:
                 await self._reset_for_continue()
                 yield rx.toast.success(text)
@@ -840,7 +846,7 @@ class EditIssueState(AppState):
 
         self.item.movement.id_user = self.user.login
 
-        flag, text, id = IssueDAO.edit_one(self.item)
+        flag, text, id = IssueDAO.edit_one(self.item, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListIssueState.on_load()

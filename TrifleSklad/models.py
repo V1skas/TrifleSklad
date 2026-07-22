@@ -93,6 +93,25 @@ class AuthToken(rx.Model, table=True):
     user: Optional['User'] = Relationship(back_populates="auth_tokens")
 
 
+class AuditLog(rx.Model, table=True):
+    __tablename__ = "audit_log" # type: ignore
+
+    # Table columns
+    id: int = Field(primary_key=True) # type: ignore
+    id_user: str = Field(foreign_key="users.login", nullable=False)
+    action: str = Field(nullable=False)  # "create" | "update" | "delete"
+    table_name: str = Field(nullable=False, index=True)  # slug сутності = префікс права
+    record_id: str = Field(nullable=False, index=True)  # str: уніфіковано (PK User — login)
+    changes: str = Field(nullable=False)  # JSON: BaseAuditAction.model_dump_json()
+    created_at: datetime = Field(
+        default_factory=now_local,
+        sa_column=Column("created_at", DateTime, nullable=False, server_default=func.current_timestamp()),
+    )
+
+    # Relationships
+    user: Optional['User'] = Relationship()
+
+
 class User(rx.Model, table=True):
     __tablename__ = "users" # type: ignore
 

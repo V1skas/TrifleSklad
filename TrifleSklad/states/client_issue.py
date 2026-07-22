@@ -30,6 +30,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -125,7 +126,11 @@ class ListClientIssueState(MovementListFilterMixin, AppState):
         return movements_status_list
 
 
-class ViewClientIssueState(AppState):
+class ViewClientIssueState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "client_issues"
+    HISTORY_ACTION = Action.CLIENT_ISSUES_HISTORY
+    HISTORY_DETAIL_ACTION = Action.CLIENT_ISSUES_HISTORY_DETAIL
+
     item: ClientIssue = ClientIssue(
         id_recipient=-1,
         contract_number="",
@@ -173,6 +178,7 @@ class ViewClientIssueState(AppState):
                 product.product_catalog = product_category.product
                 all_products.append(product)
         self._products_selector_state.items = all_products
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -227,7 +233,7 @@ class ViewClientIssueState(AppState):
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -584,7 +590,7 @@ class AddClientIssueState(LookupCreatorsMixin, AppState):
 
         self.item.movement.products_catalog = movement_products_catalog
 
-        flag, text, id = ClientIssueDAO.add_one(self.item)
+        flag, text, id = ClientIssueDAO.add_one(self.item, self.user.login)
         if flag:
             serials = {
                 p.id: p.serial_number
@@ -818,7 +824,7 @@ class EditClientIssueState(AppState):
 
         self.item.movement.id_user = self.user.login
 
-        flag, text, id = ClientIssueDAO.edit_one(self.item)
+        flag, text, id = ClientIssueDAO.edit_one(self.item, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListClientIssueState.on_load()

@@ -11,6 +11,7 @@ from TrifleSklad.states.worker import (
 )
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
 
@@ -129,6 +130,7 @@ def view_page_content() -> rx.Component:
             rx.text(rx.cond(ViewWorkerState.is_default, "Так", "Ні")),
             width="100%",
         ),
+        history_block(ViewWorkerState),
         spacing="3",
         align="stretch",
         width="100%",

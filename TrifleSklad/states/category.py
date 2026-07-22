@@ -8,6 +8,7 @@ from TrifleSklad.models import ProductCategory
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.product_category import ProductCategoryService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 
 # Сентинел «без батьківської категорії» для селекту (Radix забороняє порожнє value item).
 NONE = "none"
@@ -85,7 +86,7 @@ class AddCategoriesState(AppState):
             return
         self.item.id_parent = int(self.parent_id) if self.parent_id != NONE else None
         try:
-            self.item = ProductCategoryService().add_one(self.item)
+            self.item = ProductCategoryService().add_one(self.item, self.user.login)
             yield rx.toast.success("Категорію успішно додано!")
             yield rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -155,7 +156,7 @@ class EditCategoriesState(AppState):
             return
         self.item.id_parent = int(self.parent_id) if self.can_set_parent and self.parent_id != NONE else None
         try:
-            self.item = ProductCategoryService().edit_one(self.item)
+            self.item = ProductCategoryService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Категорію успішно змінено!")
             yield rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -164,7 +165,11 @@ class EditCategoriesState(AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewCategoriesState(AppState):
+class ViewCategoriesState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "categories"
+    HISTORY_ACTION = Action.CATEGORIES_HISTORY
+    HISTORY_DETAIL_ACTION = Action.CATEGORIES_HISTORY_DETAIL
+
     item: Optional[ProductCategory] = None
     in_process: bool = True
     parent_title: str = ""
@@ -199,6 +204,7 @@ class ViewCategoriesState(AppState):
                 parent = service.get_by_id(self.item.id_parent)
                 self.parent_title = parent.title if parent is not None else ""
             self.children = list(service.get_children(self.item.id))
+            self._load_history(self.item.id)
             self.in_process = False
         except Exception:
             self.in_process = False
@@ -218,7 +224,7 @@ class ViewCategoriesState(AppState):
         if self.item is None:
             return
         try:
-            if ProductCategoryService().delete_one(self.item.id):
+            if ProductCategoryService().delete_one(self.item.id, self.user.login):
                 yield rx.toast.success("Категорію видалено!")
                 yield ListCategoriesState.on_load()
                 yield rx.redirect(routes.CATALOG_CATEGORIES)

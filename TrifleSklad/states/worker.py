@@ -8,6 +8,7 @@ from TrifleSklad.models import Worker
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.worker import WorkerService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 
 
 class ListWorkersState(AppState):
@@ -100,7 +101,7 @@ class AddWorkerState(AppState):
             yield rx.toast.warning("Вкажіть посаду співробітника!")
             return
         try:
-            self.item = WorkerService().add_one(self.item)
+            self.item = WorkerService().add_one(self.item, self.user.login)
             yield rx.toast.success("Співробітника додано!")
             yield rx.redirect(routes.ADMIN_WORKERS_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -186,7 +187,7 @@ class EditWorkerState(AppState):
             yield rx.toast.warning("Вкажіть посаду співробітника!")
             return
         try:
-            self.item = WorkerService().edit_one(self.item)
+            self.item = WorkerService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Інформацію про співробітника змінено!")
             yield rx.redirect(routes.ADMIN_WORKERS_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -195,7 +196,11 @@ class EditWorkerState(AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewWorkerState(AppState):
+class ViewWorkerState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "workers"
+    HISTORY_ACTION = Action.WORKERS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.WORKERS_HISTORY_DETAIL
+
     item: Optional[Worker] = None
     in_process: bool = True
 
@@ -233,6 +238,8 @@ class ViewWorkerState(AppState):
             if self.item is None:
                 yield rx.redirect(routes.ADMIN_WORKERS)
                 yield rx.toast.error("Запис не було знайдено")
+                return
+            self._load_history(self.item.id)
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -250,7 +257,7 @@ class ViewWorkerState(AppState):
             return
         if self.item is None:
             return
-        if WorkerService().delete_one(self.item.id):
+        if WorkerService().delete_one(self.item.id, self.user.login):
             yield rx.toast.success("Співробітника видалено!")
             yield ListWorkersState.on_load()
             yield rx.redirect(routes.ADMIN_WORKERS)

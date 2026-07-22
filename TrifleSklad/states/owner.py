@@ -8,6 +8,7 @@ from TrifleSklad.models import Owner
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.owner import OwnerService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 
 
 class ListOwnerState(AppState):
@@ -81,7 +82,7 @@ class AddOwnerState(AppState):
             yield rx.toast.warning("Поле назви повинно бути заповненим!")
             return
         try:
-            self.item = OwnerService().add_one(self.item)
+            self.item = OwnerService().add_one(self.item, self.user.login)
             yield rx.toast.success("Власника додано!")
             yield rx.redirect(routes.CATALOG_OWNERS_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -148,7 +149,7 @@ class EditOwnerState(AppState):
             yield rx.toast.warning("Поле назви повинно бути заповненим!")
             return
         try:
-            self.item = OwnerService().edit_one(self.item)
+            self.item = OwnerService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Власника змінено!")
             yield rx.redirect(routes.CATALOG_OWNERS_VIEW_ID + str(self.item.id))
         except ServiceError as e:
@@ -157,7 +158,11 @@ class EditOwnerState(AppState):
             yield rx.toast.error("Під час виконання запиту трапилась помилка. Спробуйте ще раз.")
 
 
-class ViewOwnerState(AppState):
+class ViewOwnerState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "owners"
+    HISTORY_ACTION = Action.OWNERS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.OWNERS_HISTORY_DETAIL
+
     item: Optional[Owner] = None
     in_process: bool = True
 
@@ -187,6 +192,8 @@ class ViewOwnerState(AppState):
             if self.item is None:
                 yield rx.redirect(routes.CATALOG_OWNERS)
                 yield rx.toast.error("Запис не було знайдено")
+                return
+            self._load_history(self.item.id)
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -205,7 +212,7 @@ class ViewOwnerState(AppState):
         if self.item is None:
             return
         try:
-            if OwnerService().delete_one(self.item.id):
+            if OwnerService().delete_one(self.item.id, self.user.login):
                 yield rx.toast.success("Власника видалено!")
                 yield ListOwnerState.on_load()
                 yield rx.redirect(routes.CATALOG_OWNERS)

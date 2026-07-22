@@ -17,6 +17,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.states.app import AppState
+from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -60,7 +61,11 @@ class ListWriteOffState(MovementListFilterMixin, AppState):
         return rx.redirect(routes.MOVEMENT_WRITE_OFFS_ADD)
 
 
-class ViewWriteOffState(AppState):
+class ViewWriteOffState(AuditHistoryMixin, AppState):
+    HISTORY_TABLE = "write_offs"
+    HISTORY_ACTION = Action.WRITE_OFFS_HISTORY
+    HISTORY_DETAIL_ACTION = Action.WRITE_OFFS_HISTORY_DETAIL
+
     item: Optional[Movement] = None
     in_process: bool = True
 
@@ -119,6 +124,7 @@ class ViewWriteOffState(AppState):
                 product.product_catalog = product_category.product
                 all_products.append(product)
         self._products_movement_list_state.items = all_products
+        self._load_history(self.item.id)
         self.in_process = False
 
     @rx.event
@@ -148,7 +154,7 @@ class ViewWriteOffState(AppState):
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -346,7 +352,7 @@ class AddWriteOffState(LookupCreatorsMixin, AppState):
         }
 
         list_id_item_for_delete: List[int] = [p.id for p in products_list]
-        flag, text, id = MovementDAO.add_one(form_data)
+        flag, text, id = MovementDAO.add_one(form_data, self.user.login)
         if flag:
             serials = {
                 p.id: p.serial_number
@@ -495,7 +501,7 @@ class EditWriteOffState(AppState):
             "status": status_index,
             "comment": self.item.comment,
         }
-        flag, text, id = MovementDAO.edit_one(form_data)
+        flag, text, id = MovementDAO.edit_one(form_data, self.user.login)
         if flag:
             yield rx.toast.success("Списання змінено!")
             yield ListWriteOffState.on_load()

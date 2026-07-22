@@ -2,6 +2,8 @@ from typing import Optional, Sequence
 
 import reflex as rx
 
+from TrifleSklad.audit import record_action
+from TrifleSklad.audit.actions.category import CategoryCreated, CategoryDeleted, CategoryUpdated
 from TrifleSklad.dao.product_category import ProductCategoryDao
 from TrifleSklad.dao_legacy import ProductCatalogDAO
 from TrifleSklad.models import ProductCategory
@@ -67,13 +69,15 @@ class ProductCategoryService:
         if item.id is not None and ProductCategoryDao.has_children(item.id, session):
             raise ServiceError("Неможливо призначити батьківську категорію: у категорії вже є підкатегорії!")
 
-    def add_one(self, item: ProductCategory) -> ProductCategory:
+    def add_one(self, item: ProductCategory, actor_login: str) -> ProductCategory:
         try:
             with rx.session() as session:
                 self._validate_parent(session, item)
                 if ProductCategoryDao.exists_by_title(item.title, session):
                     raise ServiceError("Категорія з такою назвою вже існує!")
                 ProductCategoryDao.add_one(item, session)
+                session.flush()
+                record_action(session, actor_login, item.id, CategoryCreated.for_create(item, session))
                 session.commit()
                 session.refresh(item)
                 session.expunge(item)
@@ -84,13 +88,17 @@ class ProductCategoryService:
             print(f"[ProductCategoryService][add_one][ERROR] {e}")
             raise
 
-    def edit_one(self, item: ProductCategory) -> ProductCategory:
+    def edit_one(self, item: ProductCategory, actor_login: str) -> ProductCategory:
         try:
             with rx.session() as session:
                 self._validate_parent(session, item)
                 if ProductCategoryDao.exists_by_title(item.title, session, exclude_id=item.id):
                     raise ServiceError("Категорія з такою назвою вже існує!")
+                old_snapshot = CategoryUpdated.snapshot(ProductCategoryDao.get_by_id(item.id, session))
                 merged = ProductCategoryDao.edit_one(item, session)
+                record_action(
+                    session, actor_login, item.id, CategoryUpdated.from_diff(old_snapshot, merged, session)
+                )
                 session.commit()
                 session.refresh(merged)
                 session.expunge(merged)
@@ -101,7 +109,7 @@ class ProductCategoryService:
             print(f"[ProductCategoryService][edit_one][ERROR] {e}")
             raise
 
-    def delete_one(self, id: int) -> bool:
+    def delete_one(self, id: int, actor_login: str) -> bool:
         try:
             # Тимчасові залежності від dao_legacy — заміняться на нативний
             # ProductCatalogDao, коли products переїде на нові шари (в цій же хвилі).
@@ -115,6 +123,7 @@ class ProductCategoryService:
                     return False
                 item.is_deleted = True
                 ProductCategoryDao.edit_one(item, session)
+                record_action(session, actor_login, id, CategoryDeleted.for_delete(item, session))
                 session.commit()
                 return True
         except ServiceError:
