@@ -5,7 +5,7 @@ import reflex as rx
 from TrifleSklad import routes
 from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import MovementDAO, ProductCatalogDAO, ProductDAO
-from TrifleSklad.declared import movements_status_list, movements_type_list
+from TrifleSklad.declared import format_amount, movements_status_list, movements_type_list
 from TrifleSklad.models import Product
 from TrifleSklad.movement.list_mixin import ALL
 from TrifleSklad.states.app import AppState
@@ -179,25 +179,29 @@ class ViewUnitsReportState(AppState):
 
     @rx.var
     def unit_count(self) -> str:
-        return str(self.unit.count) if self.unit is not None else "—"
+        return format_amount(self.unit.count) if self.unit is not None else "—"
 
     @rx.var
-    def unit_count_num(self) -> int:
-        return self.unit.count if self.unit is not None else 0
-
-    @rx.var
-    def unit_capacity(self) -> int:
-        return (
-            self.unit.product_catalog.capacity
-            if self.unit is not None and self.unit.product_catalog is not None
-            else 0
-        )
+    def unit_fill_percent(self) -> int:
+        # Заповненість полоси у відсотках (Progress приймає лише int). Без
+        # фіксованої ємності — завжди повна (100%).
+        if self.unit is None or self.unit.product_catalog is None:
+            return 0
+        catalog = self.unit.product_catalog
+        if catalog.no_fixed_capacity:
+            return 100
+        if not catalog.capacity or catalog.capacity <= 0:
+            return 0
+        return int(min(100, round((self.unit.count / catalog.capacity) * 100)))
 
     @rx.var
     def unit_remain_label(self) -> str:
         if self.unit is None or self.unit.product_catalog is None:
             return "—"
-        return f"{self.unit.count}/{self.unit.product_catalog.capacity} {self.unit.product_catalog.unit}"
+        count = format_amount(self.unit.count)
+        if self.unit.product_catalog.no_fixed_capacity:
+            return f"{count}/∞ {self.unit.product_catalog.unit}"
+        return f"{count}/{self.unit.product_catalog.capacity} {self.unit.product_catalog.unit}"
 
     @rx.var
     def has_history(self) -> bool:

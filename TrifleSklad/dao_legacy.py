@@ -6,7 +6,7 @@ import math
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import select, func, or_, update
+from sqlmodel import select, func, or_, and_, update
 
 from TrifleSklad.audit import record_action
 from TrifleSklad.audit.actions.movement import (
@@ -1297,9 +1297,20 @@ class ProductDAO:
         if min_remaining is not None:
             statement = statement.where(Product.count >= min_remaining)
         if fullness == "full":
-            statement = statement.where(Product.count == ProductCatalog.capacity)
+            # Без фіксованої ємності одиниця завжди вважається «повною».
+            statement = statement.where(
+                or_(
+                    Product.count == ProductCatalog.capacity,
+                    ProductCatalog.no_fixed_capacity == True,
+                )
+            )
         elif fullness == "partial":
-            statement = statement.where(Product.count < ProductCatalog.capacity)
+            statement = statement.where(
+                and_(
+                    Product.count < ProductCatalog.capacity,
+                    ProductCatalog.no_fixed_capacity == False,
+                )
+            )
         if search:
             term = search.strip()
             if term:
@@ -1383,10 +1394,13 @@ class ProductDAO:
         full_only: bool,
         capacity: int,
         limit: int,
+        no_fixed: bool = False,
     ) -> List[Product]:
         """До `limit` доступних одиниць позиції каталогу для масового вибору за
         кількістю штук. full_only=True (подільне ТМЦ) — лише повні одиниці
-        (count == capacity), щоб масовий вибір не «з'їдав» уже розділені рештки."""
+        (count == capacity), щоб масовий вибір не «з'їдав» уже розділені рештки.
+        no_fixed=True (без фіксованої ємності) — опорної ємності немає, тож усі
+        одиниці вважаються повними (фільтр повноти не застосовуємо)."""
         if limit <= 0:
             return []
         statement = (
@@ -1400,7 +1414,7 @@ class ProductDAO:
             statement = statement.where(Product.id_owner == owner_id)
         if exclude_ids:
             statement = statement.where(Product.id.not_in(exclude_ids))
-        if full_only:
+        if full_only and not no_fixed:
             statement = statement.where(Product.count == capacity)
         statement = statement.order_by(Product.id).limit(limit)
 
@@ -1950,6 +1964,24 @@ def movement_filter_conditions(
     _add(Movement.id_incoming_owner, incoming_owner)
     _add(Movement.id_destination_owner, destination_owner)
     return conditions
+
+
+def _reconcile_catalog_instances(movement: Movement) -> None:
+    """Кілька позицій однієї позиції каталогу (напр. ТМЦ без фіксованої ємності,
+    доданий двічі) можуть нести РІЗНІ detached-екземпляри ProductCatalog з
+    однаковим PK — діалог перечитує список каталогу на кожній вставці. SQLAlchemy
+    не дозволяє два об'єкти з однаковою identity в одній сесії (InvalidRequestError
+    під час `session.add`). Зводимо всі посилання `.product` до єдиного екземпляра
+    на кожен id перед збереженням."""
+    seen: dict = {}
+    for pc in movement.products_catalog or []:
+        if pc.product is None:
+            continue
+        pid = pc.product.id
+        if pid in seen:
+            pc.product = seen[pid]
+        else:
+            seen[pid] = pc.product
 
 
 class MovementDAO:
@@ -2853,6 +2885,7 @@ class AdmissionDAO:
     @classmethod
     def add_one(cls, movement: Admission, actor_login: str) -> tuple[bool, str, int]:
         try:
+            _reconcile_catalog_instances(movement.movement)
             with rx.session() as session:
                 session.expire_on_commit = False
                 session.add(movement)
@@ -2879,6 +2912,7 @@ class AdmissionDAO:
     @classmethod
     def edit_one(cls, admission: Admission, actor_login: str) -> tuple[bool, str, int]:
         try:
+            _reconcile_catalog_instances(admission.movement)
             with rx.session() as session:
                 old_admission = session.get(Admission, admission.id)
                 if old_admission is None:

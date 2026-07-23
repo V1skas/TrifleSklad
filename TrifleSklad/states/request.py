@@ -217,6 +217,12 @@ class _RequestFormState(rx.State, mixin=True):
         return info[2] if info is not None else ""
 
     @rx.var
+    def new_position_no_fixed_capacity(self) -> bool:
+        # Подільний без опорної ємності (capacity == 0) — частину задати не можна,
+        # заявка формується лише цілими одиницями.
+        return self.new_position_is_divisible and self.new_position_capacity == 0
+
+    @rx.var
     def positions_rows(self) -> List[Tuple[int, str, str]]:
         result: List[Tuple[int, str, str]] = []
         for index, (cid, title, count, part) in enumerate(self.positions):
@@ -282,6 +288,9 @@ class _RequestFormState(rx.State, mixin=True):
         part = int(self.new_position_part) if self.new_position_part.isdigit() else 0
 
         if divisible:
+            # Без фіксованої ємності частина не застосовна — лише цілі одиниці.
+            if capacity == 0:
+                part = 0
             if part != 0 and (part < 1 or (capacity > 0 and part >= capacity)):
                 return rx.toast.error(
                     f"Частина має бути від 1 до {capacity - 1}!"

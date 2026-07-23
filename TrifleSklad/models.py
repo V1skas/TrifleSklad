@@ -179,6 +179,9 @@ class ProductCatalog(rx.Model, table=True):
     divisible: bool = Field(default=False, nullable=False)
     uniq: bool = Field(default=False, nullable=False)
     capacity: int = Field(default=0, nullable=False)
+    # Подільний ТМЦ без фіксованої ємності: capacity не задається в каталозі, а
+    # вводиться вручну при кожному постачанні; ємність одиниці живе в Product.count.
+    no_fixed_capacity: bool = Field(default=False, nullable=False)
     count: float = Field(default=0, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
@@ -246,7 +249,9 @@ class Product(rx.Model, table=True):
     id_owner: int = Field(foreign_key="owners.id", nullable=False)
     # Для подільного ТМЦ: посилання на одиницю-«батька», від якої відділили цю частину.
     id_parent: Optional[int] = Field(default=None, foreign_key="products.id", nullable=True)
-    count: int = Field(default=1, nullable=False)
+    # Поточна ємність/залишок одиниці. Дробове число — для подільного ТМЦ без
+    # фіксованої ємності ємність вводиться вручну і може бути дробовою (напр. 0.75).
+    count: float = Field(default=1, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationship

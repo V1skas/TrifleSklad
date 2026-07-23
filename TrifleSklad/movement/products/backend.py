@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple
 import reflex as rx
 
 from TrifleSklad.dao_legacy import ProductDAO
-from TrifleSklad.declared import generate_serial_range, sale_line_cost
+from TrifleSklad.declared import format_amount, generate_serial_range, sale_line_cost
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
@@ -230,7 +230,7 @@ class ProductsMovementListState(rx.State):
                     len(units),
                     divisible,
                     uniq,
-                    str(remainder) if divisible else "—",
+                    format_amount(remainder) if divisible else "—",
                     units,
                 )
             )
@@ -373,7 +373,7 @@ class ProductsMovementListState(rx.State):
             if amount < 1 or amount >= product.count:
                 return (
                     False,
-                    f"Обсяг для «{title}» має бути від 1 до {product.count - 1} "
+                    f"Обсяг для «{title}» має бути від 1 до {format_amount(product.count - 1)} "
                     "(не можна передати всю ємність у нову одиницю)!",
                     [],
                 )

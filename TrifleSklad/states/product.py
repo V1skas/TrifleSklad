@@ -209,6 +209,10 @@ class AddProductsState(CategoryCreateMixin, AppState):
     def capacity(self) -> str:
         return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
 
+    @rx.var
+    def no_fixed_capacity(self) -> bool:
+        return bool(self.item.no_fixed_capacity) if self.item is not None else False
+
     @rx.event
     def set_title(self, value: str):
         self.item.title = value if value != "" else None
@@ -232,6 +236,9 @@ class AddProductsState(CategoryCreateMixin, AppState):
             self.item.divisible = False
             return
         self.item.divisible = value
+        # «Без фіксованої ємності» має сенс лише для подільного ТМЦ.
+        if not value:
+            self.item.no_fixed_capacity = False
 
     @rx.event
     def set_capacity(self, value: str):
@@ -239,15 +246,30 @@ class AddProductsState(CategoryCreateMixin, AppState):
         if self.item.uniq:
             self.item.capacity = 1
             return
+        # Для товару без фіксованої ємності поле неактивне — тримаємо 0.
+        if self.item.no_fixed_capacity:
+            self.item.capacity = 0
+            return
         self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
+
+    @rx.event
+    def set_no_fixed_capacity(self, value: bool):
+        # Тумблер доступний лише для подільного неунікального ТМЦ.
+        if self.item.uniq or not self.item.divisible:
+            self.item.no_fixed_capacity = False
+            return
+        self.item.no_fixed_capacity = value
+        if value:
+            self.item.capacity = 0
 
     @rx.event
     def set_uniq(self, value: bool):
         self.item.uniq = value
         if value:
-            # Серійний номер ⇒ неподільний, місткість = 1.
+            # Серійний номер ⇒ неподільний, місткість = 1, без «без фіксованої ємності».
             self.item.divisible = False
             self.item.capacity = 1
+            self.item.no_fixed_capacity = False
 
     @rx.event
     def on_save(self):
@@ -263,9 +285,15 @@ class AddProductsState(CategoryCreateMixin, AppState):
         if self.item.uniq and self.item.divisible:
             yield rx.toast.warning("Товар із серійним номером не може бути подільним!")
             return
-        if self.item.divisible and (self.item.capacity is None or self.item.capacity <= 0):
+        if (
+            self.item.divisible
+            and not self.item.no_fixed_capacity
+            and (self.item.capacity is None or self.item.capacity <= 0)
+        ):
             yield rx.toast.warning("Для подільного ТМЦ потрібно вказати додатну місткість!")
             return
+        if self.item.no_fixed_capacity:
+            self.item.capacity = 0
         if self.item.uniq:
             self.item.capacity = 1
         try:
@@ -338,6 +366,10 @@ class EditProductsState(CategoryCreateMixin, AppState):
     def capacity(self) -> str:
         return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
 
+    @rx.var
+    def no_fixed_capacity(self) -> bool:
+        return bool(self.item.no_fixed_capacity) if self.item is not None else False
+
     @rx.event
     def set_title(self, value: str):
         self.item.title = value if value != "" else None
@@ -360,13 +392,28 @@ class EditProductsState(CategoryCreateMixin, AppState):
             self.item.divisible = False
             return
         self.item.divisible = value
+        if not value:
+            self.item.no_fixed_capacity = False
 
     @rx.event
     def set_capacity(self, value: str):
         if self.item.uniq:
             self.item.capacity = 1
             return
+        if self.item.no_fixed_capacity:
+            self.item.capacity = 0
+            return
         self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
+
+    @rx.event
+    def set_no_fixed_capacity(self, value: bool):
+        # Тумблер доступний лише для подільного неунікального ТМЦ.
+        if self.item.uniq or not self.item.divisible:
+            self.item.no_fixed_capacity = False
+            return
+        self.item.no_fixed_capacity = value
+        if value:
+            self.item.capacity = 0
 
     @rx.event
     def set_uniq(self, value: bool):
@@ -374,6 +421,7 @@ class EditProductsState(CategoryCreateMixin, AppState):
         if value:
             self.item.divisible = False
             self.item.capacity = 1
+            self.item.no_fixed_capacity = False
 
     @rx.event
     def on_save(self):
@@ -389,9 +437,15 @@ class EditProductsState(CategoryCreateMixin, AppState):
         if self.item.uniq and self.item.divisible:
             yield rx.toast.warning("Товар із серійним номером не може бути подільним!")
             return
-        if self.item.divisible and (self.item.capacity is None or self.item.capacity <= 0):
+        if (
+            self.item.divisible
+            and not self.item.no_fixed_capacity
+            and (self.item.capacity is None or self.item.capacity <= 0)
+        ):
             yield rx.toast.warning("Для подільного ТМЦ потрібно вказати додатну місткість!")
             return
+        if self.item.no_fixed_capacity:
+            self.item.capacity = 0
         if self.item.uniq:
             self.item.capacity = 1
         try:
@@ -439,6 +493,10 @@ class ViewProductsState(AuditHistoryMixin, AppState):
     @rx.var
     def capacity(self) -> str:
         return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
+
+    @rx.var
+    def no_fixed_capacity(self) -> bool:
+        return bool(self.item.no_fixed_capacity) if self.item is not None else False
 
     @rx.var
     def count(self) -> str:

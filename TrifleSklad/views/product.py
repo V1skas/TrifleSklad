@@ -23,7 +23,13 @@ def _table_row(item: ProductCatalog) -> rx.Component:
         rx.table.cell(item.category.title),
         rx.table.cell(item.unit),
         rx.table.cell(rx.cond(item.divisible, rx.text("Так"), rx.text("Ні"))),
-        rx.table.cell(rx.cond(item.divisible, rx.text(item.capacity), rx.text("-"))),
+        rx.table.cell(
+            rx.cond(
+                item.no_fixed_capacity,
+                rx.text("∞"),
+                rx.cond(item.divisible, rx.text(item.capacity), rx.text("-")),
+            )
+        ),
         rx.table.cell(rx.cond(item.uniq, rx.text("Так"), rx.text("Ні"))),
         on_click=rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + item.id.to_string()),
         cursor="pointer",
@@ -186,7 +192,12 @@ def _form_fields(state, uniq_disabled: bool) -> rx.Component:
         controls.input_field(list="units-datalist", value=state.unit, on_change=state.set_unit, width="100%"),
         _units_datalist(state),
         rx.text("Місткість", weight="medium"),
-        controls.input_field(value=state.capacity, on_change=state.set_capacity, width="100%", disabled=state.uniq),
+        controls.input_field(
+            value=state.capacity,
+            on_change=state.set_capacity,
+            width="100%",
+            disabled=state.uniq | state.no_fixed_capacity,
+        ),
         rx.checkbox(
             "Має серійний номер",
             checked=state.uniq,
@@ -200,6 +211,15 @@ def _form_fields(state, uniq_disabled: bool) -> rx.Component:
             on_change=state.set_divisible,
             size="3",
             disabled=uniq_disabled or state.uniq,
+        ),
+        # Тумблер доступний лише для подільного неунікального ТМЦ; на редагуванні
+        # не блокується — кількість завжди рахується за залишком (Product.count).
+        rx.checkbox(
+            "Без фіксованої ємності",
+            checked=state.no_fixed_capacity,
+            on_change=state.set_no_fixed_capacity,
+            size="3",
+            disabled=state.uniq | ~state.divisible,
         ),
         spacing="3",
         align="stretch",
@@ -250,7 +270,19 @@ def view_page_content() -> rx.Component:
         ),
         rx.cond(
             ViewProductsState.divisible,
-            rx.hstack(rx.text("Місткість:", weight="medium"), rx.text(ViewProductsState.capacity), width="100%"),
+            rx.hstack(
+                rx.text("Місткість:", weight="medium"),
+                rx.text(rx.cond(ViewProductsState.no_fixed_capacity, "∞", ViewProductsState.capacity)),
+                width="100%",
+            ),
+        ),
+        rx.cond(
+            ViewProductsState.divisible,
+            rx.hstack(
+                rx.text("Без фіксованої ємності:", weight="medium"),
+                rx.text(rx.cond(ViewProductsState.no_fixed_capacity, "Так", "Ні")),
+                width="100%",
+            ),
         ),
         rx.hstack(
             rx.text("Має серійний номер:", weight="medium"),

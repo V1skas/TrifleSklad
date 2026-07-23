@@ -151,8 +151,8 @@ def view_page_content() -> rx.Component:
                         rx.vstack(
                             rx.text(ViewUnitsReportState.unit_remain_label),
                             rx.progress(
-                                value=ViewUnitsReportState.unit_count_num,
-                                max=ViewUnitsReportState.unit_capacity,
+                                value=ViewUnitsReportState.unit_fill_percent,
+                                max=100,
                                 color_scheme="green",
                                 height="0.5em",
                                 width="100%",

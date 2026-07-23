@@ -151,7 +151,7 @@ def _position_dialog(state) -> rx.Component:
                     on_change=state.set_new_position_count,
                 ),
                 rx.cond(
-                    state.new_position_is_divisible,
+                    state.new_position_is_divisible & ~state.new_position_no_fixed_capacity,
                     rx.vstack(
                         rx.text(f"Частина (1..{state.new_position_capacity - 1} {state.new_position_unit}):", size="2"),
                         controls.input_field(
@@ -161,6 +161,13 @@ def _position_dialog(state) -> rx.Component:
                         ),
                         rx.text(f"Ємність однієї одиниці: {state.new_position_capacity} {state.new_position_unit}.", size="1", color="gray"),
                         spacing="1", width="100%", align="stretch",
+                    ),
+                ),
+                rx.cond(
+                    state.new_position_no_fixed_capacity,
+                    rx.text(
+                        f"Ємність одиниці: ∞ ({state.new_position_unit}). Заявка — лише цілими одиницями.",
+                        size="1", color="gray",
                     ),
                 ),
                 rx.hstack(

@@ -21,6 +21,7 @@ from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
     StorageType,
+    format_amount,
     generate_serial_range,
     movements_status_list,
     movements_type_list,
@@ -47,6 +48,26 @@ def _format_money(value: float) -> str:
         return "0.00"
 
 
+def _parse_positive_float(value: str) -> Optional[float]:
+    """Розбирає рядок у додатне дробове число (напр. «0.75»); інакше None."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _residual_label(pc: MovementProductsCatalog) -> str:
+    """Загальний обсяг позиції для колонки «Залишок». Для звичайного подільного —
+    к-сть одиниць × стандартна ємність; для подільного без фіксованої ємності —
+    сума ємностей створених одиниць (Product.count); для неподільного — прочерк."""
+    if pc.product is None or not pc.product.divisible:
+        return "—"
+    if pc.product.no_fixed_capacity:
+        return format_amount(sum((p.count or 0) for p in pc.products))
+    return str(pc.count * (pc.product.capacity or 0))
+
+
 class MovementProductCatalogAddEditFormState(rx.State):
     item: MovementProductsCatalog = MovementProductsCatalog(
         count=0, price=0.0, id_product_catalog=-1, products=[]
@@ -61,6 +82,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     selected_divisible: bool = False
     selected_capacity: int = 0
+    # Подільний ТМЦ без фіксованої ємності: ємність одиниці вводиться вручну для
+    # кожної позиції постачання (одна на всі одиниці позиції).
+    selected_no_fixed_capacity: bool = False
+    entered_capacity: str = ""
 
     search_catalog: str = ""
 
@@ -70,6 +95,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     error_count: bool = False
     error_price: bool = False
+    error_capacity: bool = False
 
     @rx.var
     def category_options(self) -> List[Tuple[str, str]]:
@@ -104,7 +130,13 @@ class MovementProductCatalogAddEditFormState(rx.State):
     @rx.var
     def has_errors(self) -> bool:
         return (
-            self.error_count or self.error_price or self.item.id_product_catalog == -1
+            self.error_count
+            or self.error_price
+            or self.item.id_product_catalog == -1
+            or (
+                self.selected_no_fixed_capacity
+                and _parse_positive_float(self.entered_capacity) is None
+            )
         )
 
     @rx.var
@@ -144,10 +176,22 @@ class MovementProductCatalogAddEditFormState(rx.State):
     def price(self) -> str:
         return self.price_input
 
-    def _per_unit_count(self) -> int:
+    def _per_unit_count(self) -> float:
+        # Без фіксованої ємності — беремо ручну ємність (дробову) для цієї позиції.
+        if self.selected_divisible and self.selected_no_fixed_capacity:
+            parsed = _parse_positive_float(self.entered_capacity)
+            return parsed if parsed is not None else 0
         if self.selected_divisible and self.selected_capacity > 0:
             return self.selected_capacity
         return 1
+
+    @rx.event
+    def on_change_entered_capacity(self, value: str):
+        self.entered_capacity = value
+        self.error_capacity = _parse_positive_float(value) is None
+        per_unit = self._per_unit_count()
+        for unit in self.item.products:
+            unit.count = per_unit
 
     @rx.event
     def on_change_search_catalog(self, value: str):
@@ -163,6 +207,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.is_product_uniq = False
         self.selected_divisible = False
         self.selected_capacity = 0
+        self.selected_no_fixed_capacity = False
+        self.entered_capacity = ""
+        self.error_capacity = False
 
     @rx.event
     def on_change_filter_category(self, value: str):
@@ -184,6 +231,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.item.id_product_catalog = self.item.product.id
         self.selected_divisible = selected.divisible
         self.selected_capacity = selected.capacity or 0
+        self.selected_no_fixed_capacity = bool(selected.no_fixed_capacity)
+        self.entered_capacity = ""
+        self.error_capacity = False
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
                 self.item.products[i].serial_number = ""
@@ -295,6 +345,16 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.selected_capacity = (
             (item.product.capacity or 0) if item.product else 0
         )
+        self.selected_no_fixed_capacity = (
+            bool(item.product.no_fixed_capacity) if item.product else False
+        )
+        # Усі одиниці позиції мають однакову введену ємність — відновлюємо з першої.
+        self.entered_capacity = (
+            format_amount(item.products[0].count)
+            if self.selected_no_fixed_capacity and item.products
+            else ""
+        )
+        self.error_capacity = False
         self.id_product_catalog_entered = True
         self.id_product_catalog_in_cache = (
             str(item.product.id) if item.product is not None else ""
@@ -316,6 +376,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.is_product_uniq = False
         self.selected_divisible = False
         self.selected_capacity = 0
+        self.selected_no_fixed_capacity = False
+        self.entered_capacity = ""
+        self.error_capacity = False
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
         self.search_catalog = ""
@@ -417,6 +480,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
                 self.is_product_uniq = catalog.uniq
                 self.selected_divisible = catalog.divisible
                 self.selected_capacity = catalog.capacity or 0
+                self.selected_no_fixed_capacity = bool(catalog.no_fixed_capacity)
+                self.entered_capacity = ""
+                self.error_capacity = False
                 per_unit = self._per_unit_count()
                 for unit in self.item.products:
                     unit.id_product_catalog = catalog.id
@@ -956,9 +1022,9 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog, str, str]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str]]:
         return [
-            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price))
+            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price), _residual_label(pc))
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
@@ -981,8 +1047,14 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
         self.is_product_dialog_view_mode = False
         self.current_product_catalog_index = -1
         form_state.clear()
+        # ТМЦ без фіксованої ємності можна додати кілька разів (різні партії —
+        # різна ємність), тож із дедупу виключаємо лише товари з фіксованою ємністю.
         form_state.set_exclude_products_catalog_list(
-            [pc.product.id for pc in self.item.movement.products_catalog]
+            [
+                pc.product.id
+                for pc in self.item.movement.products_catalog
+                if not pc.product.no_fixed_capacity
+            ]
         )
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
@@ -997,7 +1069,7 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
         form_state.set_exclude_products_catalog_list([
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
-            if i != self.current_product_catalog_index
+            if i != self.current_product_catalog_index and not pc.product.no_fixed_capacity
         ])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
@@ -1442,8 +1514,14 @@ class EditAdmissionState(AppState):
         self.is_product_dialog_view_mode = False
         self.current_product_catalog_index = -1
         form_state.clear()
+        # ТМЦ без фіксованої ємності можна додати кілька разів (різні партії —
+        # різна ємність), тож із дедупу виключаємо лише товари з фіксованою ємністю.
         form_state.set_exclude_products_catalog_list(
-            [pc.product.id for pc in self.item.movement.products_catalog]
+            [
+                pc.product.id
+                for pc in self.item.movement.products_catalog
+                if not pc.product.no_fixed_capacity
+            ]
         )
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
@@ -1460,7 +1538,7 @@ class EditAdmissionState(AppState):
         form_state.set_exclude_products_catalog_list([
             pc.product.id
             for i, pc in enumerate(self.item.movement.products_catalog)
-            if i != self.current_product_catalog_index
+            if i != self.current_product_catalog_index and not pc.product.no_fixed_capacity
         ])
         self.product_catalog_dialog_page = self.ProductCatalogDialogPages.EDIT
         self.is_open_product_catalog_dialog = True
@@ -1621,9 +1699,9 @@ class ViewAdmissionState(AuditHistoryMixin, AppState):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog, str, str]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str]]:
         return [
-            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price))
+            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price), _residual_label(pc))
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 

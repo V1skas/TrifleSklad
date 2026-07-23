@@ -11,6 +11,7 @@ _LABELS: Dict[str, str] = {
     "divisible": "Подільний",
     "uniq": "Унікальний (серійний)",
     "capacity": "Ємність одиниці",
+    "no_fixed_capacity": "Без фіксованої ємності",
 }
 
 

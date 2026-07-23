@@ -31,6 +31,7 @@ class ProductsSelectorState(rx.State):
     # Метадані обраної позиції каталогу (для міри / прогресу / валідації).
     sel_divisible: bool = False
     sel_capacity: int = 0
+    sel_no_fixed_capacity: bool = False
     sel_unit: str = ""
 
     # Загальна доступна кількість обраної позиції каталогу на місці/власнику
@@ -232,10 +233,12 @@ class ProductsSelectorState(rx.State):
         if catalog is None:
             self.sel_divisible = False
             self.sel_capacity = 0
+            self.sel_no_fixed_capacity = False
             self.sel_unit = ""
             return
         self.sel_divisible = catalog.divisible
         self.sel_capacity = catalog.capacity
+        self.sel_no_fixed_capacity = bool(catalog.no_fixed_capacity)
         self.sel_unit = catalog.unit
 
     def _load_catalog_totals(self) -> None:
@@ -417,6 +420,7 @@ class ProductsSelectorState(rx.State):
             exclude_ids=self._excluded_ids(),
             full_only=self.sel_divisible,
             capacity=self.sel_capacity,
+            no_fixed=self.sel_no_fixed_capacity,
             limit=target,
         )
         self.selected = self.selected + units

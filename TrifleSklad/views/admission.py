@@ -224,6 +224,29 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
             ),
             width="100%",
         ),
+        rx.cond(
+            MovementProductCatalogAddEditFormState.selected_divisible
+            & MovementProductCatalogAddEditFormState.selected_no_fixed_capacity,
+            rx.hstack(
+                rx.text("Місткість одиниці:"),
+                controls.input_field(
+                    type="number",
+                    min="0",
+                    step="any",
+                    required=True,
+                    is_invalid=MovementProductCatalogAddEditFormState.error_capacity,
+                    color_scheme=rx.cond(MovementProductCatalogAddEditFormState.error_capacity, "red", "None"),
+                    style=rx.cond(
+                        MovementProductCatalogAddEditFormState.error_capacity,
+                        {"border": "2px solid red", "box-shadow": "0 0 0 1px red"},
+                        {},
+                    ),
+                    value=MovementProductCatalogAddEditFormState.entered_capacity,
+                    on_change=MovementProductCatalogAddEditFormState.on_change_entered_capacity,
+                ),
+                width="100%",
+            ),
+        ),
         rx.hstack(
             rx.text("Вартість за одиницю:"),
             controls.input_field(
@@ -502,7 +525,7 @@ def _edit_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(rx.cond(item[1].product.divisible, item[1].count * item[1].product.capacity, "—")),
+                        rx.table.cell(item[4]),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
                         rx.cond(
@@ -564,7 +587,7 @@ def _add_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(rx.cond(item[1].product.divisible, item[1].count * item[1].product.capacity, "—")),
+                        rx.table.cell(item[4]),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
                         on_click=AddAdmissionState.view_product_catalog_dialog(item[0]),
@@ -602,7 +625,7 @@ def _view_admission_products_catalog_table() -> rx.Component:
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
                         rx.table.cell(item[1].count),
-                        rx.table.cell(rx.cond(item[1].product.divisible, item[1].count * item[1].product.capacity, "—")),
+                        rx.table.cell(item[4]),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
                         on_click=ViewAdmissionState.on_change_dialog_open(item[0]),

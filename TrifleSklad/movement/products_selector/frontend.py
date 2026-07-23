@@ -17,14 +17,30 @@ def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
         item[1].product_catalog.divisible,
         rx.vstack(
             rx.text(
-                f"Залишок: {item[1].count}/{item[1].product_catalog.capacity} "
-                f"{item[1].product_catalog.unit}",
+                # Без фіксованої ємності — максимум невідомий, показуємо ∞.
+                rx.cond(
+                    item[1].product_catalog.no_fixed_capacity,
+                    f"Залишок: {item[1].count}/∞ {item[1].product_catalog.unit}",
+                    f"Залишок: {item[1].count}/{item[1].product_catalog.capacity} "
+                    f"{item[1].product_catalog.unit}",
+                ),
                 size="1",
                 user_select="none",
             ),
             rx.progress(
-                value=item[1].count,
-                max=item[1].product_catalog.capacity,
+                # Без фіксованої ємності — полоса завжди повна (1/1); для звичайного
+                # подільного — залишок/ємність (count тут завжди ціле). Prop Progress
+                # приймає лише int, тож дробовий count зводимо до int.
+                value=rx.cond(
+                    item[1].product_catalog.no_fixed_capacity,
+                    1,
+                    item[1].count.to(int),
+                ),
+                max=rx.cond(
+                    item[1].product_catalog.no_fixed_capacity,
+                    1,
+                    item[1].product_catalog.capacity,
+                ),
                 color_scheme="green",
                 height="0.5em",
                 width="100%",
