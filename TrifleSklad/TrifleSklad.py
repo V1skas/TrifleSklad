@@ -4,7 +4,7 @@ import reflex as rx
 
 from rxconfig import config
 from TrifleSklad import frontend, routes, state
-from TrifleSklad.views.templates.app_shell import app_shell_wrap, content_area_wrap
+from TrifleSklad.views.templates.app_shell import app_shell_wrap, content_area_wrap, overlay_wrap
 from TrifleSklad.states.payment_type import (
     AddPaymentTypeState,
     EditPaymentTypeState,
@@ -148,6 +148,8 @@ app = rx.App(
     # Тема налаштовується через rx.plugins.RadixThemesPlugin у rxconfig.py
     # (App(theme=...) депрекейтний з 0.9.0).
     html_lang="uk",
+    # Глобальні перевизначення стилів Radix (assets/styles.css) — див. TS-44.
+    stylesheets=["styles.css"],
     # Захист від авто-перекладу браузера, який ламає Radix-компоненти
     # (напр. rx.select) під час діффу DOM.
     html_custom_attrs={"translate": "no"},
@@ -160,6 +162,9 @@ app = rx.App(
 # при навігації між сторінками (views/templates/app_shell.py).
 app.extra_app_wraps[15, "AppShell"] = app_shell_wrap
 app.extra_app_wraps[10, "ContentArea"] = content_area_wrap
+# Перекриваємо штатний app_wrap оверлею (значок «немає звʼязку» + тостер) —
+# він рендериться без z-index і губився під таблицями. Див. overlay_wrap.
+app.app_wraps[5, "Overlay"] = overlay_wrap
 
 app.add_page(frontend.index_page, route=routes.INDEX)
 app.add_page(frontend.welcome_page, route=routes.WELCOME)

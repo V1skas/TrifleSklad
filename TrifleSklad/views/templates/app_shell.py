@@ -1,4 +1,5 @@
 import reflex as rx
+from reflex.app import default_overlay_component
 
 from TrifleSklad.state import AppState
 from TrifleSklad.views.templates.layouts import active_section_sidebar, header
@@ -74,4 +75,37 @@ def content_area_wrap(_stateful: bool) -> rx.Component:
         overflow="hidden",
         height="100%",
         width="100%",
+    )
+
+
+def overlay_wrap(stateful: bool) -> rx.Component | None:
+    """Заміна штатного app_wrap'у `(5, "Overlay")` — той самий набір
+    (значок «немає звʼязку» + тостер), але у власному стекінг-контексті
+    з високим z-index.
+
+    Навіщо: `ConnectionPulser` рендериться як `<div position:fixed>` БЕЗ
+    z-index, а 9999 стоїть на іконці всередині нього. `position: fixed`
+    сам по собі створює стекінг-контекст, тож 9999 замикається в ньому,
+    а сам контейнер лишається на рівні `z-index: auto` (= 0). Далі
+    вирішує порядок у DOM: штатний Overlay-wrap вкладений у ContentArea
+    ПЕРЕД контентом сторінки, а таблиці `rx.table.root(variant="surface")`
+    мають `backdrop-filter: blur(64px)` (Radix `--backdrop-filter-panel`
+    при `panelBackground=translucent`), який теж створює стекінг-контекст
+    на рівні 0, але пізніше в DOM → таблиця малювалась ПОВЕРХ значка.
+
+    Обгортка нульового розміру (діти позиціоновані fixed самі по собі,
+    тому розмір контейнера ні на що не впливає, і він нічого не перехоплює
+    мишею) з z-index піднімає весь оверлей над контентом сторінки."""
+    if not stateful:
+        return None
+    return rx.fragment(
+        rx.box(
+            default_overlay_component(),
+            position="fixed",
+            top="0",
+            left="0",
+            width="0",
+            height="0",
+            z_index="9999",
+        ),
     )
