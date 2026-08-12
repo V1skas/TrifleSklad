@@ -140,3 +140,36 @@ def test_role_created_records_granted_actions(session):
     action = RoleCreated.for_create(role, session, lines=lines)
 
     assert action.describe() == ["Назва: Оператор", "Опис: —", "Додано: Перегляд ролей"]
+
+
+def test_parse_changes_of_legacy_row_without_reason(session, worker):
+    """Записи, зроблені до появи «причини коригування», мають читатись без
+    міграції БД: поле — скалярне зі значенням за замовчуванням у JSON-моделі."""
+    legacy = '{"summary":"","fields":{"fio":{"old":"А","new":"Б"}},"lines":[]}'
+    session.add(
+        models.AuditLog(
+            id_user="admin",
+            action="update",
+            table_name="workers",
+            record_id=str(worker.id),
+            changes=legacy,
+        )
+    )
+    session.commit()
+
+    action = parse_changes(get_audit_history(session, "workers", worker.id)[0])
+
+    assert action.reason == ""
+    assert action.has_changes() is True
+
+
+def test_reason_alone_is_not_recorded(session, worker):
+    """Збереження без реальних змін не має засмічувати історію самою лише
+    причиною коригування."""
+    unchanged = WorkerUpdated.from_diff(worker, worker, session, reason="просто так")
+
+    assert unchanged.has_changes() is False
+    record_action(session, "admin", worker.id, unchanged)
+    session.commit()
+
+    assert get_audit_history(session, "workers", worker.id) == []

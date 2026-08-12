@@ -31,8 +31,11 @@ from TrifleSklad.models import (
 from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
+from TrifleSklad.services.errors import ServiceError
+from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -647,9 +650,13 @@ class AddIssueState(LookupCreatorsMixin, AppState):
         yield rx.toast.error(text)
 
 
-class EditIssueState(AppState):
+class EditIssueState(FullEditMixin, AppState):
+    MOVEMENT_TYPE = MovementsType.ISSUE
+
     item: Optional[Issue] = None
     in_process: bool = True
+    # id заявки, за якою сформовано рух (інформаційно — заявку не чіпаємо).
+    source_request_id: str = ""
 
     list_incoming_storages: List[Tuple[str, str]] = []
     list_destination_storages: List[Tuple[str, str]] = []
@@ -707,17 +714,28 @@ class EditIssueState(AppState):
             yield rx.toast.error("Запис не знайдено!")
             return
 
+        self._load_editability(self.item.id)
+        request_id = RequestDAO.get_id_by_movement(self.item.id)
+        self.source_request_id = str(request_id) if request_id is not None else ""
+
         self._products_selector_state = await self.get_state(ProductsMovementListState)
         await self._products_selector_state.on_load()
-        self._products_selector_state.set_view_mode(True)
+        self._products_selector_state.set_view_mode(not self.can_edit_full)
+        self._products_selector_state.set_require_serial(True)
+        self._products_selector_state.filter_by_storage = self.item.movement.id_incoming_storage
+        self._products_selector_state.filter_by_owner = self.item.movement.id_incoming_owner
 
         all_products: List[Product] = []
         for product_category in self.item.movement.products_catalog:
             for product in product_category.products:
                 product.product_catalog = product_category.product
                 all_products.append(product)
-        self._products_selector_state.items = all_products
+        self._products_selector_state.prefill_for_edit(all_products)
         self.in_process = False
+
+    @rx.var
+    def has_source_request(self) -> bool:
+        return self.source_request_id != ""
 
     @rx.var
     def id_incoming_storage(self) -> str:
@@ -770,31 +788,33 @@ class EditIssueState(AppState):
 
     @rx.event
     def on_change_id_incoming_storage(self, value: str):
-        if self.item is None or not value.lstrip("-").isdigit():
+        if self.item is None or not self.can_edit_full or not value.lstrip("-").isdigit():
             return
         self.item.movement.id_incoming_storage = int(value)
         if self._products_selector_state is not None:
             self._products_selector_state.filter_by_storage = int(value)
             self._products_selector_state.items = []
+        yield rx.toast.warning("Перелік ТМЦ очищено — оберіть одиниці на новому складі!")
 
     @rx.event
     def on_change_id_incoming_owner(self, value: str):
-        if self.item is None or not value.lstrip("-").isdigit():
+        if self.item is None or not self.can_edit_full or not value.lstrip("-").isdigit():
             return
         self.item.movement.id_incoming_owner = int(value)
         self.item.movement.id_destination_owner = int(value)
         if self._products_selector_state is not None:
             self._products_selector_state.filter_by_owner = int(value)
             self._products_selector_state.items = []
+        yield rx.toast.warning("Перелік ТМЦ очищено — оберіть одиниці нового власника!")
 
     @rx.event
     def on_change_id_destination_storage(self, value: str):
-        if self.item is not None and value.lstrip("-").isdigit():
+        if self.item is not None and self.can_edit_full and value.lstrip("-").isdigit():
             self.item.movement.id_destination_storage = int(value)
 
     @rx.event
     def on_change_id_recipient(self, value: str):
-        if self.item is not None and value.lstrip("-").isdigit():
+        if self.item is not None and self.can_edit_full and value.lstrip("-").isdigit():
             self.item.id_recipient = int(value)
 
     @rx.event
@@ -808,7 +828,7 @@ class EditIssueState(AppState):
 
     @rx.event
     def on_change_date(self, value: str):
-        if self.item is not None:
+        if self.item is not None and self.can_edit_full:
             self.item.movement.date = value
 
     @rx.event
@@ -845,6 +865,56 @@ class EditIssueState(AppState):
             return
 
         self.item.movement.id_user = self.user.login
+
+        if self.can_edit_full:
+            error = self._require_reason()
+            if error is not None:
+                yield rx.toast.error(error)
+                return
+            if self.item.movement.id_destination_storage == -1:
+                yield rx.toast.error("Не обрано місце призначення!")
+                return
+            if not StorageDAO.is_type(self.item.movement.id_incoming_storage, StorageType.WAREHOUSE):
+                yield rx.toast.error("Видача можлива лише зі складу!")
+                return
+            if not StorageDAO.is_type(
+                self.item.movement.id_destination_storage,
+                (StorageType.TECHNICAL_SITE, StorageType.DEPARTMENT),
+            ):
+                yield rx.toast.error("Видача можлива лише на площадку або у відділ!")
+                return
+            flag, text, plan = self._products_selector_state.collect_unit_plan()
+            if not flag:
+                yield rx.toast.error(text)
+                return
+            try:
+                MovementEditService().save_full(
+                    FullEditPayload(
+                        movement_id=self.item.id,
+                        movement_type=MovementsType.ISSUE,
+                        reason=self.edit_reason,
+                        header={
+                            "date": self.item.movement.date,
+                            "id_incoming_storage": self.item.movement.id_incoming_storage,
+                            "id_incoming_owner": self.item.movement.id_incoming_owner,
+                            "id_destination_storage": self.item.movement.id_destination_storage,
+                            "id_destination_owner": self.item.movement.id_destination_owner,
+                            "status": self.item.movement.status,
+                            "comment": self.item.movement.comment,
+                        },
+                        child={"id_recipient": self.item.id_recipient},
+                        unit_plan=plan,
+                        serials=self._products_selector_state.collect_serials(),
+                    ),
+                    self.user.login,
+                )
+            except ServiceError as e:
+                yield rx.toast.error(str(e))
+                return
+            yield rx.toast.success("Видачу змінено!")
+            yield ListIssueState.on_load()
+            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{self.item.id}")
+            return
 
         flag, text, id = IssueDAO.edit_one(self.item, self.user.login)
         if flag:

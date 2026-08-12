@@ -1,9 +1,9 @@
 from typing import Dict, List, Optional, Tuple
 
-# Скільки днів після дати поставки дозволено редагувати перелік ТМЦ (за
-# наявності права admissions:edit_products і відсутності конфліктів із
-# пізнішими рухами — див. AdmissionDAO.can_edit_products).
-ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS = 30
+# Скільки днів після дати руху дозволене ПОВНЕ редагування (шапка + перелік
+# одиниць ТМЦ) — за наявності права <prefix>:edit_full і відсутності пізніших
+# рухів із тими ж одиницями (див. services/movement_edit.py).
+MOVEMENT_FULL_EDIT_WINDOW_DAYS = 30
 
 # Тривалість ковзного вікна сесії (хвилини): скільки часу токен лишається
 # дійсним після останньої активності (продовжується при кожному require_auth,
@@ -92,6 +92,26 @@ def sale_line_cost(price: float, units: List[Tuple[int, bool, int]]) -> float:
         else:
             total += price
     return round(total, 2)
+
+
+def admission_nds_split(
+    lines: List[Tuple[int, float]], rate_percent: float, price_includes_nds: bool
+) -> Tuple[float, float, float]:
+    """(база, ПДВ, разом) для постачання. lines = [(count, price), ...];
+    rate_percent — ставка ПДВ у відсотках; price_includes_nds — `Admission.flag_nds`
+    («ціна в рядках уже містить ПДВ»).
+
+    Єдина формула і для `@rx.var` у стейтах, і для серверного перерахунку
+    `Movement.total_cost` — інакше клієнт і бекенд рахують суму по-різному.
+    """
+    line_total = sum(count * price for count, price in lines)
+    rate = rate_percent / 100.0
+    if rate <= 0:
+        return round(line_total, 2), 0.0, round(line_total, 2)
+    if price_includes_nds:
+        base = line_total / (1 + rate)
+        return round(base, 2), round(line_total - base, 2), round(line_total, 2)
+    return round(line_total, 2), round(line_total * rate, 2), round(line_total * (1 + rate), 2)
 
 
 def generate_serial_range(

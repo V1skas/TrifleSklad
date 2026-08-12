@@ -6,9 +6,11 @@ from TrifleSklad.audit import get_audit_history, parse_changes
 from TrifleSklad.audit.labels import ACTION_LABELS
 from TrifleSklad.dao.user import UserDao
 
-# (id запису audit_log, дата, ПІБ актора, підпис дії, короткий підсумок, деталізація)
+# (id запису audit_log, дата, ПІБ актора, підпис дії, короткий підсумок,
+#  деталізація, причина коригування)
 # деталізація — [(підпис поля, було, стало), ...], див. BaseAuditAction.describe_rows.
-HistoryRow = Tuple[int, str, str, str, str, List[Tuple[str, str, str]]]
+# причина — заповнена лише для повного редагування руху ТМЦ, інакше "".
+HistoryRow = Tuple[int, str, str, str, str, List[Tuple[str, str, str]], str]
 
 
 class AuditService:
@@ -31,6 +33,7 @@ class AuditService:
                         ACTION_LABELS.get(log.action, log.action),
                         action_obj.summary_text(),
                         action_obj.describe_rows(),
+                        action_obj.reason,
                     ))
                 return rows
         except Exception as e:

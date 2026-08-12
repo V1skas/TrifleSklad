@@ -11,7 +11,7 @@ from TrifleSklad.states.sale_returns import (
     ViewSaleReturnsState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import (
     NESTED_DETAIL_TABLE,
@@ -286,12 +286,13 @@ def list_page() -> rx.Component:
     )
 
 
-def _unit_row(unit) -> rx.Component:
+def _unit_row(state, unit, read_only) -> rx.Component:
     return rx.el.tr(
         rx.el.td(
             rx.checkbox(
-                checked=AddSaleReturnsState.selected_units[unit[0]],
-                on_change=lambda checked: AddSaleReturnsState.toggle_unit(unit[0], checked),
+                checked=state.selected_units[unit[0]],
+                on_change=lambda checked: state.toggle_unit(unit[0], checked),
+                disabled=read_only,
             ),
             style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
         ),
@@ -306,9 +307,10 @@ def _unit_row(unit) -> rx.Component:
                 type="number",
                 min=0,
                 step="0.01",
-                value=AddSaleReturnsState.compensations[unit[0]],
-                on_change=lambda v: AddSaleReturnsState.set_compensation(unit[0], v),
+                value=state.compensations[unit[0]],
+                on_change=lambda v: state.set_compensation(unit[0], v),
                 placeholder="Компенсація",
+                disabled=read_only,
                 width="11em",
             ),
             style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
@@ -316,7 +318,7 @@ def _unit_row(unit) -> rx.Component:
     )
 
 
-def _units_subtable(group) -> rx.Component:
+def _units_subtable(state, group, read_only) -> rx.Component:
     # Сирий rx.el.table — уникаємо Radix ScrollArea, що схлопується в <td> у
     # Safari. Див. NESTED_DETAIL_* у layouts.py.
     return rx.el.table(
@@ -330,14 +332,14 @@ def _units_subtable(group) -> rx.Component:
             ),
             style=NESTED_DETAIL_THEAD,
         ),
-        rx.el.tbody(rx.foreach(group[4], _unit_row)),
+        rx.el.tbody(rx.foreach(group[4], lambda unit: _unit_row(state, unit, read_only))),
         style=NESTED_DETAIL_TABLE,
     )
 
 
-def _group_fragment(group) -> rx.Component:
+def _group_fragment(state, group, read_only) -> rx.Component:
     clickable = dict(
-        on_click=AddSaleReturnsState.toggle_catalog(group[0]),
+        on_click=state.toggle_catalog(group[0]),
         cursor="pointer",
     )
     return rx.fragment(
@@ -349,7 +351,7 @@ def _group_fragment(group) -> rx.Component:
                     color=rx.color("accent", 9),
                     style={
                         "transform": rx.cond(
-                            AddSaleReturnsState.expanded_catalogs[group[0]],
+                            state.expanded_catalogs[group[0]],
                             "rotate(0deg)",
                             "rotate(-90deg)",
                         ),
@@ -361,14 +363,14 @@ def _group_fragment(group) -> rx.Component:
             rx.table.cell(group[1], **clickable),
             rx.table.cell(group[2], width="1%", white_space="nowrap", **clickable),
             rx.table.cell(group[3], width="1%", white_space="nowrap", **clickable),
-            rx.table.cell(AddSaleReturnsState.position_sums[group[0]], width="1%", white_space="nowrap", **clickable),
+            rx.table.cell(state.position_sums[group[0]], width="1%", white_space="nowrap", **clickable),
             _hover={"background_color": rx.color("accent", 3)},
         ),
         rx.cond(
-            AddSaleReturnsState.expanded_catalogs[group[0]],
+            state.expanded_catalogs[group[0]],
             rx.table.row(
                 rx.table.cell(
-                    _units_subtable(group),
+                    _units_subtable(state, group, read_only),
                     custom_attrs={"colSpan": "5"},
                     padding="0.5em",
                 ),
@@ -377,7 +379,7 @@ def _group_fragment(group) -> rx.Component:
     )
 
 
-def _units_table() -> rx.Component:
+def _units_table(state, read_only) -> rx.Component:
     return rx.table.root(
         rx.table.header(
             rx.table.row(
@@ -389,27 +391,24 @@ def _units_table() -> rx.Component:
             ),
             background_color=rx.color("accent", 9),
         ),
-        rx.table.body(rx.foreach(AddSaleReturnsState.grouped_units, _group_fragment)),
+        rx.table.body(rx.foreach(state.grouped_units, lambda group: _group_fragment(state, group, read_only))),
         variant="surface",
         width="100%",
     )
 
 
-def _units_section() -> rx.Component:
-    return rx.cond(
-        AddSaleReturnsState.has_sale,
-        rx.vstack(
-            rx.heading("Одиниці до повернення:", size="3"),
-            _units_table(),
-            rx.hstack(
-                rx.spacer(),
-                rx.heading(f"Загальна компенсована вартість: {AddSaleReturnsState.total_compensation}", size="4"),
-                width="100%",
-            ),
-            spacing="3",
-            align="stretch",
+def _units_section(state, read_only=False) -> rx.Component:
+    return rx.vstack(
+        rx.heading("Одиниці до повернення:", size="3"),
+        _units_table(state, read_only),
+        rx.hstack(
+            rx.spacer(),
+            rx.heading(f"Загальна компенсована вартість: {state.total_compensation}", size="4"),
             width="100%",
         ),
+        spacing="3",
+        align="stretch",
+        width="100%",
     )
 
 
@@ -463,7 +462,7 @@ def _add_form() -> rx.Component:
             value=AddSaleReturnsState.id_destination_storage,
             on_change=AddSaleReturnsState.on_change_id_destination_storage,
         ),
-        _units_section(),
+        rx.cond(AddSaleReturnsState.has_sale, _units_section(AddSaleReturnsState)),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             AddSaleReturnsState.editable_statuses,
@@ -496,10 +495,41 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditSaleReturnsState),
         rx.text("*Дата:", weight="medium"),
         controls.input_field(value=EditSaleReturnsState.item.movement.date, type="date", required=True, disabled=True, width="100%"),
-        rx.text("Склад призначення:", weight="medium"),
-        controls.input_field(value=EditSaleReturnsState.item.movement.destination_storage.title, disabled=True, width="100%"),
+        rx.text("*Вихідний продаж:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    EditSaleReturnsState.list_sales,
+                    lambda sale: rx.select.item(sale[0], value=sale[1], width="100%"),
+                ),
+                width="100%",
+            ),
+            required=True,
+            disabled=EditSaleReturnsState.is_view_only_edit,
+            value=EditSaleReturnsState.selected_sale_id,
+            on_change=EditSaleReturnsState.on_change_sale,
+        ),
+        rx.text("*Склад призначення:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    EditSaleReturnsState.list_warehouses,
+                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                ),
+                width="100%",
+            ),
+            required=True,
+            disabled=EditSaleReturnsState.is_view_only_edit,
+            value=EditSaleReturnsState.id_destination_storage,
+            on_change=EditSaleReturnsState.on_change_id_destination_storage,
+        ),
+        _units_section(EditSaleReturnsState, read_only=EditSaleReturnsState.is_view_only_edit),
+        full_edit.reason_field(EditSaleReturnsState),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             EditSaleReturnsState.editable_statuses,

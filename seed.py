@@ -505,6 +505,24 @@ class StockPool:
         return ids if len(ids) >= min_count else []
 
 
+def _pick_coherent_units(
+    pool: StockPool, storage_ids, k_max: int
+) -> Optional[Tuple[int, int, List[int]]]:
+    """Обирає одиниці ОДНОГО (склад, власник) серед указаних складів. Забезпечує
+    інваріант руху: у русі — лише ТМЦ того складу й власника, що в шапці (у
+    програмі це гарантує діалог вибору, що фільтрує по обох). Повертає
+    (storage_id, owner_id, picked_ids) або None, якщо придатних одиниць немає."""
+    groups: Dict[Tuple[int, int], List[int]] = {}
+    for pid, u in pool.units.items():
+        if u["storage_id"] in storage_ids:
+            groups.setdefault((u["storage_id"], u["owner_id"]), []).append(pid)
+    if not groups:
+        return None
+    (storage_id, owner_id), pids = RNG.choice(list(groups.items()))
+    picked = RNG.sample(pids, k=min(RNG.randint(1, k_max), len(pids)))
+    return storage_id, owner_id, picked
+
+
 def _admission_line_totals(count: int, price: float, rate: float, flag_nds: bool) -> float:
     if not rate:
         return round(count * price, 2)
@@ -616,14 +634,10 @@ def seed_write_offs(ctx: LookupContext, pool: StockPool, admin_login: str, n: in
     with rx.session() as session:
         created = 0
         for _ in range(n):
-            candidates = [pid for pid, u in pool.units.items() if u["storage_id"] in warehouse_ids]
-            if not candidates:
+            pick = _pick_coherent_units(pool, set(warehouse_ids), 5)
+            if pick is None:
                 break
-            storage_id = RNG.choice(warehouse_ids)
-            pids = [pid for pid in candidates if pool.units[pid]["storage_id"] == storage_id]
-            if not pids:
-                continue
-            picked = RNG.sample(pids, k=min(RNG.randint(1, 5), len(pids)))
+            storage_id, owner_id, picked = pick
             products = session.exec(select(Product).where(Product.id.in_(picked))).all()
             if not products:
                 continue
@@ -632,7 +646,6 @@ def seed_write_offs(ctx: LookupContext, pool: StockPool, admin_login: str, n: in
             for p in products:
                 by_catalog.setdefault(p.id_product_catalog, []).append(p)
 
-            owner_id = pool.units[picked[0]]["owner_id"]
             movement = Movement(
                 type=MovementsType.WRITE_OFF,
                 id_user=admin_login,
@@ -666,15 +679,13 @@ def seed_relocations(ctx: LookupContext, pool: StockPool, admin_login: str, n: i
     with rx.session() as session:
         created = 0
         for _ in range(n):
-            src_candidates = [pid for pid, u in pool.units.items() if u["storage_id"] in warehouse_ids]
-            if len(warehouse_ids) < 2 or not src_candidates:
+            if len(warehouse_ids) < 2:
                 break
-            src_storage = RNG.choice(warehouse_ids)
+            pick = _pick_coherent_units(pool, set(warehouse_ids), 4)
+            if pick is None:
+                break
+            src_storage, owner_id, picked = pick
             dst_storage = RNG.choice([s for s in warehouse_ids if s != src_storage])
-            pids = [pid for pid in src_candidates if pool.units[pid]["storage_id"] == src_storage]
-            if not pids:
-                continue
-            picked = RNG.sample(pids, k=min(RNG.randint(1, 4), len(pids)))
             products = session.exec(select(Product).where(Product.id.in_(picked))).all()
             if not products:
                 continue
@@ -683,7 +694,6 @@ def seed_relocations(ctx: LookupContext, pool: StockPool, admin_login: str, n: i
             for p in products:
                 by_catalog.setdefault(p.id_product_catalog, []).append(p)
 
-            owner_id = pool.units[picked[0]]["owner_id"]
             movement = Movement(
                 type=MovementsType.MOVEMENT,
                 id_user=admin_login,
@@ -736,14 +746,12 @@ def seed_issues(ctx: LookupContext, pool: StockPool, admin_login: str, n: int = 
     with rx.session() as session:
         created = 0
         for _ in range(n):
-            candidates = [pid for pid, u in pool.units.items() if u["storage_id"] in warehouse_ids]
-            if not candidates or not dest_ids:
+            if not dest_ids:
                 break
-            src_storage = RNG.choice(warehouse_ids)
-            pids = [pid for pid in candidates if pool.units[pid]["storage_id"] == src_storage]
-            if not pids:
-                continue
-            picked = RNG.sample(pids, k=min(RNG.randint(1, 4), len(pids)))
+            pick = _pick_coherent_units(pool, set(warehouse_ids), 4)
+            if pick is None:
+                break
+            src_storage, src_owner, picked = pick
             products = session.exec(
                 select(Product).options(selectinload(Product.product_catalog)).where(Product.id.in_(picked))
             ).all()
@@ -754,7 +762,6 @@ def seed_issues(ctx: LookupContext, pool: StockPool, admin_login: str, n: int = 
             for p in products:
                 by_catalog.setdefault(p.id_product_catalog, []).append(p)
 
-            src_owner = pool.units[picked[0]]["owner_id"]
             dst_storage = RNG.choice(dest_ids)
             dst_owner = RNG.choice(ctx.owner_ids)
             recipient_id = RNG.choice(ctx.worker_ids)
@@ -795,14 +802,12 @@ def seed_client_issues(ctx: LookupContext, pool: StockPool, admin_login: str, n:
     with rx.session() as session:
         created = 0
         for _ in range(n):
-            candidates = [pid for pid, u in pool.units.items() if u["storage_id"] in warehouse_ids]
-            if not candidates or not client_ids:
+            if not client_ids:
                 break
-            src_storage = RNG.choice(warehouse_ids)
-            pids = [pid for pid in candidates if pool.units[pid]["storage_id"] == src_storage]
-            if not pids:
-                continue
-            picked = RNG.sample(pids, k=min(RNG.randint(1, 3), len(pids)))
+            pick = _pick_coherent_units(pool, set(warehouse_ids), 3)
+            if pick is None:
+                break
+            src_storage, src_owner, picked = pick
             products = session.exec(
                 select(Product).options(selectinload(Product.product_catalog)).where(Product.id.in_(picked))
             ).all()
@@ -813,7 +818,6 @@ def seed_client_issues(ctx: LookupContext, pool: StockPool, admin_login: str, n:
             for p in products:
                 by_catalog.setdefault(p.id_product_catalog, []).append(p)
 
-            src_owner = pool.units[picked[0]]["owner_id"]
             dst_storage = RNG.choice(client_ids)
             dst_owner = RNG.choice(ctx.owner_ids)
             recipient_id = RNG.choice(ctx.worker_ids)
@@ -857,14 +861,10 @@ def seed_sales(ctx: LookupContext, pool: StockPool, admin_login: str, n: int = 4
     with rx.session() as session:
         created = 0
         for _ in range(n):
-            candidates = [pid for pid, u in pool.units.items() if u["storage_id"] in warehouse_ids]
-            if not candidates:
+            pick = _pick_coherent_units(pool, set(warehouse_ids), 5)
+            if pick is None:
                 break
-            src_storage = RNG.choice(warehouse_ids)
-            pids = [pid for pid in candidates if pool.units[pid]["storage_id"] == src_storage]
-            if not pids:
-                continue
-            picked = RNG.sample(pids, k=min(RNG.randint(1, 5), len(pids)))
+            src_storage, src_owner, picked = pick
             products = session.exec(select(Product).where(Product.id.in_(picked))).all()
             if not products:
                 continue
@@ -873,7 +873,6 @@ def seed_sales(ctx: LookupContext, pool: StockPool, admin_login: str, n: int = 4
             for p in products:
                 by_catalog.setdefault(p.id_product_catalog, []).append(p)
 
-            src_owner = pool.units[picked[0]]["owner_id"]
             responsible_id = RNG.choice(ctx.worker_ids)
 
             movement_products_catalog = []

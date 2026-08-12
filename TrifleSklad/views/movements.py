@@ -18,7 +18,7 @@ from TrifleSklad.states.movements import (
     ViewMovementsState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
@@ -243,6 +243,7 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditMovementsState),
         rx.text("*Дата:", weight="medium"),
         controls.input_field(value=EditMovementsState.item.date, type="date", required=True, disabled=True, width="100%"),
         rx.text("*Склад відправлення:", weight="medium"),
@@ -256,7 +257,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditMovementsState.is_view_only_edit,
             value=EditMovementsState.id_incoming_storage,
             on_change=EditMovementsState.on_change_id_incoming_storage,
         ),
@@ -271,7 +272,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditMovementsState.is_view_only_edit,
             value=EditMovementsState.id_incoming_owner,
             on_change=EditMovementsState.on_change_id_incoming_owner,
         ),
@@ -286,7 +287,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditMovementsState.is_view_only_edit,
             value=EditMovementsState.id_destination_storage,
             on_change=EditMovementsState.on_change_id_destination_storage,
         ),
@@ -301,11 +302,12 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditMovementsState.is_view_only_edit,
             value=EditMovementsState.id_destination_owner,
             on_change=EditMovementsState.on_change_id_destination_owner,
         ),
         products_widget(width="100%"),
+        full_edit.reason_field(EditMovementsState),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             EditMovementsState.editable_statuses,

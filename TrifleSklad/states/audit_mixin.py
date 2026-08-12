@@ -45,5 +45,11 @@ class AuditHistoryMixin(rx.State, mixin=True):
             # Право на деталізацію — окреме від права бачити сам факт історії:
             # без нього деталі полів не повинні йти на клієнт узагалі (не лише
             # ховатись у UI), інакше їх видно через стан у мережевому інспекторі.
-            entries = [(log_id, date, actor, action, summary, []) for log_id, date, actor, action, summary, _ in entries]
+            # Причину коригування НЕ обрізаємо: деталізація захищає «що саме
+            # змінилось», а причина — «навіщо», і вона є сенсом обмежувача
+            # повного редагування, тож належить кожному з правом history.
+            entries = [
+                (log_id, date, actor, action, summary, [], reason)
+                for log_id, date, actor, action, summary, _, reason in entries
+            ]
         self.history_entries = entries

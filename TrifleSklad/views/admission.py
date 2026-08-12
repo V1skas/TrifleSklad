@@ -25,7 +25,7 @@ from TrifleSklad.states.admission import (
     ViewAdmissionState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
@@ -493,7 +493,7 @@ def _edit_admission_products_catalog_dialog() -> rx.Component:
 
 def _edit_admission_add_product_button() -> rx.Component:
     return rx.cond(
-        EditAdmissionState.can_edit_products,
+        EditAdmissionState.can_edit_full,
         rx.hstack(
             rx.spacer(),
             rx.button("Додати позицію", type="button", variant="soft", size="2", on_click=EditAdmissionState.add_product_catalog_dialog_open),
@@ -513,7 +513,7 @@ def _edit_admission_products_catalog_table() -> rx.Component:
                     rx.table.column_header_cell("Ціна за од.", color=rx.color("accent", 2)),
                     rx.table.column_header_cell("Сума", color=rx.color("accent", 2)),
                     rx.cond(
-                        EditAdmissionState.can_edit_products,
+                        EditAdmissionState.can_edit_full,
                         rx.table.column_header_cell("Дії", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                     ),
                 ),
@@ -529,7 +529,7 @@ def _edit_admission_products_catalog_table() -> rx.Component:
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
                         rx.cond(
-                            EditAdmissionState.can_edit_products,
+                            EditAdmissionState.can_edit_full,
                             rx.table.cell(
                                 rx.hstack(
                                     rx.icon_button(
@@ -994,8 +994,9 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditAdmissionState),
         rx.text("*Дата:", weight="medium"),
-        controls.input_field(type="date", required=True, default_value=EditAdmissionState.item.movement.date, disabled=True, width="100%"),
+        controls.input_field(type="date", required=True, default_value=EditAdmissionState.item.movement.date, disabled=EditAdmissionState.is_view_only_edit, on_change=EditAdmissionState.on_change_date, width="100%"),
         rx.text("*Постачальник:", weight="medium"),
         rx.select.root(
             rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
@@ -1004,7 +1005,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditAdmissionState.is_view_only_edit,
             value=EditAdmissionState.id_supplier,
             default_value=EditAdmissionState.id_supplier,
             on_change=EditAdmissionState.on_change_id_supplier,
@@ -1026,7 +1027,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditAdmissionState.is_view_only_edit,
             value=EditAdmissionState.id_destination_storage,
             default_value=EditAdmissionState.id_destination_storage,
             on_change=EditAdmissionState.on_change_id_destination_storage,
@@ -1039,7 +1040,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditAdmissionState.is_view_only_edit,
             value=EditAdmissionState.id_destination_owner,
             on_change=EditAdmissionState.on_change_id_destination_owner,
         ),
@@ -1059,7 +1060,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditAdmissionState.is_view_only_edit,
             value=EditAdmissionState.id_payment_type,
             on_change=EditAdmissionState.on_change_id_payment_type,
         ),
@@ -1090,7 +1091,7 @@ def _edit_form() -> rx.Component:
             align="center",
         ),
         rx.hstack(
-            rx.switch(default_value=False, disabled=True, value=EditAdmissionState.flag_nds, on_change=EditAdmissionState.on_change_flag_nds),
+            rx.switch(default_value=False, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.flag_nds, on_change=EditAdmissionState.on_change_flag_nds),
             rx.text("Ціна в рядках вказана з ПДВ"),
         ),
         rx.vstack(
@@ -1101,18 +1102,19 @@ def _edit_form() -> rx.Component:
         ),
         rx.hstack(
             rx.text("Курс долара:"),
-            controls.input_field(required=True, disabled=True, value=EditAdmissionState.dollar_rate, on_change=EditAdmissionState.on_change_dollar_rate),
+            controls.input_field(required=True, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.dollar_rate, on_change=EditAdmissionState.on_change_dollar_rate),
         ),
         rx.hstack(
             rx.text("*Статус:"),
             rx.select(
-                EditAdmissionState.get_movement_statuses,
+                EditAdmissionState.editable_statuses,
                 placeholder="Оберіть зі списку",
                 required=True,
                 value=EditAdmissionState.status,
                 on_change=EditAdmissionState.on_change_status,
             ),
         ),
+        full_edit.reason_field(EditAdmissionState),
         rx.text("Коментар:", weight="medium"),
         controls.text_area_field(value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment, width="100%"),
         spacing="3",

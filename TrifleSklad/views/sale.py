@@ -21,7 +21,7 @@ from TrifleSklad.states.sale import (
     ViewSaleState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import (
     NESTED_DETAIL_TABLE,
@@ -269,6 +269,20 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditSaleState),
+        rx.cond(
+            EditSaleState.has_source_request,
+            rx.hstack(
+                rx.text("Рух сформовано за заявкою", size="2", color=rx.color("gray", 11)),
+                rx.link(
+                    f"№{EditSaleState.source_request_id}",
+                    href=f"{routes.CATALOG_REQUESTS_VIEW_ID}{EditSaleState.source_request_id}",
+                    size="2",
+                ),
+                spacing="1",
+                align="center",
+            ),
+        ),
         rx.text("*Дата:", weight="medium"),
         controls.input_field(value=EditSaleState.item.movement.date, type="date", required=True, disabled=True, width="100%"),
         rx.text("*Склад:", weight="medium"),
@@ -282,8 +296,9 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditSaleState.is_view_only_edit,
             value=EditSaleState.id_incoming_storage,
+            on_change=EditSaleState.on_change_id_incoming_storage,
         ),
         rx.text("*Власник:", weight="medium"),
         rx.select.root(
@@ -296,8 +311,9 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditSaleState.is_view_only_edit,
             value=EditSaleState.id_incoming_owner,
+            on_change=EditSaleState.on_change_id_incoming_owner,
         ),
         rx.text("*Відповідальний:", weight="medium"),
         rx.select.root(
@@ -310,10 +326,12 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditSaleState.is_view_only_edit,
             value=EditSaleState.id_responsible,
+            on_change=EditSaleState.on_change_id_responsible,
         ),
         products_widget(width="100%"),
+        full_edit.reason_field(EditSaleState),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             EditSaleState.editable_statuses,

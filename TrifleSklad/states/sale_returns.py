@@ -13,14 +13,18 @@ from TrifleSklad.dao_legacy import (
 )
 from TrifleSklad.declared import (
     MovementsStatus,
+    MovementsType,
     StorageType,
     movements_status_list,
     movements_type_list,
 )
 from TrifleSklad.models import Movement, Product, SaleReturn
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
+from TrifleSklad.services.errors import ServiceError
+from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -493,10 +497,136 @@ class AddSaleReturnsState(AppState):
         yield rx.toast.error(text)
 
 
-class EditSaleReturnsState(AppState):
+class EditSaleReturnsState(FullEditMixin, AppState):
+    MOVEMENT_TYPE = MovementsType.SALE_RETURN
+
     item: Optional[SaleReturn] = None
     in_process: bool = True
     status: str = ""
+
+    id_destination_storage: str = ""
+    selected_sale_id: str = ""
+    list_sales: List[Tuple[str, str]] = []
+    list_warehouses: List[Tuple[str, str]] = []
+
+    # Повернення продажу не використовує спільний віджет вибору одиниць: ТМЦ
+    # уже продано (is_deleted=True), тож перелік будується з одиниць вихідного
+    # продажу — так само, як на сторінці додавання.
+    units: List[Product] = []
+    selected_units: Dict[int, bool] = {}
+    compensations: Dict[int, str] = {}
+    expanded_catalogs: Dict[int, bool] = {}
+
+    def _load_warehouses(self):
+        self.list_warehouses = [
+            (s.title, str(s.id)) for s in StorageDAO.get_all_by_type(StorageType.WAREHOUSE)
+        ]
+
+    def _load_sales(self):
+        sales = {str(s.id): f"№{s.id} від {s.movement.date}" for s in SaleReturnDAO.get_returnable_sales()}
+        # Вихідний продаж цього повернення міг «зникнути» зі списку доступних
+        # (усі його одиниці вже повернені) — але лишатись обраним він мусить.
+        if self.selected_sale_id != "" and self.selected_sale_id not in sales:
+            sale = SaleDAO.get_by_id_with_all_relationship(int(self.selected_sale_id))
+            if sale is not None:
+                sales[self.selected_sale_id] = f"№{sale.id} від {sale.movement.date}"
+        self.list_sales = [(title, sale_id) for sale_id, title in sales.items()]
+
+    def _load_units(self, sale_id: int, movement_id: int, selected_ids: Optional[List[int]] = None):
+        self.units = SaleReturnDAO.get_sale_units_for_edit(sale_id, movement_id)
+        chosen = set(selected_ids) if selected_ids is not None else {p.id for p in self.units}
+        self.selected_units = {p.id: p.id in chosen for p in self.units}
+        self.compensations = {p.id: self.compensations.get(p.id, "") for p in self.units}
+        self.expanded_catalogs = {
+            p.product_catalog.id: True for p in self.units if p.product_catalog is not None
+        }
+
+    def _catalog_of(self, unit_id: int) -> Optional[int]:
+        for p in self.units:
+            if p.id == unit_id and p.product_catalog is not None:
+                return p.product_catalog.id
+        return None
+
+    def _unit_compensation(self, unit_id: int) -> float:
+        raw = self.compensations.get(unit_id, "")
+        try:
+            return float(raw) if raw not in (None, "") else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    @rx.var
+    def grouped_units(self) -> List[Tuple[int, str, int, str, List[Tuple[int, str, str]]]]:
+        order: List[int] = []
+        groups: Dict[int, Tuple[str, bool, int, List[Tuple[int, str, str]]]] = {}
+        for product in self.units:
+            catalog = product.product_catalog
+            if catalog is None:
+                continue
+            if catalog.id not in groups:
+                order.append(catalog.id)
+                groups[catalog.id] = (catalog.title, catalog.divisible, 0, [])
+            title, divisible, remainder, units = groups[catalog.id]
+            serial = product.serial_number if (catalog.uniq and product.serial_number) else "—"
+            remain = str(product.count) if catalog.divisible else "—"
+            units.append((product.id, serial, remain))
+            groups[catalog.id] = (title, divisible, remainder + (product.count or 0), units)
+        result: List[Tuple[int, str, int, str, List[Tuple[int, str, str]]]] = []
+        for catalog_id in order:
+            title, divisible, remainder, units = groups[catalog_id]
+            result.append((catalog_id, title, len(units), str(remainder) if divisible else "—", units))
+        return result
+
+    @rx.var
+    def position_sums(self) -> Dict[int, float]:
+        sums: Dict[int, float] = {}
+        for product in self.units:
+            if product.product_catalog is None or not self.selected_units.get(product.id, False):
+                continue
+            catalog_id = product.product_catalog.id
+            sums[catalog_id] = round(sums.get(catalog_id, 0.0) + self._unit_compensation(product.id), 2)
+        return sums
+
+    @rx.var
+    def total_compensation(self) -> float:
+        total = 0.0
+        for unit_id, selected in self.selected_units.items():
+            if selected:
+                total += self._unit_compensation(unit_id)
+        return round(total, 2)
+
+    @rx.event
+    def toggle_catalog(self, catalog_id: int):
+        self.expanded_catalogs[catalog_id] = not self.expanded_catalogs.get(catalog_id, False)
+
+    @rx.event
+    def toggle_unit(self, unit_id: int, checked: bool):
+        if self.can_edit_full:
+            self.selected_units[unit_id] = checked
+
+    @rx.event
+    def set_compensation(self, unit_id: int, value: str):
+        if self.can_edit_full:
+            self.compensations[unit_id] = value
+
+    @rx.event
+    def on_change_sale(self, value: str):
+        if not self.can_edit_full or value == "":
+            return
+        sale = SaleDAO.get_by_id_with_all_relationship(int(value))
+        if sale is None:
+            yield rx.toast.error("Продаж не знайдено!")
+            return
+        self.selected_sale_id = value
+        if sale.movement.id_incoming_storage is not None:
+            self.id_destination_storage = str(sale.movement.id_incoming_storage)
+        self.compensations = {}
+        self._load_units(int(value), self.item.id, selected_ids=[])
+        yield rx.toast.warning("Перелік одиниць оновлено — оберіть, що саме повертається!")
+
+    @rx.event
+    def on_change_id_destination_storage(self, value: str):
+        if self.can_edit_full:
+            self.id_destination_storage = value
 
     def _status_index(self) -> int:
         for index, status_text in enumerate(movements_status_list):
@@ -531,6 +661,29 @@ class EditSaleReturnsState(AppState):
             yield rx.toast.error("Запис не знайдено!")
             return
         self.status = movements_status_list[self.item.movement.status]
+        self.selected_sale_id = str(self.item.id_sale)
+        self.id_destination_storage = str(self.item.movement.id_destination_storage)
+
+        self._load_warehouses()
+        self._load_sales()
+        self._load_editability(self.item.id)
+
+        current_ids = [
+            product.id
+            for position in self.item.movement.products_catalog
+            for product in position.products
+        ]
+        self.compensations = {}
+        self._load_units(self.item.id_sale, self.item.id, selected_ids=current_ids)
+        # Компенсація зберігається на позицію каталогу — при редагуванні
+        # розкладаємо її по обраних одиницях цієї позиції порівну.
+        for position in self.item.movement.products_catalog:
+            unit_ids = [product.id for product in position.products]
+            if not unit_ids:
+                continue
+            per_unit = round(position.price / len(unit_ids), 2)
+            for unit_id in unit_ids:
+                self.compensations[unit_id] = str(per_unit)
         self.in_process = False
 
     @rx.event
@@ -559,6 +712,62 @@ class EditSaleReturnsState(AppState):
             yield rx.toast.error(
                 "Скасування виконується кнопкою «Скасувати», а не через редагування!"
             )
+            return
+
+        if self.can_edit_full:
+            error = self._require_reason()
+            if error is not None:
+                yield rx.toast.error(error)
+                return
+            if not StorageDAO.is_type(int(self.id_destination_storage), StorageType.WAREHOUSE):
+                yield rx.toast.error("Повертати ТМЦ можна лише на склад!")
+                return
+            selected_ids = [uid for uid, sel in self.selected_units.items() if sel]
+            if len(selected_ids) == 0:
+                yield rx.toast.error("Оберіть хоча б одну одиницю для повернення!")
+                return
+            compensations: Dict[int, float] = {}
+            for unit_id in selected_ids:
+                catalog_id = self._catalog_of(unit_id)
+                if catalog_id is None:
+                    continue
+                value = self._unit_compensation(unit_id)
+                if value < 0:
+                    yield rx.toast.error("Компенсована вартість не може бути від'ємною!")
+                    return
+                compensations[catalog_id] = round(compensations.get(catalog_id, 0.0) + value, 2)
+
+            sale = SaleDAO.get_by_id_with_all_relationship(int(self.selected_sale_id))
+            if sale is None:
+                yield rx.toast.error("Продаж не знайдено!")
+                return
+            # Власником повернених одиниць стає той, з ким їх було продано.
+            last_owner = sale.movement.id_incoming_owner
+            try:
+                MovementEditService().save_full(
+                    FullEditPayload(
+                        movement_id=self.item.id,
+                        movement_type=MovementsType.SALE_RETURN,
+                        reason=self.edit_reason,
+                        header={
+                            "id_incoming_owner": last_owner,
+                            "id_destination_owner": last_owner,
+                            "id_destination_storage": int(self.id_destination_storage),
+                            "status": status_index,
+                            "comment": self.item.movement.comment,
+                        },
+                        child={"id_sale": int(self.selected_sale_id)},
+                        unit_plan=[(unit_id, None) for unit_id in selected_ids],
+                        prices=compensations,
+                    ),
+                    self.user.login,
+                )
+            except ServiceError as e:
+                yield rx.toast.error(str(e))
+                return
+            yield rx.toast.success("Повернення продажу змінено!")
+            yield ListSaleReturnsState.on_load()
+            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{self.item.id}")
             return
 
         form_data = {

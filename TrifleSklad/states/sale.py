@@ -26,8 +26,11 @@ from TrifleSklad.models import Movement, Product, Sale
 from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
+from TrifleSklad.services.errors import ServiceError
+from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -595,9 +598,13 @@ class AddSaleState(LookupCreatorsMixin, AppState):
         yield rx.toast.error(text)
 
 
-class EditSaleState(AppState):
+class EditSaleState(FullEditMixin, AppState):
+    MOVEMENT_TYPE = MovementsType.SALE
+
     item: Optional[Sale] = None
     in_process: bool = True
+    # id заявки, за якою сформовано продаж (інформаційно — заявку не чіпаємо).
+    source_request_id: str = ""
 
     id_incoming_storage: str = ""
     id_incoming_owner: str = ""
@@ -673,17 +680,59 @@ class EditSaleState(AppState):
         self._load_list_owners()
         self._load_list_workers()
 
+        self._load_editability(self.item.id)
+        request_id = RequestDAO.get_id_by_movement(self.item.id)
+        self.source_request_id = str(request_id) if request_id is not None else ""
+
         self._products_movement_list_state = await self.get_state(ProductsMovementListState)
         await self._products_movement_list_state.on_load()
-        self._products_movement_list_state.set_view_mode(True)
+        self._products_movement_list_state.set_view_mode(not self.can_edit_full)
+        self._products_movement_list_state.set_require_serial(True)
+        self._products_movement_list_state.set_require_price(True)
+        self._products_movement_list_state.filter_by_storage = self.item.movement.id_incoming_storage
+        self._products_movement_list_state.filter_by_owner = self.item.movement.id_incoming_owner
 
         all_products: List[Product] = []
         for product_category in self.item.movement.products_catalog:
             for product in product_category.products:
                 product.product_catalog = product_category.product
                 all_products.append(product)
-        self._products_movement_list_state.items = all_products
+        # Ціни позицій підтягуємо з руху — інакше в режимі редагування поля
+        # порожні, а підсумок порахувався б у нуль.
+        self._products_movement_list_state.prefill_for_edit(
+            all_products,
+            {pc.id_product_catalog: pc.price for pc in self.item.movement.products_catalog},
+        )
         self.in_process = False
+
+    @rx.var
+    def has_source_request(self) -> bool:
+        return self.source_request_id != ""
+
+    @rx.event
+    def on_change_id_incoming_storage(self, value: str):
+        if not self.can_edit_full:
+            return
+        self.id_incoming_storage = value
+        if self._products_movement_list_state is not None:
+            self._products_movement_list_state.filter_by_storage = int(value)
+            self._products_movement_list_state.items = []
+        yield rx.toast.warning("Перелік ТМЦ очищено — оберіть одиниці на новому складі!")
+
+    @rx.event
+    def on_change_id_incoming_owner(self, value: str):
+        if not self.can_edit_full:
+            return
+        self.id_incoming_owner = value
+        if self._products_movement_list_state is not None:
+            self._products_movement_list_state.filter_by_owner = int(value)
+            self._products_movement_list_state.items = []
+        yield rx.toast.warning("Перелік ТМЦ очищено — оберіть одиниці нового власника!")
+
+    @rx.event
+    def on_change_id_responsible(self, value: str):
+        if self.can_edit_full:
+            self.id_responsible = value
 
     @rx.event
     def on_change_status(self, value: str):
@@ -716,6 +765,57 @@ class EditSaleState(AppState):
             yield rx.toast.error(
                 "Скасування виконується кнопкою «Скасувати», а не через редагування!"
             )
+            return
+
+        if self.can_edit_full:
+            error = self._require_reason()
+            if error is not None:
+                yield rx.toast.error(error)
+                return
+            if not StorageDAO.is_type(int(self.id_incoming_storage), StorageType.WAREHOUSE):
+                yield rx.toast.error("Продаж можливий лише зі складу!")
+                return
+            flag, text, plan = self._products_movement_list_state.collect_unit_plan()
+            if not flag:
+                yield rx.toast.error(text)
+                return
+            if len(plan) == 0:
+                yield rx.toast.error("Список ТМЦ для продажу порожній!")
+                return
+            prices = self._products_movement_list_state.get_prices()
+            for product in self._products_movement_list_state.items:
+                catalog_id = product.id_product_catalog
+                if prices.get(catalog_id, 0.0) <= 0:
+                    yield rx.toast.error("Вкажіть ціну для кожної позиції!")
+                    return
+            try:
+                MovementEditService().save_full(
+                    FullEditPayload(
+                        movement_id=self.item.id,
+                        movement_type=MovementsType.SALE,
+                        reason=self.edit_reason,
+                        header={
+                            "id_incoming_storage": int(self.id_incoming_storage),
+                            "id_incoming_owner": int(self.id_incoming_owner),
+                            "status": status_index,
+                            "comment": self.item.movement.comment,
+                        },
+                        child={
+                            "id_responsible": int(self.id_responsible),
+                            "client_info": self.item.client_info,
+                        },
+                        unit_plan=plan,
+                        prices=prices,
+                        serials=self._products_movement_list_state.collect_serials(),
+                    ),
+                    self.user.login,
+                )
+            except ServiceError as e:
+                yield rx.toast.error(str(e))
+                return
+            yield rx.toast.success("Продаж змінено!")
+            yield ListSaleState.on_load()
+            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{self.item.id}")
             return
 
         form_data = {

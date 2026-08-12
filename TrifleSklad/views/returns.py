@@ -17,7 +17,7 @@ from TrifleSklad.states.returns import (
     ViewReturnsState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
@@ -177,13 +177,41 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditReturnsState),
         rx.text("*Дата:", weight="medium"),
         controls.input_field(value=EditReturnsState.item.date, type="date", required=True, disabled=True, width="100%"),
-        rx.text("Звідки (площадка/відділ/клієнт):", weight="medium"),
-        controls.input_field(value=EditReturnsState.item.incoming_storage.title, disabled=True, width="100%"),
-        rx.text("Склад призначення:", weight="medium"),
-        controls.input_field(value=EditReturnsState.item.destination_storage.title, disabled=True, width="100%"),
+        rx.text("*Звідки (площадка/відділ/клієнт):", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    EditReturnsState.list_source_storages,
+                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                ),
+                width="100%",
+            ),
+            required=True,
+            disabled=EditReturnsState.is_view_only_edit,
+            value=EditReturnsState.id_incoming_storage,
+            on_change=EditReturnsState.on_change_id_incoming_storage,
+        ),
+        rx.text("*Склад призначення:", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+            rx.select.content(
+                rx.foreach(
+                    EditReturnsState.list_destination_storages,
+                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                ),
+                width="100%",
+            ),
+            required=True,
+            disabled=EditReturnsState.is_view_only_edit,
+            value=EditReturnsState.id_destination_storage,
+            on_change=EditReturnsState.on_change_id_destination_storage,
+        ),
         products_widget(width="100%"),
+        full_edit.reason_field(EditReturnsState),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             EditReturnsState.editable_statuses,

@@ -21,7 +21,7 @@ from TrifleSklad.states.client_issue import (
     ViewClientIssueState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
@@ -254,11 +254,12 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditClientIssueState),
         rx.text("*Дата:", weight="medium"),
         controls.input_field(
             type="date",
             required=True,
-            disabled=True,
+            disabled=EditClientIssueState.is_view_only_edit,
             default_value=EditClientIssueState.item.movement.date,
             width="100%",
             on_change=EditClientIssueState.on_change_date,
@@ -273,7 +274,7 @@ def _edit_form() -> rx.Component:
                 ),
                 width="100%",
             ),
-            disabled=True,
+            disabled=EditClientIssueState.is_view_only_edit,
             required=True,
             value=EditClientIssueState.id_incoming_storage,
             on_change=EditClientIssueState.on_change_id_incoming_storage,
@@ -289,7 +290,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditClientIssueState.is_view_only_edit,
             value=EditClientIssueState.id_incoming_owner,
             on_change=EditClientIssueState.on_change_id_incoming_owner,
         ),
@@ -313,7 +314,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditClientIssueState.is_view_only_edit,
             value=EditClientIssueState.id_destination_storage,
             on_change=EditClientIssueState.on_change_id_destination_storage,
         ),
@@ -341,11 +342,12 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditClientIssueState.is_view_only_edit,
             value=EditClientIssueState.id_recipient,
             on_change=EditClientIssueState.on_change_id_recipient,
         ),
         products_widget(width="100%"),
+        full_edit.reason_field(EditClientIssueState),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             EditClientIssueState.editable_statuses,

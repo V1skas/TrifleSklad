@@ -49,8 +49,14 @@ class BaseAuditAction(BaseModel):
     summary: str = ""
     fields: Dict[str, FieldChange] = {}
     lines: List[LineChange] = []
+    # «Причина коригування» — обов'язкова при повному редагуванні руху ТМЦ
+    # (services/movement_edit.py). Скалярний дефолт: старі записи `audit_logs`
+    # без цього ключа розбираються без міграції БД.
+    reason: str = ""
 
     def has_changes(self) -> bool:
+        # Причина навмисно НЕ враховується: збереження без реальних змін не
+        # повинно засмічувати історію порожнім записом із самою лише причиною.
         return bool(self.fields) or bool(self.lines)
 
     def describe(self) -> List[str]:
@@ -132,27 +138,46 @@ class BaseAuditAction(BaseModel):
 
     @classmethod
     def for_create(
-        cls, obj: Any, session: Session, *, summary: str = "", lines: Optional[List[LineChange]] = None
+        cls,
+        obj: Any,
+        session: Session,
+        *,
+        summary: str = "",
+        lines: Optional[List[LineChange]] = None,
+        reason: str = "",
     ) -> "BaseAuditAction":
         fields = {
             name: FieldChange(new=cls._resolve(name, getattr(obj, name, None), session))
             for name in cls._auto_fields()
         }
-        return cls(summary=summary, fields=fields, lines=lines or [])
+        return cls(summary=summary, fields=fields, lines=lines or [], reason=reason)
 
     @classmethod
     def for_delete(
-        cls, obj: Any, session: Session, *, summary: str = "", lines: Optional[List[LineChange]] = None
+        cls,
+        obj: Any,
+        session: Session,
+        *,
+        summary: str = "",
+        lines: Optional[List[LineChange]] = None,
+        reason: str = "",
     ) -> "BaseAuditAction":
         fields = {
             name: FieldChange(old=cls._resolve(name, getattr(obj, name, None), session))
             for name in cls._auto_fields()
         }
-        return cls(summary=summary, fields=fields, lines=lines or [])
+        return cls(summary=summary, fields=fields, lines=lines or [], reason=reason)
 
     @classmethod
     def from_diff(
-        cls, old: Any, new: Any, session: Session, *, summary: str = "", lines: Optional[List[LineChange]] = None
+        cls,
+        old: Any,
+        new: Any,
+        session: Session,
+        *,
+        summary: str = "",
+        lines: Optional[List[LineChange]] = None,
+        reason: str = "",
     ) -> "BaseAuditAction":
         fields: Dict[str, FieldChange] = {}
         for name in cls._auto_fields():
@@ -163,4 +188,4 @@ class BaseAuditAction(BaseModel):
                     old=cls._resolve(name, old_val, session),
                     new=cls._resolve(name, new_val, session),
                 )
-        return cls(summary=summary, fields=fields, lines=lines or [])
+        return cls(summary=summary, fields=fields, lines=lines or [], reason=reason)

@@ -39,10 +39,12 @@ from TrifleSklad.audit.actions.worker import WorkerCreated
 from TrifleSklad.audit.base import LineChange
 from TrifleSklad.audit.labels import (
     diff_position_lines,
+    diff_unit_lines,
     movement_position_label,
     movement_position_title,
     movement_view,
     snapshot_position_lines,
+    snapshot_unit_rows,
 )
 from TrifleSklad.declared import MovementsStatus, MovementsType, RequestStatus, sale_line_cost
 from TrifleSklad.models import (
@@ -2316,51 +2318,33 @@ class MovementDAO:
     def restore_products_to_previous_location(
         cls, product_ids: List[int], current_movement_id: int
     ) -> tuple[bool, str]:
-        """Повертає кожну одиницю товару на місце, куди її привів попередній рух —
-        рух із максимальним id < current_movement_id, що містить цю одиницю і не
-        скасований. За точку призначення береться destination_owner/destination_storage
-        того руху (наскрізна нумерація рухів = порядок у часі). Якщо попереднього руху
-        немає або в нього не задано місце призначення — одиниця залишається на місці."""
+        """Повертає одиниці в джерело самого руху `current_movement_id` —
+        `id_incoming_storage`/`id_incoming_owner`.
+
+        Під інваріантом «у русі лише ТМЦ того складу й власника, що в шапці»
+        (забезпечується діалогом вибору при створенні) шапка й є достовірним
+        «звідки» для кожної одиниці. Раніше метод реконструював попереднє місце
+        обходом ланцюжка рухів — це ламалося на даних, що порушують інваріант.
+        Для повернення (RETURN) `id_incoming_owner` не задано — тоді змінюється
+        лише склад, кожна одиниця зберігає свого власника."""
         if len(product_ids) == 0:
             return True, "Нет единиц для возврата"
         try:
             with rx.session() as session:
+                movement = session.get(Movement, current_movement_id)
+                if movement is None:
+                    return False, "Помилка: рух не знайдено"
                 for product_id in product_ids:
-                    statement = (
-                        select(Movement)
-                        .join(
-                            MovementProductsCatalog,
-                            MovementProductsCatalog.id_movement == Movement.id,
-                        )
-                        .join(
-                            MovementProducts,
-                            MovementProducts.id_movement_product
-                            == MovementProductsCatalog.id,
-                        )
-                        .where(MovementProducts.id_product == product_id)
-                        .where(Movement.id < current_movement_id)
-                        .where(Movement.status != MovementsStatus.CANCELED)
-                        .order_by(Movement.id.desc())
-                        .limit(1)
-                    )
-                    previous = session.exec(statement).first()
-                    if previous is None:
-                        continue
-                    if (
-                        previous.id_destination_owner is None
-                        or previous.id_destination_storage is None
-                    ):
-                        continue
-
                     product = session.get(Product, product_id)
                     if product is None:
                         continue
-                    product.id_owner = previous.id_destination_owner
-                    product.id_storage = previous.id_destination_storage
+                    product.id_storage = movement.id_incoming_storage
+                    if movement.id_incoming_owner is not None:
+                        product.id_owner = movement.id_incoming_owner
                     session.add(product)
 
                 session.commit()
-                return True, "Единицы товара возвращены на предыдущее место"
+                return True, "Единицы товара возвращены в источник движения"
 
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}"
@@ -2910,7 +2894,21 @@ class AdmissionDAO:
             return False, "Системна помилка!", -1
 
     @classmethod
-    def edit_one(cls, admission: Admission, actor_login: str) -> tuple[bool, str, int]:
+    def edit_one(
+        cls,
+        admission: Admission,
+        actor_login: str,
+        reason: str = "",
+        removed_line_ids: Optional[List[int]] = None,
+    ) -> tuple[bool, str, int]:
+        """Редагування постачання. `reason` — обов'язкова причина коригування при
+        повному редагуванні (йде в аудит). `removed_line_ids` — позиції, які
+        користувач прибрав із переліку у формі: видаляються тут, у тій самій
+        транзакції (раніше рядок зникав із БД одразу при кліку, ще до збереження).
+
+        Одиниці, що випали зі складу позицій, видаляються фізично: постачання —
+        це рух, який їх породив, тож інакше вони лишились би в залишках без
+        жодного руху (session.merge прибирає лише рядки зв'язку)."""
         try:
             _reconcile_catalog_instances(admission.movement)
             with rx.session() as session:
@@ -2919,9 +2917,38 @@ class AdmissionDAO:
                     return False, "Помилка! Постачання не знайдено.", -1
                 old_snapshot = AdmissionUpdated.snapshot(movement_view(old_admission))
                 old_positions = snapshot_position_lines(old_admission.movement.products_catalog)
+                old_units = [
+                    product
+                    for position in old_admission.movement.products_catalog
+                    for product in position.products
+                ]
+                old_unit_rows = snapshot_unit_rows(old_units)
+
+                for line_id in removed_line_ids or []:
+                    flag, text = cls._delete_line_in_session(session, line_id)
+                    if not flag:
+                        return False, text, -1
 
                 merged = session.merge(admission)
+                session.flush()
 
+                kept_unit_ids = {
+                    product.id
+                    for position in merged.movement.products_catalog
+                    for product in position.products
+                }
+                for unit in old_units:
+                    if unit.id not in kept_unit_ids:
+                        session.delete(session.get(Product, unit.id))
+                session.flush()
+
+                new_unit_rows = snapshot_unit_rows(
+                    [
+                        product
+                        for position in merged.movement.products_catalog
+                        for product in position.products
+                    ]
+                )
                 position_lines = diff_position_lines(
                     old_positions, merged.movement.products_catalog, session,
                     key=lambda x: x.id_product_catalog,
@@ -2929,7 +2956,13 @@ class AdmissionDAO:
                 )
                 record_action(
                     session, actor_login, merged.id,
-                    AdmissionUpdated.from_diff(old_snapshot, movement_view(merged), session, lines=position_lines),
+                    AdmissionUpdated.from_diff(
+                        old_snapshot,
+                        movement_view(merged),
+                        session,
+                        reason=reason,
+                        lines=position_lines + diff_unit_lines(old_unit_rows, new_unit_rows, session),
+                    ),
                 )
 
                 session.commit()
@@ -2975,6 +3008,55 @@ class AdmissionDAO:
             ).all()
             return len(other_movements_with_current_products) == 0
 
+    @staticmethod
+    def _delete_line_in_session(
+        session, id_movement_products_catalog: int, *, actor_login: Optional[str] = None
+    ) -> tuple[bool, str]:
+        """Видаляє рядок переліку ТМЦ поставлення разом з його одиницями у ПЕРЕДАНІЙ
+        сесії (без commit) — за умови, що жодна одиниця рядка не фігурує в іншому
+        русі. `actor_login` заданий — пише окремий запис аудиту (самостійне
+        видалення позиції); None — виклик усередині edit_one, де аудит формується
+        одним записом на все збереження."""
+        mpc: Optional[MovementProductsCatalog] = session.get(
+            MovementProductsCatalog, id_movement_products_catalog
+        )
+        if mpc is None:
+            return False, "Помилка! Позицію не знайдено."
+
+        products_in_line: List[MovementProducts] = session.exec(
+            select(MovementProducts).where(MovementProducts.id_movement_product == mpc.id)
+        ).all()
+        products: List[Product] = session.exec(
+            select(Product).where(Product.id.in_([p.id_product for p in products_in_line]))
+        ).all()
+
+        other_movements_with_current_products = session.exec(
+            select(MovementProducts)
+            .where(MovementProducts.id_product.in_([p.id for p in products]))
+            .where(MovementProducts.id_movement_product != mpc.id)
+        ).all()
+        if len(other_movements_with_current_products) > 0:
+            return (
+                False,
+                "Помилка! Позицію не можна видалити, оскільки товар вже використовується в іншому русі.",
+            )
+
+        if actor_login is not None:
+            removed_line = LineChange(
+                kind="removed",
+                title=movement_position_title(mpc, session),
+                old=movement_position_label(mpc, session),
+            )
+            record_action(session, actor_login, mpc.id_movement, AdmissionUpdated(lines=[removed_line]))
+
+        for item in products_in_line:
+            session.delete(item)
+        for item in products:
+            session.delete(item)
+        session.delete(mpc)
+        session.flush()
+        return True, "Позицію видалено!"
+
     @classmethod
     def delete_product_line(cls, id_movement_products_catalog: int, actor_login: str) -> tuple[bool, str]:
         """Видаляє один рядок переліку ТМЦ поставлення (позицію каталогу разом
@@ -2982,50 +3064,13 @@ class AdmissionDAO:
         фігурує в іншому русі. Використовується при редагуванні поставлення."""
         try:
             with rx.session() as session:
-                mpc: Optional[MovementProductsCatalog] = session.get(
-                    MovementProductsCatalog, id_movement_products_catalog
+                flag, text = cls._delete_line_in_session(
+                    session, id_movement_products_catalog, actor_login=actor_login
                 )
-                if mpc is None:
-                    return False, "Помилка! Позицію не знайдено."
-
-                products_in_line: List[MovementProducts] = session.exec(
-                    select(MovementProducts).where(
-                        MovementProducts.id_movement_product == mpc.id
-                    )
-                ).all()
-                products: List[Product] = session.exec(
-                    select(Product).where(
-                        Product.id.in_([p.id_product for p in products_in_line])
-                    )
-                ).all()
-
-                other_movements_with_current_products = session.exec(
-                    select(MovementProducts)
-                    .where(
-                        MovementProducts.id_product.in_([p.id for p in products])
-                    )
-                    .where(MovementProducts.id_movement_product != mpc.id)
-                ).all()
-                if len(other_movements_with_current_products) > 0:
-                    return (
-                        False,
-                        "Помилка! Позицію не можна видалити, оскільки товар вже використовується в іншому русі.",
-                    )
-
-                removed_line = LineChange(
-                    kind="removed",
-                    title=movement_position_title(mpc, session),
-                    old=movement_position_label(mpc, session),
-                )
-                record_action(session, actor_login, mpc.id_movement, AdmissionUpdated(lines=[removed_line]))
-
-                for item in products_in_line:
-                    session.delete(item)
-                for item in products:
-                    session.delete(item)
-                session.delete(mpc)
+                if not flag:
+                    return False, text
                 session.commit()
-                return True, "Позицію видалено!"
+                return True, text
 
         except IntegrityError:
             return False, "Помилка! Позицію не може бути видалено."
@@ -3953,6 +3998,43 @@ class SaleReturnDAO:
             return list(products)
 
     @classmethod
+    def get_sale_units_for_edit(cls, sale_id: int, movement_id: int) -> List[Product]:
+        """Одиниці продажу, доступні при РЕДАГУВАННІ повернення: ще не повернені
+        (is_deleted == True) ПЛЮС ті, що вже входять у це саме повернення (вони
+        зараз is_deleted == False, але мають лишатися в переліку для вибору)."""
+        already_in_movement = (
+            select(MovementProducts.id_product)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id == MovementProducts.id_movement_product,
+            )
+            .where(MovementProductsCatalog.id_movement == movement_id)
+        )
+        statement = (
+            select(Product)
+            .options(joinedload(Product.product_catalog))
+            .join(MovementProducts, MovementProducts.id_product == Product.id)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id == MovementProducts.id_movement_product,
+            )
+            .where(MovementProductsCatalog.id_movement == sale_id)
+            .where(
+                or_(
+                    Product.is_deleted == True,
+                    Product.id.in_(already_in_movement),
+                )
+            )
+            .distinct()
+            .order_by(Product.id_product_catalog, Product.id)
+        )
+        with rx.session() as session:
+            products = session.exec(statement).all()
+            if len(products) > 0:
+                session.expunge_all()
+            return list(products)
+
+    @classmethod
     def add_one(cls, form_data: dict, actor_login: str) -> tuple[bool, str, int]:
         """Створює повернення продажу: Movement (тип SALE_RETURN) із позиціями
         (price = компенсація за позицію, total_cost = Σ компенсацій) і дочірній
@@ -4289,6 +4371,15 @@ class RequestDAO:
 
         except SQLAlchemyError as e:
             return False, "Системна помилка!"
+
+    @classmethod
+    def get_id_by_movement(cls, id_movement: int) -> Optional[int]:
+        """id заявки, сформованої в цей рух, або None. Для інформаційного рядка
+        «Рух сформовано за заявкою №N» на сторінці редагування руху."""
+        with rx.session() as session:
+            return session.exec(
+                select(Request.id).where(Request.id_movement == id_movement)
+            ).first()
 
     @classmethod
     def revert_completion_by_movement(cls, id_movement: int, actor_login: str) -> tuple[bool, str]:

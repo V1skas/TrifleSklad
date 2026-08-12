@@ -62,6 +62,17 @@ def _history_card(state, entry) -> rx.Component:
                         align="center",
                     ),
                     rx.text(entry[4], size="2", weight="medium", width="100%"),
+                    # Причина коригування видима без права на деталізацію —
+                    # це «навіщо», а не «що саме змінилось».
+                    rx.cond(
+                        entry[6] != "",
+                        rx.text(
+                            f"Причина коригування: {entry[6]}",
+                            size="2",
+                            color=rx.color("amber", 11),
+                            width="100%",
+                        ),
+                    ),
                     rx.text(entry[2], size="1", color=rx.color("gray", 9)),
                     spacing="1",
                     align="start",

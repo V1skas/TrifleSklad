@@ -1,4 +1,3 @@
-from datetime import date
 from typing import List, Optional, Tuple
 
 import reflex as rx
@@ -17,10 +16,10 @@ from TrifleSklad.dao_legacy import (
     SupplierDAO,
 )
 from TrifleSklad.declared import (
-    ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS,
     MovementsStatus,
     MovementsType,
     StorageType,
+    admission_nds_split,
     format_amount,
     generate_serial_range,
     movements_status_list,
@@ -38,6 +37,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -798,16 +798,14 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
                 return rate
         return 0.0
 
+    def _nds_split(self) -> Tuple[float, float, float]:
+        """(база, ПДВ, разом) поточного переліку позицій — спільна формула
+        `declared.admission_nds_split`, одна для UI і для серверного перерахунку."""
+        lines = [(pc.count, pc.price) for pc in self.item.movement.products_catalog]
+        return admission_nds_split(lines, self._get_nds_rate_value(), self.item.flag_nds)
+
     def _recompute_total(self):
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0:
-            self.item.movement.total_cost = round(line_total, 2)
-            return
-        if self.item.flag_nds:
-            self.item.movement.total_cost = round(line_total, 2)
-        else:
-            self.item.movement.total_cost = round(line_total * (1 + rate), 2)
+        self.item.movement.total_cost = self._nds_split()[2]
 
     @rx.event
     def on_load(self):
@@ -902,32 +900,15 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
 
     @rx.var
     def subtotal_display(self) -> str:
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0:
-            return _format_money(line_total)
-        if self.item.flag_nds:
-            return _format_money(line_total / (1 + rate))
-        return _format_money(line_total)
+        return _format_money(self._nds_split()[0])
 
     @rx.var
     def nds_amount_display(self) -> str:
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0:
-            return _format_money(0)
-        if self.item.flag_nds:
-            subtotal = line_total / (1 + rate)
-            return _format_money(line_total - subtotal)
-        return _format_money(line_total * rate)
+        return _format_money(self._nds_split()[1])
 
     @rx.var
     def total_display(self) -> str:
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0 or self.item.flag_nds:
-            return _format_money(line_total)
-        return _format_money(line_total * (1 + rate))
+        return _format_money(self._nds_split()[2])
 
     @rx.event
     def on_change_search_name_destination_storage(self, value: str):
@@ -1193,7 +1174,9 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
         yield rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}")
 
 
-class EditAdmissionState(AppState):
+class EditAdmissionState(FullEditMixin, AppState):
+    MOVEMENT_TYPE = MovementsType.ADMISSION
+
     class ProductCatalogDialogPages:
         EDIT = "edit"
         VIEW = "view"
@@ -1216,7 +1199,9 @@ class EditAdmissionState(AppState):
     product_catalog_dialog_page: str = ""
     is_product_dialog_view_mode: bool = False
 
-    _can_edit_products: bool = False
+    # Позиції, які користувач прибрав із переліку: видаляються при збереженні,
+    # а не одразу при кліку (щоб «Скасувати» справді нічого не змінювало).
+    removed_line_ids: List[int] = []
 
     def _load_suppliers(self):
         self.list_suppliers = [
@@ -1255,18 +1240,18 @@ class EditAdmissionState(AppState):
                 return rate
         return 0.0
 
+    def _nds_split(self) -> Tuple[float, float, float]:
+        """(база, ПДВ, разом) поточного переліку позицій — спільна формула
+        `declared.admission_nds_split`, одна для UI і для серверного перерахунку."""
+        if self.item is None:
+            return 0.0, 0.0, 0.0
+        lines = [(pc.count, pc.price) for pc in self.item.movement.products_catalog]
+        return admission_nds_split(lines, self._get_nds_rate_value(), self.item.flag_nds)
+
     def _recompute_total(self):
         if self.item is None:
             return
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0:
-            self.item.movement.total_cost = round(line_total, 2)
-            return
-        if self.item.flag_nds:
-            self.item.movement.total_cost = round(line_total, 2)
-        else:
-            self.item.movement.total_cost = round(line_total * (1 + rate), 2)
+        self.item.movement.total_cost = self._nds_split()[2]
 
     @rx.event
     def on_load(self, id: str = ""):
@@ -1295,20 +1280,11 @@ class EditAdmissionState(AppState):
             yield rx.toast.error("Запис не знайдено!")
             return
 
-        self._can_edit_products = False
-        if self.has_permission(Action.ADMISSIONS_EDIT_PRODUCTS):
-            try:
-                movement_date = date.fromisoformat(self.item.movement.date)
-                within_window = (now_local().date() - movement_date).days <= ADMISSION_PRODUCTS_EDIT_WINDOW_DAYS
-            except ValueError:
-                within_window = False
-            if within_window and AdmissionDAO.can_edit_products(self.item.id):
-                self._can_edit_products = True
+        # Гвард повного редагування (право + вікно + відсутність пізніших рухів)
+        # спільний для всіх операцій — див. FullEditMixin/MovementEditService.
+        self._load_editability(self.item.id)
+        self.removed_line_ids = []
         self.in_process = False
-
-    @rx.var
-    def can_edit_products(self) -> bool:
-        return self._can_edit_products
 
     @rx.var
     def id_destination_storage(self) -> str:
@@ -1356,38 +1332,15 @@ class EditAdmissionState(AppState):
 
     @rx.var
     def subtotal_display(self) -> str:
-        if self.item is None:
-            return _format_money(0)
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0:
-            return _format_money(line_total)
-        if self.item.flag_nds:
-            return _format_money(line_total / (1 + rate))
-        return _format_money(line_total)
+        return _format_money(self._nds_split()[0])
 
     @rx.var
     def nds_amount_display(self) -> str:
-        if self.item is None:
-            return _format_money(0)
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0:
-            return _format_money(0)
-        if self.item.flag_nds:
-            subtotal = line_total / (1 + rate)
-            return _format_money(line_total - subtotal)
-        return _format_money(line_total * rate)
+        return _format_money(self._nds_split()[1])
 
     @rx.var
     def total_display(self) -> str:
-        if self.item is None:
-            return _format_money(0)
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = self._get_nds_rate_value() / 100.0
-        if rate <= 0 or self.item.flag_nds:
-            return _format_money(line_total)
-        return _format_money(line_total * (1 + rate))
+        return _format_money(self._nds_split()[2])
 
     @rx.var
     def item_status(self) -> str:
@@ -1423,17 +1376,17 @@ class EditAdmissionState(AppState):
 
     @rx.event
     def on_change_id_destination_storage(self, value: str):
-        if self.item is not None and value.lstrip("-").isdigit():
+        if self.item is not None and self.can_edit_full and value.lstrip("-").isdigit():
             self.item.movement.id_destination_storage = int(value)
 
     @rx.event
     def on_change_id_destination_owner(self, value: str):
-        if self.item is not None and value.lstrip("-").isdigit():
+        if self.item is not None and self.can_edit_full and value.lstrip("-").isdigit():
             self.item.movement.id_destination_owner = int(value)
 
     @rx.event
     def on_change_id_supplier(self, value: str):
-        if self.item is not None and value.lstrip("-").isdigit():
+        if self.item is not None and self.can_edit_full and value.lstrip("-").isdigit():
             self.item.id_supplier = int(value)
 
     @rx.event
@@ -1445,14 +1398,24 @@ class EditAdmissionState(AppState):
                 self.item.movement.status = index
                 return
 
+    @rx.var
+    def editable_statuses(self) -> List[str]:
+        """Без «Скасовано» — скасування руху виконується окремою дією, що
+        компенсує залишки, а не зміною статусу у формі."""
+        return [
+            status
+            for index, status in enumerate(movements_status_list)
+            if index != MovementsStatus.CANCELED
+        ]
+
     @rx.event
     def on_change_id_payment_type(self, value: str):
-        if self.item is not None and value.lstrip("-").isdigit():
+        if self.item is not None and self.can_edit_full and value.lstrip("-").isdigit():
             self.item.id_payment_type = int(value)
 
     @rx.event
     def on_change_flag_nds(self, value: bool):
-        if self.item is None:
+        if self.item is None or not self.can_edit_full:
             return
         self.item.flag_nds = value
         self._recompute_total()
@@ -1478,7 +1441,7 @@ class EditAdmissionState(AppState):
 
     @rx.event
     def on_change_dollar_rate(self, value: str):
-        if self.item is None:
+        if self.item is None or not self.can_edit_full:
             return
         try:
             self.item.dollar_rate = float(value)
@@ -1487,7 +1450,7 @@ class EditAdmissionState(AppState):
 
     @rx.event
     def on_change_date(self, value: str):
-        if self.item is not None:
+        if self.item is not None and self.can_edit_full:
             self.item.movement.date = value
 
     @rx.event
@@ -1508,7 +1471,7 @@ class EditAdmissionState(AppState):
 
     @rx.event
     async def add_product_catalog_dialog_open(self):
-        if self.item is None or not self._can_edit_products:
+        if self.item is None or not self.can_edit_full:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
@@ -1528,7 +1491,7 @@ class EditAdmissionState(AppState):
 
     @rx.event
     async def edit_product_catalog_dialog(self):
-        if self.item is None or not self._can_edit_products:
+        if self.item is None or not self.can_edit_full:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         self.is_product_dialog_view_mode = False
@@ -1550,7 +1513,7 @@ class EditAdmissionState(AppState):
 
     @rx.event
     async def on_save_product_catalog_dialog(self):
-        if self.item is None or not self._can_edit_products:
+        if self.item is None or not self.can_edit_full:
             return
         form_state = await self.get_state(MovementProductCatalogAddEditFormState)
         if form_state.has_errors:
@@ -1572,18 +1535,16 @@ class EditAdmissionState(AppState):
 
     @rx.event
     def delete_product_catalog_row(self, index: int):
-        if self.item is None or not self._can_edit_products:
+        if self.item is None or not self.can_edit_full:
             return rx.toast.error("У Вас немає дозволу на редагування переліку ТМЦ!")
         if index < 0 or index >= len(self.item.movement.products_catalog):
             return
         pc = self.item.movement.products_catalog[index]
         if pc.id is not None and pc.id > 0:
-            flag, text = AdmissionDAO.delete_product_line(pc.id, self.user.login)
-            if not flag:
-                return rx.toast.error(text)
+            self.removed_line_ids.append(pc.id)
         del self.item.movement.products_catalog[index]
         self._recompute_total()
-        return rx.toast.success("Позицію видалено!")
+        return rx.toast.info("Позицію прибрано з переліку — збережіть, щоб застосувати.")
 
     @rx.event
     def edit_one(self):
@@ -1602,6 +1563,11 @@ class EditAdmissionState(AppState):
         if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number, exclude_id=self.item.id):
             yield rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
             return
+        if self.can_edit_full:
+            error = self._require_reason()
+            if error is not None:
+                yield rx.toast.error(error)
+                return
         self.item.movement.id_user = self.user.login
 
         for pc in self.item.movement.products_catalog:
@@ -1609,8 +1575,14 @@ class EditAdmissionState(AppState):
                 product.id_storage = self.item.movement.id_destination_storage
                 product.id_owner = self.item.movement.id_destination_owner
 
-        flag, text, id = AdmissionDAO.edit_one(self.item, self.user.login)
+        flag, text, id = AdmissionDAO.edit_one(
+            self.item,
+            self.user.login,
+            reason=self.edit_reason,
+            removed_line_ids=list(self.removed_line_ids),
+        )
         if flag:
+            self.removed_line_ids = []
             yield rx.toast.success(text)
             yield ListAdmissionState.on_load()
             yield rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}")
@@ -1723,34 +1695,25 @@ class ViewAdmissionState(AuditHistoryMixin, AppState):
     def invoice_number(self) -> str:
         return self.item.invoice_number if self.item.invoice_number is not None else ""
 
+    def _nds_split(self) -> Tuple[float, float, float]:
+        """(база, ПДВ, разом) — спільна формула `declared.admission_nds_split`.
+        Ставка тут береться з завантаженого relationship `Admission.nds_rate`
+        (у View немає кешу ставок, як в Add/Edit)."""
+        lines = [(pc.count, pc.price) for pc in self.item.movement.products_catalog]
+        rate = self.item.nds_rate.rate if self.item.nds_rate is not None else 0.0
+        return admission_nds_split(lines, rate, self.item.flag_nds)
+
     @rx.var
     def subtotal_display(self) -> str:
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
-        if rate <= 0:
-            return _format_money(line_total)
-        if self.item.flag_nds:
-            return _format_money(line_total / (1 + rate))
-        return _format_money(line_total)
+        return _format_money(self._nds_split()[0])
 
     @rx.var
     def nds_amount_display(self) -> str:
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
-        if rate <= 0:
-            return _format_money(0)
-        if self.item.flag_nds:
-            subtotal = line_total / (1 + rate)
-            return _format_money(line_total - subtotal)
-        return _format_money(line_total * rate)
+        return _format_money(self._nds_split()[1])
 
     @rx.var
     def total_display(self) -> str:
-        line_total = sum(pc.count * pc.price for pc in self.item.movement.products_catalog)
-        rate = (self.item.nds_rate.rate / 100.0) if self.item.nds_rate is not None else 0.0
-        if rate <= 0 or self.item.flag_nds:
-            return _format_money(line_total)
-        return _format_money(line_total * (1 + rate))
+        return _format_money(self._nds_split()[2])
 
     @rx.event
     async def on_change_dialog_open(self, index: int):

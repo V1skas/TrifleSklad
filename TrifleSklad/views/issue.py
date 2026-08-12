@@ -21,7 +21,7 @@ from TrifleSklad.states.issue import (
     ViewIssueState,
 )
 from TrifleSklad.views.auth import require_login
-from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
 from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
 
@@ -280,11 +280,25 @@ def add_page() -> rx.Component:
 
 def _edit_form() -> rx.Component:
     return rx.vstack(
+        full_edit.full_edit_notice(EditIssueState),
+        rx.cond(
+            EditIssueState.has_source_request,
+            rx.hstack(
+                rx.text("Рух сформовано за заявкою", size="2", color=rx.color("gray", 11)),
+                rx.link(
+                    f"№{EditIssueState.source_request_id}",
+                    href=f"{routes.CATALOG_REQUESTS_VIEW_ID}{EditIssueState.source_request_id}",
+                    size="2",
+                ),
+                spacing="1",
+                align="center",
+            ),
+        ),
         rx.text("*Дата:", weight="medium"),
         controls.input_field(
             type="date",
             required=True,
-            disabled=True,
+            disabled=EditIssueState.is_view_only_edit,
             default_value=EditIssueState.item.movement.date,
             width="100%",
             on_change=EditIssueState.on_change_date,
@@ -299,7 +313,7 @@ def _edit_form() -> rx.Component:
                 ),
                 width="100%",
             ),
-            disabled=True,
+            disabled=EditIssueState.is_view_only_edit,
             required=True,
             value=EditIssueState.id_incoming_storage,
             on_change=EditIssueState.on_change_id_incoming_storage,
@@ -315,7 +329,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditIssueState.is_view_only_edit,
             value=EditIssueState.id_incoming_owner,
             on_change=EditIssueState.on_change_id_incoming_owner,
         ),
@@ -339,7 +353,7 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditIssueState.is_view_only_edit,
             value=EditIssueState.id_destination_storage,
             on_change=EditIssueState.on_change_id_destination_storage,
         ),
@@ -354,11 +368,12 @@ def _edit_form() -> rx.Component:
                 width="100%",
             ),
             required=True,
-            disabled=True,
+            disabled=EditIssueState.is_view_only_edit,
             value=EditIssueState.id_recipient,
             on_change=EditIssueState.on_change_id_recipient,
         ),
         products_widget(width="100%"),
+        full_edit.reason_field(EditIssueState),
         rx.text("*Статус:", weight="medium"),
         rx.select(
             EditIssueState.editable_statuses,

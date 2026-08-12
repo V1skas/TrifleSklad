@@ -13,7 +13,13 @@ from TrifleSklad.dao.storage import StorageDao
 from TrifleSklad.dao.supplier import SupplierDao
 from TrifleSklad.dao.user import UserDao
 from TrifleSklad.dao.worker import WorkerDao
-from TrifleSklad.declared import movements_status_list, movements_type_list, request_status_list, storage_type_list
+from TrifleSklad.declared import (
+    format_amount,
+    movements_status_list,
+    movements_type_list,
+    request_status_list,
+    storage_type_list,
+)
 
 ACTION_LABELS = {"create": "Створення", "update": "Редагування", "delete": "Видалення"}
 
@@ -137,6 +143,75 @@ def snapshot_position_lines(items: Optional[List[Any]]) -> List[SimpleNamespace]
     return [
         SimpleNamespace(id_product_catalog=item.id_product_catalog, count=item.count, price=item.price)
         for item in (items or [])
+    ]
+
+
+# Поріг, після якого поштучний перелік одиниць у записі аудиту замінюється
+# агрегатом — інакше рух на сотні одиниць роздуває JSON `audit_logs.changes`.
+UNIT_LINES_LIMIT = 50
+
+
+def snapshot_unit_rows(units: Optional[List[Any]]) -> List[SimpleNamespace]:
+    """Знімок складу руху (id одиниці / id каталогу / s/n / залишок) у незалежні
+    від ORM-сесії об'єкти — знімати ДО мутацій складу, та сама пастка identity
+    map, що й у `snapshot_position_lines`."""
+    return [
+        SimpleNamespace(
+            id=unit.id,
+            id_product_catalog=unit.id_product_catalog,
+            serial_number=unit.serial_number,
+            count=unit.count,
+        )
+        for unit in (units or [])
+    ]
+
+
+def _unit_title(unit: Any, session: Session) -> str:
+    return f"Одиниця №{unit.id} — {product_catalog_title(unit.id_product_catalog, session)}"
+
+
+def _unit_label(unit: Any) -> str:
+    chunks: List[str] = []
+    if getattr(unit, "serial_number", None):
+        chunks.append(f"s/n {unit.serial_number}")
+    if getattr(unit, "count", None) is not None:
+        chunks.append(f"залишок {format_amount(unit.count)}")
+    return " · ".join(chunks) if chunks else MISSING_LABEL
+
+
+def diff_unit_lines(
+    old_units: Optional[List[Any]],
+    new_units: Optional[List[Any]],
+    session: Session,
+) -> List[LineChange]:
+    """Діф складу руху до КОНКРЕТНИХ одиниць ТМЦ — доповнює
+    `diff_position_lines`, який схлопує позиції за id каталогу і тому не бачить
+    заміну однієї одиниці іншою в межах тієї самої позиції.
+
+    Понад `UNIT_LINES_LIMIT` змін — повертає агрегати замість поштучного
+    переліку."""
+    old_by_id = {unit.id: unit for unit in (old_units or [])}
+    new_by_id = {unit.id: unit for unit in (new_units or [])}
+    added = [unit for unit_id, unit in new_by_id.items() if unit_id not in old_by_id]
+    removed = [unit for unit_id, unit in old_by_id.items() if unit_id not in new_by_id]
+
+    if len(added) + len(removed) > UNIT_LINES_LIMIT:
+        result: List[LineChange] = []
+        if added:
+            result.append(LineChange(kind="added", title="Одиниці ТМЦ", new=f"{len(added)} шт."))
+        if removed:
+            result.append(LineChange(kind="removed", title="Одиниці ТМЦ", old=f"{len(removed)} шт."))
+        return result
+
+    return [
+        *(
+            LineChange(kind="added", title=_unit_title(unit, session), new=_unit_label(unit))
+            for unit in added
+        ),
+        *(
+            LineChange(kind="removed", title=_unit_title(unit, session), old=_unit_label(unit))
+            for unit in removed
+        ),
     ]
 
 

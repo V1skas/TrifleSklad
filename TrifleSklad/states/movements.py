@@ -16,8 +16,11 @@ from TrifleSklad.models import Movement, Product
 from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import MovementListFilterMixin
 from TrifleSklad.movement.products.backend import ProductsMovementListState
+from TrifleSklad.services.errors import ServiceError
+from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
 
@@ -435,7 +438,9 @@ class AddMovementsState(LookupCreatorsMixin, AppState):
         yield rx.toast.error(text)
 
 
-class EditMovementsState(AppState):
+class EditMovementsState(FullEditMixin, AppState):
+    MOVEMENT_TYPE = MovementsType.MOVEMENT
+
     item: Optional[Movement] = None
     in_process: bool = True
 
@@ -521,32 +526,58 @@ class EditMovementsState(AppState):
         self._load_list_storages()
         self._load_list_owners()
 
+        self._load_editability(self.item.id)
+
         self._products_movement_list_state = await self.get_state(ProductsMovementListState)
         await self._products_movement_list_state.on_load()
-        self._products_movement_list_state.set_view_mode(True)
+        self._products_movement_list_state.set_view_mode(not self.can_edit_full)
+        self._products_movement_list_state.set_show_serial(True)
+        self._products_movement_list_state.filter_by_storage = self.item.id_incoming_storage
+        self._products_movement_list_state.filter_by_owner = self.item.id_incoming_owner
 
         all_products: List[Product] = []
         for product_category in self.item.products_catalog:
             for product in product_category.products:
                 product.product_catalog = product_category.product
                 all_products.append(product)
-        self._products_movement_list_state.items = all_products
+        self._products_movement_list_state.prefill_for_edit(all_products)
         self.in_process = False
+
+    def _reset_selection(self):
+        """Джерело змінилось — перелік ТМЦ більше не відповідає новому місцю."""
+        if self._products_movement_list_state is not None:
+            self._products_movement_list_state.items = []
 
     @rx.event
     def on_change_id_incoming_storage(self, value: str):
+        if not self.can_edit_full:
+            return
         self.id_incoming_storage = value
+        if self._products_movement_list_state is not None:
+            self._products_movement_list_state.filter_by_storage = int(value)
+        self._reset_selection()
+        yield rx.toast.warning("Перелік ТМЦ очищено — оберіть одиниці на новому складі!")
 
     @rx.event
     def on_change_id_incoming_owner(self, value: str):
+        if not self.can_edit_full:
+            return
         self.id_incoming_owner = value
+        if self._products_movement_list_state is not None:
+            self._products_movement_list_state.filter_by_owner = int(value)
+        self._reset_selection()
+        yield rx.toast.warning("Перелік ТМЦ очищено — оберіть одиниці нового власника!")
 
     @rx.event
     def on_change_id_destination_storage(self, value: str):
+        if not self.can_edit_full:
+            return
         self.id_destination_storage = value
 
     @rx.event
     def on_change_id_destination_owner(self, value: str):
+        if not self.can_edit_full:
+            return
         self.id_destination_owner = value
 
     @rx.event
@@ -591,6 +622,51 @@ class EditMovementsState(AppState):
             yield rx.toast.error(
                 "Скасування виконується кнопкою «Скасувати», а не через редагування!"
             )
+            return
+
+        if self.can_edit_full:
+            error = self._require_reason()
+            if error is not None:
+                yield rx.toast.error(error)
+                return
+            if not StorageDAO.is_type(int(self.id_incoming_storage), StorageType.WAREHOUSE):
+                yield rx.toast.error("Переміщення можливе лише між складами!")
+                return
+            if not StorageDAO.is_type(int(self.id_destination_storage), StorageType.WAREHOUSE):
+                yield rx.toast.error("Переміщення можливе лише між складами!")
+                return
+            flag, text, plan = self._products_movement_list_state.collect_unit_plan()
+            if not flag:
+                yield rx.toast.error(text)
+                return
+            if len(plan) == 0:
+                yield rx.toast.error("Оберіть ТМЦ для переміщення!")
+                return
+            try:
+                MovementEditService().save_full(
+                    FullEditPayload(
+                        movement_id=self.item.id,
+                        movement_type=MovementsType.MOVEMENT,
+                        reason=self.edit_reason,
+                        header={
+                            "id_incoming_storage": int(self.id_incoming_storage),
+                            "id_incoming_owner": int(self.id_incoming_owner),
+                            "id_destination_storage": int(self.id_destination_storage),
+                            "id_destination_owner": int(self.id_destination_owner),
+                            "status": status_index,
+                            "comment": self.item.comment,
+                        },
+                        unit_plan=plan,
+                        serials=self._products_movement_list_state.collect_serials(),
+                    ),
+                    self.user.login,
+                )
+            except ServiceError as e:
+                yield rx.toast.error(str(e))
+                return
+            yield rx.toast.success("Переміщення змінено!")
+            yield ListMovementsState.on_load()
+            yield rx.redirect(f"{routes.MOVEMENT_MOVEMENTS_VIEW_ID}{self.item.id}")
             return
 
         form_data = {
