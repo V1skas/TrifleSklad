@@ -24,6 +24,14 @@ def _list_table_row(item: Product) -> rx.Component:
         ),
         rx.table.cell(item.storage.title),
         rx.table.cell(item.owner.title),
+        rx.table.cell(
+            rx.cond(
+                item.excluded_from_accounting,
+                rx.badge("Поза обліком", color_scheme="orange"),
+                rx.text("—", color="gray"),
+            ),
+            width="1%", white_space="nowrap",
+        ),
         on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{item.id}"),
         cursor="pointer",
         _hover={"background_color": rx.color("accent", 3)},
@@ -40,6 +48,7 @@ def _list_table() -> rx.Component:
                 rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                 rx.table.column_header_cell("Місце зберігання", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Власник", color=rx.color("accent", 2)),
+                rx.table.column_header_cell("Облік", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
             ),
             background_color=rx.color("accent", 9),
         ),
@@ -172,6 +181,10 @@ def view_page_content() -> rx.Component:
             rx.cond(ViewUnitsReportState.unit_divisible, _remain_row(ViewUnitsReportState)),
             field_row("Місце зберігання", ViewUnitsReportState.unit_storage),
             field_row("Власник", ViewUnitsReportState.unit_owner),
+            field_row(
+                "Бухгалтерський облік",
+                rx.cond(ViewUnitsReportState.unit_excluded, "Виключено", "Враховується"),
+            ),
         ),
         titled_section(
             "Історія руху",

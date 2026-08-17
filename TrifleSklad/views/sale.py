@@ -429,6 +429,7 @@ def _position_units_subtable(group) -> rx.Component:
                 rx.el.th("ID ТМЦ", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
                 rx.el.th("Серійний номер", style=NESTED_DETAIL_TH),
                 rx.el.th("Залишок", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
+                rx.el.th("Облік", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
             ),
             style=NESTED_DETAIL_THEAD,
         ),
@@ -439,6 +440,14 @@ def _position_units_subtable(group) -> rx.Component:
                     rx.el.td(unit[0], style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"}),
                     rx.el.td(unit[1], style=NESTED_DETAIL_TD),
                     rx.el.td(unit[2], style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"}),
+                    rx.el.td(
+                        rx.cond(
+                            unit[3],
+                            rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+                            rx.text("—", color="gray"),
+                        ),
+                        style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
+                    ),
                     on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{unit[0]}"),
                     cursor="pointer",
                     _hover={"background_color": rx.color("accent", 4)},

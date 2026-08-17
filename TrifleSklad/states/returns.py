@@ -231,6 +231,7 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
         await self._products_movement_list_state.on_load()
         self._products_movement_list_state.set_view_mode(False)
         self._products_movement_list_state.set_require_owner(False)
+        self._products_movement_list_state.set_show_excluded(True)
 
         default_storage = StorageDAO.get_default_id(StorageType.WAREHOUSE)
         if default_storage is not None:
@@ -289,6 +290,7 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
         await self._products_movement_list_state.on_load()
         self._products_movement_list_state.set_view_mode(False)
         self._products_movement_list_state.set_require_owner(False)
+        self._products_movement_list_state.set_show_excluded(True)
         if keep["id_incoming_storage"] != "":
             self._products_movement_list_state.filter_by_storage = int(keep["id_incoming_storage"])
 
@@ -336,9 +338,14 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
         }
 
         list_id_products: List[int] = [p.id for p in products_list]
+        # Позначки «поза обліком» збираємо ДО MovementDAO.add_one: після нього
+        # сесія закривається й ORM-об'єкти у products_list/self.items стають
+        # expired-detached (навіть читання .id падає DetachedInstanceError).
+        excluded_map = self._products_movement_list_state.collect_excluded(products_list)
         flag, text, id = MovementDAO.add_one(form_data, self.user.login)
         if flag:
             ProductDAO.update_storage(list_id_products, int(self.id_destination_storage))
+            ProductDAO.set_excluded_flags(excluded_map)
             if keep:
                 await self._reset_for_continue()
                 yield rx.toast.success("Повернення проведено!")
@@ -422,6 +429,7 @@ class EditReturnsState(FullEditMixin, AppState):
         # Повернення не задає власника — фільтр лише за місцем, кожна одиниця
         # зберігає свого власника.
         self._products_movement_list_state.set_require_owner(False)
+        self._products_movement_list_state.set_show_excluded(True)
         self._products_movement_list_state.filter_by_storage = self.item.id_incoming_storage
 
         all_products: List[Product] = []
@@ -516,6 +524,9 @@ class EditReturnsState(FullEditMixin, AppState):
             except ServiceError as e:
                 yield rx.toast.error(str(e))
                 return
+            ProductDAO.apply_excluded_flags_for_movement(
+                self.item.id, self._products_movement_list_state.collect_excluded()
+            )
             yield rx.toast.success("Повернення змінено!")
             yield ListReturnsState.on_load()
             yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{self.item.id}", replace=True)

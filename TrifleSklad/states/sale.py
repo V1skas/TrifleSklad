@@ -153,12 +153,12 @@ class ViewSaleState(AuditHistoryMixin, AppState):
     @rx.var
     def positions_grouped(
         self,
-    ) -> List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]]:
+    ) -> List[Tuple[int, str, int, float, float, List[Tuple[int, str, str, bool]]]]:
         if self.item is None:
             return []
-        result: List[Tuple[int, str, int, float, float, List[Tuple[int, str, str]]]] = []
+        result: List[Tuple[int, str, int, float, float, List[Tuple[int, str, str, bool]]]] = []
         for index, pc in enumerate(self.item.movement.products_catalog):
-            units: List[Tuple[int, str, str]] = []
+            units: List[Tuple[int, str, str, bool]] = []
             line_units: List[Tuple[int, bool, int]] = []
             for unit in pc.products:
                 catalog = unit.product_catalog
@@ -172,7 +172,7 @@ class ViewSaleState(AuditHistoryMixin, AppState):
                     if (catalog is not None and catalog.divisible)
                     else "—"
                 )
-                units.append((unit.id, serial, remain))
+                units.append((unit.id, serial, remain, unit.excluded_from_accounting))
                 line_units.append(
                     (
                         unit.count or 0,

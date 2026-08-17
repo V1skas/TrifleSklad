@@ -85,6 +85,14 @@ def _view_unit_row(unit) -> rx.Component:
             rx.cond(unit[2] != "—", rx.text(unit[2]), rx.text("—", color="gray")),
             style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
         ),
+        rx.el.td(
+            rx.cond(
+                unit[3],
+                rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+                rx.text("—", color="gray"),
+            ),
+            style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
+        ),
         on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{unit[0]}"),
         cursor="pointer",
         _hover={"background_color": rx.color("accent", 4)},
@@ -100,6 +108,7 @@ def _view_units_subtable(group) -> rx.Component:
                 rx.el.th("ID ТМЦ", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
                 rx.el.th("Серійний номер", style=NESTED_DETAIL_TH),
                 rx.el.th("Залишок", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
+                rx.el.th("Облік", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
             ),
             style=NESTED_DETAIL_THEAD,
         ),
@@ -320,6 +329,14 @@ def _unit_row(state, unit, read_only) -> rx.Component:
             ),
             style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
         ),
+        rx.el.td(
+            rx.checkbox(
+                checked=state.excluded[unit[0]],
+                on_change=lambda checked: state.set_excluded(unit[0], checked),
+                disabled=read_only,
+            ),
+            style={**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"},
+        ),
     )
 
 
@@ -334,6 +351,7 @@ def _units_subtable(state, group, read_only) -> rx.Component:
                 rx.el.th("Серійний номер", style=NESTED_DETAIL_TH),
                 rx.el.th("Залишок", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
                 rx.el.th("Компенсована вартість", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
+                rx.el.th("Поза обліком", style={**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}),
             ),
             style=NESTED_DETAIL_THEAD,
         ),

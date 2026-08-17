@@ -97,12 +97,12 @@ class ViewSaleReturnsState(AuditHistoryMixin, AppState):
     @rx.var
     def positions_grouped(
         self,
-    ) -> List[Tuple[int, str, int, float, List[Tuple[int, str, str]]]]:
+    ) -> List[Tuple[int, str, int, float, List[Tuple[int, str, str, bool]]]]:
         if self.item is None:
             return []
-        result: List[Tuple[int, str, int, float, List[Tuple[int, str, str]]]] = []
+        result: List[Tuple[int, str, int, float, List[Tuple[int, str, str, bool]]]] = []
         for index, pc in enumerate(self.item.movement.products_catalog):
-            units: List[Tuple[int, str, str]] = []
+            units: List[Tuple[int, str, str, bool]] = []
             for unit in pc.products:
                 catalog = unit.product_catalog
                 serial = (
@@ -115,7 +115,7 @@ class ViewSaleReturnsState(AuditHistoryMixin, AppState):
                     if (catalog is not None and catalog.divisible)
                     else "—"
                 )
-                units.append((unit.id, serial, remain))
+                units.append((unit.id, serial, remain, unit.excluded_from_accounting))
             result.append((index, pc.product.title, pc.count, pc.price, units))
         return result
 
@@ -235,6 +235,7 @@ class AddSaleReturnsState(AppState):
     selected_units: Dict[int, bool] = {}
     compensations: Dict[int, str] = {}
     expanded_catalogs: Dict[int, bool] = {}
+    excluded: Dict[int, bool] = {}
 
     def _load_warehouses(self):
         self.list_warehouses = [
@@ -257,6 +258,7 @@ class AddSaleReturnsState(AppState):
             for p in self.units
             if p.product_catalog is not None
         }
+        self.excluded = {p.id: False for p in self.units}
 
     def _status_index(self) -> int:
         for index, status_text in enumerate(movements_status_list):
@@ -385,6 +387,7 @@ class AddSaleReturnsState(AppState):
         self.selected_units = {}
         self.compensations = {}
         self.expanded_catalogs = {}
+        self.excluded = {}
 
         self._load_warehouses()
         self._load_sales()
@@ -400,6 +403,7 @@ class AddSaleReturnsState(AppState):
             self.selected_units = {}
             self.compensations = {}
             self.expanded_catalogs = {}
+            self.excluded = {}
             return
         sale = SaleDAO.get_by_id_with_all_relationship(int(value))
         if sale is None:
@@ -425,6 +429,10 @@ class AddSaleReturnsState(AppState):
     @rx.event
     def set_compensation(self, unit_id: int, value: str):
         self.compensations[unit_id] = value
+
+    @rx.event
+    def set_excluded(self, unit_id: int, value: bool):
+        self.excluded[unit_id] = value
 
     @rx.event
     def on_change_status(self, value: str):
@@ -490,6 +498,9 @@ class AddSaleReturnsState(AppState):
 
         flag, text, id = SaleReturnDAO.add_one(form_data, self.user.login)
         if flag:
+            ProductDAO.set_excluded_flags(
+                {uid: self.excluded.get(uid, False) for uid in selected_ids}
+            )
             yield rx.toast.success("Повернення продажу проведено!")
             yield ListSaleReturnsState.on_load()
             yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}", replace=True)
@@ -516,6 +527,7 @@ class EditSaleReturnsState(FullEditMixin, AppState):
     selected_units: Dict[int, bool] = {}
     compensations: Dict[int, str] = {}
     expanded_catalogs: Dict[int, bool] = {}
+    excluded: Dict[int, bool] = {}
 
     def _load_warehouses(self):
         self.list_warehouses = [
@@ -540,6 +552,7 @@ class EditSaleReturnsState(FullEditMixin, AppState):
         self.expanded_catalogs = {
             p.product_catalog.id: True for p in self.units if p.product_catalog is not None
         }
+        self.excluded = {p.id: p.excluded_from_accounting for p in self.units}
 
     def _catalog_of(self, unit_id: int) -> Optional[int]:
         for p in self.units:
@@ -607,6 +620,11 @@ class EditSaleReturnsState(FullEditMixin, AppState):
     def set_compensation(self, unit_id: int, value: str):
         if self.can_edit_full:
             self.compensations[unit_id] = value
+
+    @rx.event
+    def set_excluded(self, unit_id: int, value: bool):
+        if self.can_edit_full:
+            self.excluded[unit_id] = value
 
     @rx.event
     def on_change_sale(self, value: str):
@@ -765,6 +783,9 @@ class EditSaleReturnsState(FullEditMixin, AppState):
             except ServiceError as e:
                 yield rx.toast.error(str(e))
                 return
+            ProductDAO.set_excluded_flags(
+                {uid: self.excluded.get(uid, False) for uid in selected_ids}
+            )
             yield rx.toast.success("Повернення продажу змінено!")
             yield ListSaleReturnsState.on_load()
             yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{self.item.id}", replace=True)

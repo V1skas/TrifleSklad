@@ -204,6 +204,10 @@ class ViewUnitsReportState(AppState):
         return f"{count}/{self.unit.product_catalog.capacity} {self.unit.product_catalog.unit}"
 
     @rx.var
+    def unit_excluded(self) -> bool:
+        return self.unit is not None and self.unit.excluded_from_accounting
+
+    @rx.var
     def has_history(self) -> bool:
         return len(self.history_rows) > 0
 

@@ -366,6 +366,14 @@ def _detailed_unit_table_row(item: Tuple[int, Product]) -> rx.Component:
             ),
             width="1%", white_space="nowrap",
         ),
+        rx.table.cell(
+            rx.cond(
+                item[1].excluded_from_accounting,
+                rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+                rx.text("—", color="gray"),
+            ),
+            width="1%", white_space="nowrap",
+        ),
     )
 
 
@@ -394,6 +402,7 @@ def _movement_product_catalog_detailed_view_form() -> rx.Component:
                         rx.table.column_header_cell("ID", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                         rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
                         rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                        rx.table.column_header_cell("Облік", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                     ),
                     background_color=rx.color("accent", 9),
                 ),

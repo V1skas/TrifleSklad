@@ -8,6 +8,13 @@ from TrifleSklad.movement.products_selector.backend import ALL, ProductsSelector
 from TrifleSklad.views.templates import controls
 
 
+def excluded_badge(item: Tuple[int, Product]) -> rx.Component:
+    return rx.cond(
+        item[1].excluded_from_accounting,
+        rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+    )
+
+
 def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
     # Показуємо лише поля, доречні для типу позиції каталогу:
     # подільне → залишок «count/capacity unit» + прогрес-бар заповненості;
@@ -45,12 +52,18 @@ def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
                 height="0.5em",
                 width="100%",
             ),
+            excluded_badge(item),
             spacing="1",
             width="100%",
         ),
-        rx.cond(
-            item[1].product_catalog.uniq,
-            rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+        rx.vstack(
+            rx.cond(
+                item[1].product_catalog.uniq,
+                rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+            ),
+            excluded_badge(item),
+            spacing="1",
+            width="100%",
         ),
     )
 
@@ -270,6 +283,19 @@ def filters_panel() -> rx.Component:
                 weight="bold",
                 color=rx.color("accent", 11),
             ),
+        ),
+        rx.text("Бухгалтерський облік:", size="2"),
+        rx.select.root(
+            rx.select.trigger(width="100%"),
+            rx.select.content(
+                rx.select.item("Усі", value=ALL),
+                rx.select.item("Включені в облік", value="included"),
+                rx.select.item("Поза обліком", value="excluded"),
+            ),
+            value=ProductsSelectorState.filter_accounting,
+            on_change=ProductsSelectorState.change_filter_accounting,
+            width="100%",
+            size="2",
         ),
         rx.text("Пошук (назва / s/n / ID):", size="2"),
         controls.search_field(

@@ -27,6 +27,7 @@ class ProductsSelectorState(rx.State):
     catalog_options: List[Tuple[str, str]] = []
     filter_category: str = ALL          # id категорії або ALL
     filter_catalog: str = ALL           # id позиції каталогу або ALL
+    filter_accounting: str = ALL        # ALL / "included" / "excluded"
 
     # Метадані обраної позиції каталогу (для міри / прогресу / валідації).
     sel_divisible: bool = False
@@ -71,6 +72,7 @@ class ProductsSelectorState(rx.State):
         self.catalog_options = []
         self.filter_category = ALL
         self.filter_catalog = ALL
+        self.filter_accounting = ALL
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
@@ -264,6 +266,7 @@ class ProductsSelectorState(rx.State):
             search=self.filter_search,
             catalog_id=self._catalog_id_value(),
             category_id=self._category_id_value(),
+            accounting=self.filter_accounting,
             offset=self._offset,
             limit=self._limit,
         )
@@ -297,6 +300,7 @@ class ProductsSelectorState(rx.State):
         self.filter_search = ""
         self.filter_category = ALL
         self.filter_catalog = ALL
+        self.filter_accounting = ALL
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
@@ -337,6 +341,7 @@ class ProductsSelectorState(rx.State):
     def reset_filters(self):
         self.filter_category = ALL
         self.filter_catalog = ALL
+        self.filter_accounting = ALL
         self.filter_search = ""
         self.mass_count = ""
         self.mass_measure = ""
@@ -383,6 +388,14 @@ class ProductsSelectorState(rx.State):
     def change_filter_search(self, value: str):
         self.filter_search = value
         return ProductsSelectorState.apply_filters
+
+    @rx.event
+    def change_filter_accounting(self, value: str):
+        self.filter_accounting = value
+        self.is_loading = True
+        yield
+        self._load_page(reset=True)
+        self.is_loading = False
 
     @rx.event
     def set_mass_count(self, value: str):

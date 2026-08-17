@@ -22,6 +22,11 @@ class ProductsMovementListState(rx.State):
     split_mode: Dict[int, bool] = {}
     split_amount: Dict[int, str] = {}
 
+    # Позначка «поза бухгалтерським обліком», ключ — id одиниці товару.
+    # Видима лише там, де вмикається (повернення — set_show_excluded(True)).
+    excluded: Dict[int, bool] = {}
+    show_excluded: bool = False
+
     # Розгорнуті позиції каталогу в таблиці (клік по рядку розкриває перелік
     # одиниць). Ключ — id позиції каталогу.
     expanded_catalogs: Dict[int, bool] = {}
@@ -57,6 +62,8 @@ class ProductsMovementListState(rx.State):
         self._products_selector_state.clear()
         self.split_mode = {}
         self.split_amount = {}
+        self.excluded = {}
+        self.show_excluded = False
         self.expanded_catalogs = {}
         self.require_owner = True
         self.require_serial = False
@@ -83,6 +90,9 @@ class ProductsMovementListState(rx.State):
 
     def set_show_serial(self, flag: bool):
         self.show_serial = flag
+
+    def set_show_excluded(self, flag: bool):
+        self.show_excluded = flag
 
     @rx.var
     def serial_visible(self) -> bool:
@@ -309,6 +319,7 @@ class ProductsMovementListState(rx.State):
                 else:
                     self.split_mode[product.id] = False
                     self.split_amount[product.id] = ""
+            self.excluded.setdefault(product.id, False)
             # Ініціалізуємо ціну позиції (для продажу), якщо її ще немає.
             if (
                 product.product_catalog is not None
@@ -334,6 +345,7 @@ class ProductsMovementListState(rx.State):
             removed = self.items.pop(item)
             self.split_mode.pop(removed.id, None)
             self.split_amount.pop(removed.id, None)
+            self.excluded.pop(removed.id, None)
 
     @rx.event
     def set_split_mode_value(self, product_id: int, value: str):
@@ -342,6 +354,10 @@ class ProductsMovementListState(rx.State):
     @rx.event
     def set_split_amount(self, product_id: int, value: str):
         self.split_amount[product_id] = value
+
+    @rx.event
+    def set_excluded(self, product_id: int, value: bool):
+        self.excluded[product_id] = value
 
     @staticmethod
     def _is_divisible(product: Product) -> bool:
@@ -361,6 +377,7 @@ class ProductsMovementListState(rx.State):
             if self._is_divisible(product):
                 self.split_mode.setdefault(product.id, False)
                 self.split_amount.setdefault(product.id, "")
+            self.excluded.setdefault(product.id, product.excluded_from_accounting)
             if product.product_catalog is None:
                 continue
             catalog_id = product.product_catalog.id
@@ -380,6 +397,31 @@ class ProductsMovementListState(rx.State):
             for product in self.items
             if product.product_catalog is not None and product.product_catalog.uniq
         }
+
+    def collect_excluded(
+        self, final_products: Optional[List[Product]] = None
+    ) -> Dict[int, bool]:
+        """id одиниці -> позначка «поза обліком» для підсумкового складу.
+
+        Без аргументу — пряма мапа за `self.excluded` (шлях РЕДАГУВАННЯ: реальний
+        поділ і фінальні id одиниць невідомі до збереження в транзакції сервісу,
+        тож застосування виконує окремий DAO-крок, сам ураховуючи спадкування
+        позначки від батька для осколків поділу).
+
+        З `final_products` (шлях СТВОРЕННЯ, після `resolve_movement_products`) —
+        мапа за фінальними id: розділена одиниця успадковує позначку вихідної
+        (позиційна відповідність `self.items[i]` -> `final_products[i]`, та сама,
+        що будує `resolve_movement_products`). НЕ читаємо `id_parent` з елементів
+        `final_products` напряму — серед них є detached SQLAlchemy-об'єкти зі
+        `self.items`, і звернення до незавантаженого атрибута на detached
+        інстансі падає `DetachedInstanceError`.
+        """
+        if final_products is None:
+            return dict(self.excluded)
+        result: Dict[int, bool] = {}
+        for source, final in zip(self.items, final_products):
+            result[final.id] = self.excluded.get(source.id, False)
+        return result
 
     def collect_unit_plan(self) -> Tuple[bool, str, List[Tuple[int, Optional[float]]]]:
         """Те саме, що `resolve_movement_products`, але БЕЗ запису в БД: валідує

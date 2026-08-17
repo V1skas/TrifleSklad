@@ -42,7 +42,7 @@ class StockReportState(AppState):
 
     is_units_open: bool = False
     selected_title: str = ""
-    unit_rows: List[Tuple[str, str, str, str, str]] = []
+    unit_rows: List[Tuple[str, str, str, str, str, bool]] = []
 
     def _excluded_types(self) -> List[int]:
         excluded: List[int] = []
@@ -256,7 +256,7 @@ class StockReportState(AppState):
             self._excluded_types(),
             self.search_text or None,
         )
-        rows: List[Tuple[str, str, str, str, str]] = []
+        rows: List[Tuple[str, str, str, str, str, bool]] = []
         for unit in units:
             divisible = (
                 unit.product_catalog.divisible
@@ -267,7 +267,7 @@ class StockReportState(AppState):
             storage = unit.storage.title if unit.storage is not None else "—"
             owner = unit.owner.title if unit.owner is not None else "—"
             count = str(unit.count) if divisible else "—"
-            rows.append((str(unit.id), serial, storage, owner, count))
+            rows.append((str(unit.id), serial, storage, owner, count, unit.excluded_from_accounting))
         self.unit_rows = rows
         self.is_units_open = True
 

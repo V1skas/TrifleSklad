@@ -120,6 +120,16 @@ def serial_cell_input(item: Tuple[int, Product]):
         style=_TD_TIGHT,
     )
 
+def excluded_badge_cell(item: Tuple[int, Product]):
+    return rx.el.td(
+        rx.cond(
+            item[1].excluded_from_accounting,
+            rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+            rx.text("—", color="gray"),
+        ),
+        style=_TD_TIGHT,
+    )
+
 # Внутрішні рядки одиниць ТМЦ (показуються при розгортанні позиції каталогу)
 # ======================
 def unit_row_view(item: Tuple[int, Product]):
@@ -128,9 +138,25 @@ def unit_row_view(item: Tuple[int, Product]):
         rx.el.td(item[1].id, style=_TD_TIGHT),
         serial_cell_text(item),
         divisible_cell_text(item),
+        excluded_badge_cell(item),
         on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{item[1].id}"),
         cursor="pointer",
         _hover={"background_color": rx.color("accent", 4)},
+    )
+
+def excluded_cell(item: Tuple[int, Product]):
+    # Редагована позначка — лише там, де вмикається (повернення); інакше —
+    # інформаційний бейдж поточного стану (як у перегляді).
+    return rx.cond(
+        ProductsMovementListState.show_excluded,
+        rx.el.td(
+            rx.checkbox(
+                checked=ProductsMovementListState.excluded[item[1].id],
+                on_change=lambda value: ProductsMovementListState.set_excluded(item[1].id, value),
+            ),
+            style=_TD_TIGHT,
+        ),
+        excluded_badge_cell(item),
     )
 
 def unit_row_edit(item: Tuple[int, Product]):
@@ -146,6 +172,7 @@ def unit_row_edit(item: Tuple[int, Product]):
             style=NESTED_DETAIL_TD,
         ),
         rx.cond(ProductsMovementListState.serial_visible, serial_cell_input(item)),
+        excluded_cell(item),
         rx.el.td(
             rx.button(
                 "Видалити",
@@ -173,6 +200,7 @@ def units_subtable(group):
                     rx.el.th("ID ТМЦ", style=_TH_TIGHT),
                     rx.el.th("Серійний номер", style=NESTED_DETAIL_TH),
                     rx.el.th("Залишок", style=_TH_TIGHT),
+                    rx.el.th("Поза обліком", style=_TH_TIGHT),
                 ),
                 rx.el.tr(
                     rx.el.th("ID ТМЦ", style=_TH_TIGHT),
@@ -182,6 +210,7 @@ def units_subtable(group):
                         ProductsMovementListState.serial_visible,
                         rx.el.th("Серійний номер", style=_TH_TIGHT),
                     ),
+                    rx.el.th("Поза обліком", style=_TH_TIGHT),
                     rx.el.th("Дія", style=_TH_TIGHT),
                 ),
             ),

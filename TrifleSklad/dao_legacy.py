@@ -1262,6 +1262,7 @@ class ProductDAO:
         category_id: int = -1,
         min_remaining: Optional[int] = None,
         fullness: str = "all",
+        accounting: str = "all",
         offset: int = 0,
         limit: int = 30,
     ) -> tuple[List[Product], bool]:
@@ -1275,6 +1276,8 @@ class ProductDAO:
         - catalog_id — конкретна позиція каталогу;
         - min_remaining — залишок (Product.count) >= значення;
         - fullness — "full" (count == capacity) / "partial" (count < capacity) / "all".
+        - accounting — "included" (excluded_from_accounting == False) /
+          "excluded" (== True) / "all".
 
         Повертає (порція, чи_є_ще): тягнемо limit+1 рядків, щоб дізнатися, чи
         лишилися ще дані, не роблячи окремий COUNT.
@@ -1313,6 +1316,10 @@ class ProductDAO:
                     ProductCatalog.no_fixed_capacity == False,
                 )
             )
+        if accounting == "included":
+            statement = statement.where(Product.excluded_from_accounting == False)
+        elif accounting == "excluded":
+            statement = statement.where(Product.excluded_from_accounting == True)
         if search:
             term = search.strip()
             if term:
@@ -1701,6 +1708,77 @@ class ProductDAO:
 
         except IntegrityError:
             return False, "Ошибка: Единицы товара не могут быть перемещены"
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
+
+    @classmethod
+    def set_excluded_flags(cls, mapping: Dict[int, bool]) -> tuple[bool, str]:
+        """Виставляє Product.excluded_from_accounting за словником {unit_id: flag}."""
+        if not mapping:
+            return True, "Нема одиниць для оновлення"
+        try:
+            with rx.session() as session:
+                statement = select(Product).where(Product.id.in_(mapping.keys()))
+                products = session.exec(statement).all()
+
+                for product in products:
+                    product.excluded_from_accounting = mapping[product.id]
+                    session.add(product)
+
+                session.commit()
+                return True, "Позначку обліку оновлено"
+
+        except SQLAlchemyError as e:
+            return False, f"Ошибка: {str(e)}"
+        except Exception as e:
+            return False, f"Ошибка: {str(e)}"
+
+    @classmethod
+    def apply_excluded_flags_for_movement(
+        cls, movement_id: int, excluded_by_id: Dict[int, bool]
+    ) -> tuple[bool, str]:
+        """Виставляє excluded_from_accounting на ПІДСУМКОВИХ одиницях руху —
+        для шляху РЕДАГУВАННЯ, де реальний поділ подільної одиниці й фінальні id
+        стають відомі лише після `MovementEditService.save_full` (транзакція
+        сервісу навмисно не займається цим прапорцем — див. TS-52).
+
+        Одиниця, породжена поділом усередині транзакції збереження (новий id,
+        якого немає в `excluded_by_id`), успадковує позначку від батька
+        (`id_parent`)."""
+        if not excluded_by_id:
+            return True, "Нема одиниць для оновлення"
+        try:
+            with rx.session() as session:
+                statement = (
+                    select(Product)
+                    .join(
+                        MovementProducts,
+                        MovementProducts.id_product == Product.id,
+                    )
+                    .join(
+                        MovementProductsCatalog,
+                        MovementProducts.id_movement_product == MovementProductsCatalog.id,
+                    )
+                    .where(MovementProductsCatalog.id_movement == movement_id)
+                    .distinct()
+                )
+                products = session.exec(statement).all()
+
+                for product in products:
+                    if product.id in excluded_by_id:
+                        value = excluded_by_id[product.id]
+                    elif product.id_parent is not None and product.id_parent in excluded_by_id:
+                        value = excluded_by_id[product.id_parent]
+                    else:
+                        value = False
+                    product.excluded_from_accounting = value
+                    session.add(product)
+
+                session.commit()
+                return True, "Позначку обліку оновлено"
+
         except SQLAlchemyError as e:
             return False, f"Ошибка: {str(e)}"
         except Exception as e:

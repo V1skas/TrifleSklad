@@ -253,6 +253,8 @@ class Product(rx.Model, table=True):
     # фіксованої ємності ємність вводиться вручну і може бути дробовою (напр. 0.75).
     count: float = Field(default=1, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
+    # Виключено з бухгалтерського обліку (виставляється при оформленні повернення).
+    excluded_from_accounting: bool = Field(default=False, nullable=False)
 
     # Relationship
     product_catalog: Optional[ProductCatalog] = Relationship(back_populates="products")

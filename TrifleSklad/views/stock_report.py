@@ -113,6 +113,7 @@ def _units_dialog() -> rx.Component:
                         rx.table.column_header_cell("Місце зберігання", color=rx.color("accent", 2)),
                         rx.table.column_header_cell("Власник", color=rx.color("accent", 2)),
                         rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                        rx.table.column_header_cell("Облік", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                     ),
                     background_color=rx.color("accent", 9),
                 ),
@@ -125,6 +126,14 @@ def _units_dialog() -> rx.Component:
                             rx.table.cell(unit[2]),
                             rx.table.cell(unit[3]),
                             rx.table.cell(unit[4], width="1%", white_space="nowrap"),
+                            rx.table.cell(
+                                rx.cond(
+                                    unit[5],
+                                    rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+                                    rx.text("—", color="gray"),
+                                ),
+                                width="1%", white_space="nowrap",
+                            ),
                             on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{unit[0]}"),
                             cursor="pointer",
                             _hover={"background_color": rx.color("accent", 3)},
