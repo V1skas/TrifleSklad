@@ -99,7 +99,7 @@ class AddNdsRateState(AppState):
         try:
             self.item = NdsRateService().add_one(self.item, self.user.login)
             yield rx.toast.success("Ставку ПДВ додано!")
-            yield rx.redirect(routes.CATALOG_NDS_RATES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_NDS_RATES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -181,7 +181,7 @@ class EditNdsRateState(AppState):
         try:
             self.item = NdsRateService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Ставку ПДВ змінено!")
-            yield rx.redirect(routes.CATALOG_NDS_RATES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_NDS_RATES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

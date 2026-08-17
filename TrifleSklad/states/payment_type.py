@@ -84,7 +84,7 @@ class AddPaymentTypeState(AppState):
         try:
             self.item = PaymentTypeService().add_one(self.item, self.user.login)
             yield rx.toast.success("Тип оплати додано!")
-            yield rx.redirect(routes.CATALOG_PAYMENT_TYPES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_PAYMENT_TYPES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -151,7 +151,7 @@ class EditPaymentTypeState(AppState):
         try:
             self.item = PaymentTypeService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Тип оплати змінено!")
-            yield rx.redirect(routes.CATALOG_PAYMENT_TYPES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_PAYMENT_TYPES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

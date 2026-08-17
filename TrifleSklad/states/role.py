@@ -95,7 +95,7 @@ class AddRoleState(AppState):
         try:
             self.item = RoleService().add_one(self.item, self.user.login)
             yield rx.toast.success("Роль успішно додана!")
-            yield rx.redirect(routes.ADMIN_ROLES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.ADMIN_ROLES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -168,7 +168,7 @@ class EditRoleState(AppState):
         try:
             self.item = RoleService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Роль успішно змінена!")
-            yield rx.redirect(routes.ADMIN_ROLES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.ADMIN_ROLES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

@@ -370,7 +370,7 @@ class AddWriteOffState(LookupCreatorsMixin, AppState):
                 return
             yield rx.toast.success("Списання проведено!")
             yield ListWriteOffState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 
@@ -557,7 +557,7 @@ class EditWriteOffState(FullEditMixin, AppState):
                 return
             yield rx.toast.success("Списання змінено!")
             yield ListWriteOffState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{self.item.id}")
+            yield rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{self.item.id}", replace=True)
             return
 
         form_data = {
@@ -569,6 +569,6 @@ class EditWriteOffState(FullEditMixin, AppState):
         if flag:
             yield rx.toast.success("Списання змінено!")
             yield ListWriteOffState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_WRITE_OFFS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)

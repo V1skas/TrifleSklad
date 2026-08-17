@@ -305,7 +305,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
         try:
             self.item = ProductCatalogService().add_one(self.item, self.user.login)
             yield rx.toast.success("Товар додано!")
-            yield rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -457,7 +457,7 @@ class EditProductsState(CategoryCreateMixin, AppState):
         try:
             self.item = ProductCatalogService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Товар успішно змінено!")
-            yield rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

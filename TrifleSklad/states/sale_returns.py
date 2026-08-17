@@ -492,7 +492,7 @@ class AddSaleReturnsState(AppState):
         if flag:
             yield rx.toast.success("Повернення продажу проведено!")
             yield ListSaleReturnsState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 
@@ -767,7 +767,7 @@ class EditSaleReturnsState(FullEditMixin, AppState):
                 return
             yield rx.toast.success("Повернення продажу змінено!")
             yield ListSaleReturnsState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{self.item.id}")
+            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{self.item.id}", replace=True)
             return
 
         form_data = {
@@ -779,6 +779,6 @@ class EditSaleReturnsState(FullEditMixin, AppState):
         if flag:
             yield rx.toast.success("Повернення продажу змінено!")
             yield ListSaleReturnsState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_SALE_RETURNS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)

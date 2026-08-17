@@ -7,7 +7,7 @@ from TrifleSklad.movement.list_mixin import ALL
 from TrifleSklad.states.units_report import ListUnitsReportState, ViewUnitsReportState
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _list_table_row(item: Product) -> rx.Component:
@@ -128,57 +128,61 @@ def _history_table() -> rx.Component:
     )
 
 
-def _info_row(label: str, value) -> rx.Component:
+def _remain_row(state) -> rx.Component:
+    """Рядок «Залишок» для подільного ТМЦ — та сама розмітка мітки, що й у
+    `field_row`, але значення не текст, а смуга заповнення (`field_row`
+    обгортає value в `rx.text`, тому для нетекстового вмісту потрібен
+    окремий рядок)."""
     return rx.hstack(
-        rx.text(label, weight="bold", width="14em"),
-        rx.text(value),
+        rx.text(
+            "Залишок:",
+            weight="medium",
+            color=rx.color("accent", 11),
+            min_width="12em",
+            flex_shrink="0",
+        ),
+        rx.vstack(
+            rx.text(state.unit_remain_label),
+            rx.progress(
+                value=state.unit_fill_percent,
+                max=100,
+                color_scheme="green",
+                height="0.5em",
+                width="100%",
+            ),
+            spacing="1",
+            width="100%",
+            max_width="22em",
+        ),
         width="100%",
+        wrap="wrap",
+        spacing="2",
+        align="center",
     )
 
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.card(
-            rx.vstack(
-                _info_row("ID одиниці:", ViewUnitsReportState.unit.id),
-                _info_row("Позиція каталогу:", ViewUnitsReportState.unit_title),
-                _info_row("Одиниця виміру:", ViewUnitsReportState.unit_unit),
-                rx.cond(ViewUnitsReportState.unit_uniq, _info_row("Серійний номер:", ViewUnitsReportState.unit_serial)),
-                rx.cond(
-                    ViewUnitsReportState.unit_divisible,
-                    rx.hstack(
-                        rx.text("Залишок:", weight="bold", width="14em"),
-                        rx.vstack(
-                            rx.text(ViewUnitsReportState.unit_remain_label),
-                            rx.progress(
-                                value=ViewUnitsReportState.unit_fill_percent,
-                                max=100,
-                                color_scheme="green",
-                                height="0.5em",
-                                width="100%",
-                            ),
-                            spacing="1",
-                            width="100%",
-                            max_width="22em",
-                        ),
-                        width="100%",
-                        align="center",
-                    ),
-                ),
-                _info_row("Місце зберігання:", ViewUnitsReportState.unit_storage),
-                _info_row("Власник:", ViewUnitsReportState.unit_owner),
-                spacing="2",
-                width="100%",
+        titled_section(
+            "Інформація",
+            field_row("ID одиниці", ViewUnitsReportState.unit.id),
+            field_row("Позиція каталогу", ViewUnitsReportState.unit_title),
+            field_row("Одиниця виміру", ViewUnitsReportState.unit_unit),
+            rx.cond(ViewUnitsReportState.unit_uniq, field_row("Серійний номер", ViewUnitsReportState.unit_serial)),
+            rx.cond(ViewUnitsReportState.unit_divisible, _remain_row(ViewUnitsReportState)),
+            field_row("Місце зберігання", ViewUnitsReportState.unit_storage),
+            field_row("Власник", ViewUnitsReportState.unit_owner),
+        ),
+        titled_section(
+            "Історія руху",
+            rx.cond(
+                ViewUnitsReportState.has_history,
+                _history_table(),
+                controls.empty_placeholder("Рухів за цією одиницею немає"),
             ),
-            width="100%",
         ),
-        rx.heading("Історія руху", size="4", width="100%"),
-        rx.cond(
-            ViewUnitsReportState.has_history,
-            _history_table(),
-            controls.empty_placeholder("Рухів за цією одиницею немає"),
-        ),
-        spacing="4",
+        spacing="3",
+        align="stretch",
         width="100%",
     )
 

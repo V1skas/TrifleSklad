@@ -4,7 +4,14 @@ import reflex as rx
 def button_back(href: str, label: str = "Назад", **prop):
     """Кнопка повернення/скасування — повнотекстова ghost-кнопка (старий
     дизайн: «Скасувати» на формах додавання/редагування, «Повернутись» на
-    перегляді, `git show dev:TrifleSklad/administration/workers/frontend.py`)."""
+    перегляді, `git show dev:TrifleSklad/administration/workers/frontend.py`).
+
+    `href` — маршрут списку розділу, використовується як fallback, якщо
+    власної історії навігації немає (прямий заступ по посиланню/нова
+    вкладка). Клас `trifle-back` — маркер для capture-listener'а з
+    `_UNSAVED_GUARD_SCRIPT`, який перехоплює клік і підміняє перехід на
+    `window.history.back()`, коли історія є (TS-51)."""
+    prop["class_name"] = f"trifle-back {prop.get('class_name', '')}".strip()
     return button_secondary(label, on_click=rx.redirect(href), **prop)
 
 
@@ -124,10 +131,11 @@ def filter_actions(*buttons) -> rx.Component:
     )
 
 
-# Гвард несохранённых изменений. Перехоплює будь-яку навігацію (у т.ч.
-# клієнтську через React Router) і оновлення/закриття вкладки, коли на
-# сторінці додавання/редагування є незбережені зміни. Відкриття посилання в
-# новій вкладці (target=_blank, Ctrl/Cmd/Shift/middle-click) НЕ перехоплюється.
+# Гвард несохранённых изменений + лічильник глибини навігації (TS-51).
+# Перехоплює будь-яку навігацію (у т.ч. клієнтську через React Router) і
+# оновлення/закриття вкладки, коли на сторінці додавання/редагування є
+# незбережені зміни. Відкриття посилання в новій вкладці (target=_blank,
+# Ctrl/Cmd/Shift/middle-click) НЕ перехоплюється.
 #
 # Активність визначається МАРШРУТОМ: сторінки додавання закінчуються на "/add",
 # редагування містять "/edit/". Тому гвард автоматично працює на ВСІХ формах
@@ -137,11 +145,40 @@ def filter_actions(*buttons) -> rx.Component:
 # Прапорець скидається при кожній зміні маршруту (React Router йде через history API).
 # Кнопки «Зберегти»/«Скасувати» — це <button> з rx.redirect (клієнтська навігація,
 # не <a>), тож не блокуються.
+#
+# TS-51: `__trifleNavDepth` — глибина ВЛАСНОЇ SPA-історії з моменту повної
+# завантаги сторінки (скидається в 0 на кожен реальний reload/новий заступ,
+# бо `window.__trifleGuardInit` не переживає reload). `pushState` (форвард-
+# навігація, у т.ч. `rx.redirect` без `replace`) — інкремент; `popstate`
+# (кнопка "назад" браузера) — декремент з підлогою 0; `replaceState`
+# (`rx.redirect(replace=True)`) глибину НЕ змінює — заміна запису історії.
+#
+# Дублі однакового шляху в стеку історії. Перегляд → Редагувати (push) →
+# Зберегти (`replace=True` назад на URL перегляду) лишає в стеку ДВА сусідніх
+# записи з однаковим шляхом: той, що був до заходу в редагування, і той,
+# що з нього зроблений replace. Один `history.back()` переставляє лише на
+# сусідній запис — той самий шлях, візуально нічого не змінюється; при N
+# послідовних циклах редагування таких дублів N, і без спеціальної обробки
+# довелося б клацати «Назад» N разів. Тому клік по `.trifle-back` не робить
+# один `history.back()`, а рекурсивно (через `popstate`) проходить усі
+# сусідні записи, чий шлях співпадає зі шляхом ДО кліку, і зупиняється на
+# першому, що вже відрізняється, — за один клік користувача.
+#
+# Кнопка `button_back` (клас `trifle-back`) перехоплюється в capture-фазі:
+# якщо власна історія є (`depth > 0`) — підміняємо на описаний прохід через
+# дублі; інакше лишаємо штатний `rx.redirect(href)` кнопки — це fallback на
+# список розділу (прямий заступ по посиланню/нова вкладка). Document-рівневий
+# capture-listener гарантовано спрацьовує РАНІШЕ делегованого React-обробника
+# кліка на кореневому DOM-вузлі (він — нащадок document у дереві), тому
+# `stopImmediatePropagation()` надійно блокує клієнтський `rx.redirect`
+# кнопки — той самий прийом, що вже використаний нижче для перехоплення
+# `<a href>`.
 _UNSAVED_GUARD_SCRIPT = """
 (function(){
   if(window.__trifleGuardInit){ return; }
   window.__trifleGuardInit=true;
   window.__trifleDirty=false;
+  window.__trifleNavDepth=0;
   var onForm=function(){ var p=location.pathname; return /\\/add\\/?$/.test(p) || /\\/edit\\//.test(p); };
   var mark=function(){ if(onForm()){ window.__trifleDirty=true; } };
   document.addEventListener('input', function(e){
@@ -158,12 +195,15 @@ _UNSAVED_GUARD_SCRIPT = """
   }, true);
   // Скидаємо прапорець при реальній зміні маршруту (React Router — history API).
   var lastPath=location.pathname;
-  var reset=function(){ if(location.pathname!==lastPath){ lastPath=location.pathname; window.__trifleDirty=false; } };
-  ['pushState','replaceState'].forEach(function(m){
-    var orig=history[m];
-    history[m]=function(){ var r=orig.apply(this, arguments); reset(); return r; };
+  var resetDirty=function(){ if(location.pathname!==lastPath){ lastPath=location.pathname; window.__trifleDirty=false; } };
+  var origPush=history.pushState;
+  history.pushState=function(){ var r=origPush.apply(this, arguments); window.__trifleNavDepth+=1; resetDirty(); return r; };
+  var origReplace=history.replaceState;
+  history.replaceState=function(){ var r=origReplace.apply(this, arguments); resetDirty(); return r; };
+  window.addEventListener('popstate', function(){
+    window.__trifleNavDepth=Math.max(0, window.__trifleNavDepth-1);
+    resetDirty();
   });
-  window.addEventListener('popstate', reset);
   document.addEventListener('click', function(e){
     if(!onForm() || window.__trifleDirty!==true){ return; }
     var a=e.target.closest ? e.target.closest('a[href]') : null;
@@ -176,6 +216,25 @@ _UNSAVED_GUARD_SCRIPT = """
     } else {
       window.__trifleDirty=false;
     }
+  }, true);
+  document.addEventListener('click', function(e){
+    var btn=e.target.closest ? e.target.closest('.trifle-back') : null;
+    if(!btn){ return; }
+    if(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || (typeof e.button==='number' && e.button!==0)){ return; }
+    if(window.__trifleNavDepth<=0){ return; }
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    var fromPath=location.pathname;
+    var budget=window.__trifleNavDepth;
+    var onPop=function(){
+      budget-=1;
+      if(location.pathname!==fromPath || window.__trifleNavDepth<=0 || budget<=0){
+        window.removeEventListener('popstate', onPop);
+        return;
+      }
+      window.history.back();
+    };
+    window.addEventListener('popstate', onPop);
+    window.history.back();
   }, true);
   window.addEventListener('beforeunload', function(e){
     if(onForm() && window.__trifleDirty===true){ e.preventDefault(); e.returnValue=''; }

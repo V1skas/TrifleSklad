@@ -593,7 +593,7 @@ class AddSaleState(LookupCreatorsMixin, AppState):
                 return
             yield rx.toast.success("Продаж проведено!")
             yield ListSaleState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 
@@ -815,7 +815,7 @@ class EditSaleState(FullEditMixin, AppState):
                 return
             yield rx.toast.success("Продаж змінено!")
             yield ListSaleState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{self.item.id}")
+            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{self.item.id}", replace=True)
             return
 
         form_data = {
@@ -828,6 +828,6 @@ class EditSaleState(FullEditMixin, AppState):
         if flag:
             yield rx.toast.success("Продаж змінено!")
             yield ListSaleState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_SALES_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)

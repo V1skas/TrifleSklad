@@ -130,7 +130,7 @@ class AddUserState(AppState):
         try:
             self.item = UserService().add_one(self.item, self.user.login, self.password)
             yield rx.toast.success("Користувача додано!")
-            yield rx.redirect(routes.ADMIN_USERS_VIEW_ID + str(self.item.login))
+            yield rx.redirect(routes.ADMIN_USERS_VIEW_ID + str(self.item.login), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -222,7 +222,7 @@ class EditUserState(AppState):
         try:
             self.item = UserService().edit_one(self.item, self.user.login, self.password)
             yield rx.toast.success("Інформацію про користувача змінено!")
-            yield rx.redirect(routes.ADMIN_USERS_VIEW_ID + str(self.item.login))
+            yield rx.redirect(routes.ADMIN_USERS_VIEW_ID + str(self.item.login), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

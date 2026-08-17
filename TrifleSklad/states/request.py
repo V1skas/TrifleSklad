@@ -375,7 +375,7 @@ class AddRequestsState(_RequestFormState, AppState):
         if flag:
             yield rx.toast.success(text)
             yield ListRequestsState.on_load()
-            yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(id))
+            yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(id), replace=True)
         else:
             yield rx.toast.error(text)
 
@@ -441,7 +441,7 @@ class EditRequestsState(_RequestFormState, AppState):
         if flag:
             yield rx.toast.success(text)
             yield ListRequestsState.on_load()
-            yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(id))
+            yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(id), replace=True)
         else:
             yield rx.toast.error(text)
 
@@ -760,7 +760,7 @@ class ProcessRequestsState(AppState):
 
         RequestDAO.mark_completed(self.item.id, movement_id, login)
         yield rx.toast.success("Заявку виконано, рух сформовано!")
-        yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(self.item.id))
+        yield rx.redirect(routes.CATALOG_REQUESTS_VIEW_ID + str(self.item.id), replace=True)
 
     def _group_products(self, products_list) -> List[MovementProductsCatalog]:
         catalog_ids: List[int] = []

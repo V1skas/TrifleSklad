@@ -1171,7 +1171,7 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
             return
         yield rx.toast.success(text)
         yield ListAdmissionState.on_load()
-        yield rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}")
+        yield rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}", replace=True)
 
 
 class EditAdmissionState(FullEditMixin, AppState):
@@ -1585,7 +1585,7 @@ class EditAdmissionState(FullEditMixin, AppState):
             self.removed_line_ids = []
             yield rx.toast.success(text)
             yield ListAdmissionState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_ADMISSIONS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 

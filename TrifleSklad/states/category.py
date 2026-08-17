@@ -88,7 +88,7 @@ class AddCategoriesState(AppState):
         try:
             self.item = ProductCategoryService().add_one(self.item, self.user.login)
             yield rx.toast.success("Категорію успішно додано!")
-            yield rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -158,7 +158,7 @@ class EditCategoriesState(AppState):
         try:
             self.item = ProductCategoryService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Категорію успішно змінено!")
-            yield rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

@@ -103,7 +103,7 @@ class AddWorkerState(AppState):
         try:
             self.item = WorkerService().add_one(self.item, self.user.login)
             yield rx.toast.success("Співробітника додано!")
-            yield rx.redirect(routes.ADMIN_WORKERS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.ADMIN_WORKERS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -189,7 +189,7 @@ class EditWorkerState(AppState):
         try:
             self.item = WorkerService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Інформацію про співробітника змінено!")
-            yield rx.redirect(routes.ADMIN_WORKERS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.ADMIN_WORKERS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

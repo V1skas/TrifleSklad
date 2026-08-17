@@ -137,7 +137,7 @@ class AddSupplierState(AppState):
         try:
             self.item = SupplierService().add_one(self.item, self.user.login)
             yield rx.toast.success("Постачальника додано!")
-            yield rx.redirect(routes.CATALOG_SUPPLIERS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_SUPPLIERS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -236,7 +236,7 @@ class EditSupplierState(AppState):
         try:
             self.item = SupplierService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Інформація про постачальника змінена!")
-            yield rx.redirect(routes.CATALOG_SUPPLIERS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_SUPPLIERS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

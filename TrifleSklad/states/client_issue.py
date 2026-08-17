@@ -612,7 +612,7 @@ class AddClientIssueState(LookupCreatorsMixin, AppState):
                 return
             yield rx.toast.success(text)
             yield ListClientIssueState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_CLIENT_ISSUES_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_CLIENT_ISSUES_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 
@@ -886,13 +886,13 @@ class EditClientIssueState(FullEditMixin, AppState):
                 return
             yield rx.toast.success("Видачу клієнту змінено!")
             yield ListClientIssueState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_CLIENT_ISSUES_VIEW_ID}{self.item.id}")
+            yield rx.redirect(f"{routes.MOVEMENT_CLIENT_ISSUES_VIEW_ID}{self.item.id}", replace=True)
             return
 
         flag, text, id = ClientIssueDAO.edit_one(self.item, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListClientIssueState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_CLIENT_ISSUES_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_CLIENT_ISSUES_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)

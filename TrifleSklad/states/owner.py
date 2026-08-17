@@ -84,7 +84,7 @@ class AddOwnerState(AppState):
         try:
             self.item = OwnerService().add_one(self.item, self.user.login)
             yield rx.toast.success("Власника додано!")
-            yield rx.redirect(routes.CATALOG_OWNERS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_OWNERS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:
@@ -151,7 +151,7 @@ class EditOwnerState(AppState):
         try:
             self.item = OwnerService().edit_one(self.item, self.user.login)
             yield rx.toast.success("Власника змінено!")
-            yield rx.redirect(routes.CATALOG_OWNERS_VIEW_ID + str(self.item.id))
+            yield rx.redirect(routes.CATALOG_OWNERS_VIEW_ID + str(self.item.id), replace=True)
         except ServiceError as e:
             yield rx.toast.warning(str(e))
         except Exception:

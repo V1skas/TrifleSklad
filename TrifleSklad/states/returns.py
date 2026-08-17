@@ -345,7 +345,7 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
                 return
             yield rx.toast.success("Повернення проведено!")
             yield ListReturnsState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 
@@ -518,7 +518,7 @@ class EditReturnsState(FullEditMixin, AppState):
                 return
             yield rx.toast.success("Повернення змінено!")
             yield ListReturnsState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{self.item.id}")
+            yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{self.item.id}", replace=True)
             return
 
         form_data = {
@@ -530,6 +530,6 @@ class EditReturnsState(FullEditMixin, AppState):
         if flag:
             yield rx.toast.success("Повернення змінено!")
             yield ListReturnsState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_RETURNS_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)

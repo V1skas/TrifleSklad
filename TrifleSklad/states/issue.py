@@ -645,7 +645,7 @@ class AddIssueState(LookupCreatorsMixin, AppState):
                 return
             yield rx.toast.success(text)
             yield ListIssueState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
 
@@ -913,13 +913,13 @@ class EditIssueState(FullEditMixin, AppState):
                 return
             yield rx.toast.success("Видачу змінено!")
             yield ListIssueState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{self.item.id}")
+            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{self.item.id}", replace=True)
             return
 
         flag, text, id = IssueDAO.edit_one(self.item, self.user.login)
         if flag:
             yield rx.toast.success(text)
             yield ListIssueState.on_load()
-            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}")
+            yield rx.redirect(f"{routes.MOVEMENT_ISSUES_VIEW_ID}{id}", replace=True)
             return
         yield rx.toast.error(text)
