@@ -13,7 +13,7 @@ from TrifleSklad.views.actions_picker import actions_picker
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _list_action_item(item: Action) -> rx.Component:
@@ -99,25 +99,37 @@ def _actions_dialog(state) -> rx.Component:
 
 def _form_fields(state) -> rx.Component:
     return rx.vstack(
-        rx.text("*Назва:"),
-        controls.input_field(value=state.item.title, on_change=state.set_title, width="100%"),
-        rx.text("Опис:"),
-        controls.text_area_field(value=state.description, on_change=state.set_description, width="100%"),
-        _actions_dialog(state),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    state.has_selected_actions,
-                    rx.foreach(state.item.actions, _list_action_item),
-                    rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+        titled_section(
+            "Інформація",
+            rx.text("*Назва:"),
+            controls.input_field(value=state.item.title, on_change=state.set_title, width="100%"),
+            rx.text("Опис:"),
+            controls.text_area_field(value=state.description, on_change=state.set_description, width="100%"),
+        ),
+        titled_section(
+            "Права",
+            _actions_dialog(state),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        state.has_selected_actions,
+                        rx.foreach(state.item.actions, _list_action_item),
+                        rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    # Overlay-скролбар (macOS) інакше малюється поверх правого
+                    # краю карток — див. те саме в page_wrapper (layouts.py).
+                    padding_right="0.75em",
                 ),
                 spacing="1",
                 width="100%",
-                height="100%",
+                # height="fit-content" + max_height — картка росте разом із
+                # вмістом (мало прав — мало місця), але не безмежно: за межею
+                # увімкається прокрутка.
+                height="fit-content",
+                max_height="30em",
             ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
         ),
         align="stretch",
         spacing="3",
@@ -154,23 +166,29 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.heading(ViewRoleState.item.title, size="7", width="100%"),
-        rx.text(ViewRoleState.description, width="100%"),
-        rx.heading("Права", size="3", width="100%"),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    ViewRoleState.has_actions,
-                    rx.foreach(ViewRoleState.item.actions, _list_action_item),
-                    rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+        titled_section(
+            "Інформація",
+            field_row("Назва", ViewRoleState.item.title),
+            field_row("Опис", ViewRoleState.description),
+        ),
+        titled_section(
+            "Права",
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        ViewRoleState.has_actions,
+                        rx.foreach(ViewRoleState.item.actions, _list_action_item),
+                        rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    padding_right="0.75em",
                 ),
                 spacing="1",
                 width="100%",
-                height="100%",
+                height="fit-content",
+                max_height="30em",
             ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
         ),
         history_block(ViewRoleState),
         spacing="3",

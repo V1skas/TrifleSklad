@@ -71,8 +71,12 @@ class AddUserState(AppState):
         self.item = User(roles=[], actions=[])
         self.password = ""
         self.list_workers = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
-        yield RoleSelectorState.on_load(self.item.roles)
-        yield ActionsPickerState.on_load(self.item.actions)
+        # list(...) — інакше в yield-подію потрапляє «жива» SQLAlchemy
+        # InstrumentedList; Reflex робить deepcopy аргументів події при
+        # ланцюжку подій, а deepcopy інструментованої колекції ламається на
+        # weakref власника (AttributeError: InstanceState має 'obj').
+        yield RoleSelectorState.on_load(list(self.item.roles))
+        yield ActionsPickerState.on_load(list(self.item.actions))
 
     @rx.event
     def set_login(self, value: str):
@@ -170,8 +174,8 @@ class EditUserState(AppState):
             self.password = ""
             self.list_workers = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
             self.in_process = False
-            yield RoleSelectorState.on_load(self.item.roles)
-            yield ActionsPickerState.on_load(self.item.actions)
+            yield RoleSelectorState.on_load(list(self.item.roles))
+            yield ActionsPickerState.on_load(list(self.item.actions))
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")

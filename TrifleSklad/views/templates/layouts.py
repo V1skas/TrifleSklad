@@ -346,6 +346,54 @@ def page_wrapper(
     )
 
 
+def field_row(label: str, value, **prop) -> rx.Component:
+    """Єдина строка «підпис: значення» для детального перегляду — заміняє
+    обидва наявні хендрольні варіанти (`rx.hstack(rx.text("Label:",
+    weight="medium"), rx.text(value))` та голий `rx.text(f"Label: {value}")`)."""
+    prop.setdefault("width", "100%")
+    prop.setdefault("wrap", "wrap")
+    prop.setdefault("spacing", "2")
+    return rx.hstack(
+        rx.text(
+            f"{label}:",
+            weight="medium",
+            color=rx.color("accent", 11),
+            min_width="12em",
+            flex_shrink="0",
+        ),
+        rx.text(value),
+        **prop,
+    )
+
+
+def titled_section(title: str, *children, **prop) -> rx.Component:
+    """Картка-секція для групування полів детального перегляду — заголовок
+    кольору акценту з тонкою лінією знизу (той самий прийом, що й у
+    `header_subpage`), тіло — vstack дітей (зазвичай `field_row`)."""
+    prop.setdefault("width", "100%")
+    return rx.box(
+        rx.vstack(
+            rx.heading(
+                title,
+                size="4",
+                color=rx.color("accent", 9),
+                padding_bottom="0.5em",
+                style={"border_bottom": f"1px solid {rx.color('accent', 6)}"},
+                width="100%",
+            ),
+            *children,
+            spacing="3",
+            align="stretch",
+            width="100%",
+        ),
+        border=f"1px solid {rx.color('accent', 6)}",
+        border_radius="0.6rem",
+        background_color=rx.color("accent", 2),
+        padding="1rem",
+        **prop,
+    )
+
+
 def header_subpage(title: str, *args, left: Optional[rx.Component] = None, **prop) -> rx.Component:
     """Шапка підсторінки — старий вигляд (`git show
     dev:components/elements.py::subpage_header`): заголовок кольору акценту,

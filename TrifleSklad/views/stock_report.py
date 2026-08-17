@@ -22,8 +22,8 @@ def _filter_select(label: str, value, options, on_change, search_value=None, on_
         )
     content.append(rx.select.item("Усі", value=ALL))
     content.append(rx.foreach(options, lambda opt: rx.select.item(opt[1], value=opt[0])))
-    return rx.vstack(
-        rx.text(label, size="2"),
+    return controls.filter_group(
+        label,
         rx.select.root(
             rx.select.trigger(placeholder="Усі", width="100%"),
             rx.select.content(*content, width="100%"),
@@ -31,15 +31,24 @@ def _filter_select(label: str, value, options, on_change, search_value=None, on_
             on_change=on_change,
             width="100%",
         ),
-        spacing="1",
-        width="100%",
     )
 
 
 def _filter_card() -> rx.Component:
     return rx.card(
         rx.vstack(
-            rx.hstack(
+            controls.filter_grid(
+                controls.filter_group(
+                    "Пошук",
+                    controls.search_field(
+                        rx.input.slot(rx.icon("search")),
+                        placeholder="Назва ТМЦ або серійний номер",
+                        value=StockReportState.search_text,
+                        on_change=StockReportState.on_change_search_text,
+                        width="100%",
+                    ),
+                    wide=True,
+                ),
                 _filter_select(
                     "Категорія",
                     StockReportState.filter_category_value,
@@ -68,21 +77,22 @@ def _filter_card() -> rx.Component:
                     StockReportState.list_owners,
                     StockReportState.on_change_owner,
                 ),
-                spacing="3",
-                width="100%",
-                align="end",
             ),
-            rx.hstack(
-                rx.text("Виключити:", size="2", weight="bold"),
-                rx.checkbox("Склади", checked=StockReportState.exclude_warehouse, on_change=StockReportState.on_change_exclude_warehouse),
-                rx.checkbox("Площадки", checked=StockReportState.exclude_site, on_change=StockReportState.on_change_exclude_site),
-                rx.checkbox("Відділи", checked=StockReportState.exclude_department, on_change=StockReportState.on_change_exclude_department),
-                rx.checkbox("Клієнти", checked=StockReportState.exclude_client, on_change=StockReportState.on_change_exclude_client),
-                rx.spacer(),
-                rx.button("Скинути фільтри", variant="soft", size="2", type="button", on_click=StockReportState.reset_filters),
-                spacing="4",
-                width="100%",
-                align="center",
+            controls.filter_group(
+                "Виключити місця",
+                rx.hstack(
+                    rx.checkbox("Склади", checked=StockReportState.exclude_warehouse, on_change=StockReportState.on_change_exclude_warehouse),
+                    rx.checkbox("Площадки", checked=StockReportState.exclude_site, on_change=StockReportState.on_change_exclude_site),
+                    rx.checkbox("Відділи", checked=StockReportState.exclude_department, on_change=StockReportState.on_change_exclude_department),
+                    rx.checkbox("Клієнти", checked=StockReportState.exclude_client, on_change=StockReportState.on_change_exclude_client),
+                    spacing="5",
+                    wrap="wrap",
+                    align="center",
+                ),
+                height="auto",
+            ),
+            controls.filter_actions(
+                rx.button("Скинути фільтри", variant="soft", type="button", on_click=StockReportState.reset_filters),
             ),
             spacing="3",
             width="100%",
@@ -167,19 +177,8 @@ def _table() -> rx.Component:
     )
 
 
-def _search_box() -> rx.Component:
-    return controls.search_field(
-        rx.input.slot(rx.icon("search")),
-        placeholder="Пошук за назвою ТМЦ або серійним номером",
-        value=StockReportState.search_text,
-        on_change=StockReportState.on_change_search_text,
-        width="100%",
-    )
-
-
 def page_content() -> rx.Component:
     return rx.vstack(
-        _search_box(),
         _filter_card(),
         rx.cond(
             StockReportState.has_rows,

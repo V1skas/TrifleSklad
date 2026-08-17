@@ -12,7 +12,7 @@ from TrifleSklad.states.nds_rate import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: NDSRate) -> rx.Component:
@@ -67,7 +67,8 @@ def list_page() -> rx.Component:
 def _form_fields(
     title, rate, description, is_default, set_title, set_rate, set_description, set_is_default
 ) -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Назва", weight="medium"),
         controls.input_field(value=title, on_change=set_title, placeholder="Назва", width="100%"),
         rx.text("Ставка, %", weight="medium"),
@@ -80,9 +81,6 @@ def _form_fields(
             align="center",
             spacing="2",
         ),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -141,13 +139,12 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.hstack(rx.text("Назва:", weight="medium"), rx.text(ViewNdsRateState.title), width="100%"),
-        rx.hstack(rx.text("Ставка:", weight="medium"), rx.text(ViewNdsRateState.rate, "%"), width="100%"),
-        rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewNdsRateState.description), width="100%"),
-        rx.hstack(
-            rx.text("За замовчуванням для рухів:", weight="medium"),
-            rx.text(rx.cond(ViewNdsRateState.is_default, "Так", "Ні")),
-            width="100%",
+        titled_section(
+            "Інформація",
+            field_row("Назва", ViewNdsRateState.title),
+            field_row("Ставка", f"{ViewNdsRateState.rate}%"),
+            field_row("Опис", ViewNdsRateState.description),
+            field_row("За замовчуванням для рухів", rx.cond(ViewNdsRateState.is_default, "Так", "Ні")),
         ),
         history_block(ViewNdsRateState),
         spacing="3",

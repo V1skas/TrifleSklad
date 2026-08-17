@@ -12,7 +12,7 @@ from TrifleSklad.states.worker import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Worker) -> rx.Component:
@@ -71,7 +71,8 @@ def list_page() -> rx.Component:
 
 
 def _form_fields(state) -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Прізвище І.Б.", weight="medium"),
         controls.input_field(value=state.worker_fio, on_change=state.set_worker_fio, width="100%"),
         rx.text("*Посада", weight="medium"),
@@ -86,9 +87,6 @@ def _form_fields(state) -> rx.Component:
             align="center",
             spacing="2",
         ),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -121,14 +119,13 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.heading(ViewWorkerState.worker_fio, size="7", width="100%"),
-        rx.hstack(rx.text("Посада:", weight="medium"), rx.text(ViewWorkerState.position), width="100%"),
-        rx.hstack(rx.text("Телефон:", weight="medium"), rx.text(ViewWorkerState.phone_number), width="100%"),
-        rx.hstack(rx.text("Ел. пошта:", weight="medium"), rx.text(ViewWorkerState.email), width="100%"),
-        rx.hstack(
-            rx.text("За замовчуванням для рухів:", weight="medium"),
-            rx.text(rx.cond(ViewWorkerState.is_default, "Так", "Ні")),
-            width="100%",
+        titled_section(
+            "Інформація",
+            field_row("Прізвище І.Б.", ViewWorkerState.worker_fio),
+            field_row("Посада", ViewWorkerState.position),
+            field_row("Телефон", ViewWorkerState.phone_number),
+            field_row("Ел. пошта", ViewWorkerState.email),
+            field_row("За замовчуванням для рухів", rx.cond(ViewWorkerState.is_default, "Так", "Ні")),
         ),
         history_block(ViewWorkerState),
         spacing="3",

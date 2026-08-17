@@ -12,7 +12,7 @@ from TrifleSklad.states.supplier import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Supplier) -> rx.Component:
@@ -42,22 +42,29 @@ def _table() -> rx.Component:
     )
 
 
+def _filter_shell() -> rx.Component:
+    return controls.filter_shell(
+        ListSupplierState.is_filter_open,
+        controls.filter_grid(
+            controls.filter_group(
+                "Пошук",
+                controls.search_field(
+                    rx.input.slot(rx.icon("search")),
+                    value=ListSupplierState.filter_title,
+                    on_change=ListSupplierState.set_filter_title,
+                    placeholder="Назва постачальника",
+                    width="100%",
+                ),
+            ),
+        ),
+    )
+
+
 def list_page_content() -> rx.Component:
-    return rx.vstack(
-        controls.search_field(
-            rx.input.slot(rx.icon("search")),
-            value=ListSupplierState.filter_title,
-            on_change=ListSupplierState.set_filter_title,
-            placeholder="Пошук за назвою...",
-            width="100%",
-        ),
-        rx.cond(
-            ListSupplierState.has_items,
-            _table(),
-            controls.empty_placeholder(),
-        ),
-        spacing="3",
-        width="100%",
+    return rx.cond(
+        ListSupplierState.has_items,
+        _table(),
+        controls.empty_placeholder(),
     )
 
 
@@ -66,6 +73,11 @@ def list_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Постачальники",
+            controls.filter_toggle_button(
+                ListSupplierState.is_filter_open,
+                ListSupplierState.toggle_filter,
+                active=ListSupplierState.has_active_filters,
+            ),
             rx.cond(
                 ListSupplierState.get_user_actions.contains(Action.SUPPLIERS_CREATE),
                 controls.button_primary("Створити", on_click=ListSupplierState.on_click_add),
@@ -73,12 +85,14 @@ def list_page() -> rx.Component:
             width="100%",
         ),
         rx.skeleton(list_page_content(), loading=ListSupplierState.in_progress, height="100%"),
+        filter_panel=_filter_shell(),
         on_mount=ListSupplierState.on_load,
     )
 
 
 def _form_fields(state) -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Назва", weight="medium"),
         controls.input_field(value=state.title, on_change=state.set_title, placeholder="Назва", width="100%"),
         rx.text("ЄДРПОУ", weight="medium"),
@@ -93,9 +107,6 @@ def _form_fields(state) -> rx.Component:
         controls.input_field(value=state.contact_phone, on_change=state.set_contact_phone, placeholder="Телефон", width="100%"),
         rx.text("Опис", weight="medium"),
         controls.text_area_field(value=state.description, on_change=state.set_description, placeholder="Опис", width="100%"),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -128,13 +139,16 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.hstack(rx.text("Назва:", weight="medium"), rx.text(ViewSupplierState.title), width="100%"),
-        rx.hstack(rx.text("ЄДРПОУ:", weight="medium"), rx.text(ViewSupplierState.edrpou), width="100%"),
-        rx.hstack(rx.text("Адреса:", weight="medium"), rx.text(ViewSupplierState.address), width="100%"),
-        rx.hstack(rx.text("Email:", weight="medium"), rx.text(ViewSupplierState.email), width="100%"),
-        rx.hstack(rx.text("Контактна особа:", weight="medium"), rx.text(ViewSupplierState.contact_person), width="100%"),
-        rx.hstack(rx.text("Контактний телефон:", weight="medium"), rx.text(ViewSupplierState.contact_phone), width="100%"),
-        rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewSupplierState.description), width="100%"),
+        titled_section(
+            "Інформація",
+            field_row("Назва", ViewSupplierState.title),
+            field_row("ЄДРПОУ", ViewSupplierState.edrpou),
+            field_row("Адреса", ViewSupplierState.address),
+            field_row("Email", ViewSupplierState.email),
+            field_row("Контактна особа", ViewSupplierState.contact_person),
+            field_row("Контактний телефон", ViewSupplierState.contact_phone),
+            field_row("Опис", ViewSupplierState.description),
+        ),
         history_block(ViewSupplierState),
         spacing="3",
         align="stretch",

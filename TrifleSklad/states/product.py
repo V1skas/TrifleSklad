@@ -10,6 +10,7 @@ from TrifleSklad.services.product_catalog import ProductCatalogService
 from TrifleSklad.services.product_category import ProductCategoryService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.list_filter_mixin import SearchFilterMixin
 
 ALL = "all"
 
@@ -71,7 +72,7 @@ class CategoryCreateMixin(rx.State, mixin=True):
         return rx.toast.success("Категорію створено та обрано!")
 
 
-class ListProductsState(AppState):
+class ListProductsState(SearchFilterMixin, AppState):
     items: Optional[Sequence[ProductCatalog]] = None
     in_progress: bool = True
 
@@ -106,6 +107,10 @@ class ListProductsState(AppState):
     def has_items(self) -> bool:
         return self.items is not None and len(self.items) > 0
 
+    @rx.var
+    def has_active_filters(self) -> bool:
+        return bool(self.search_str) or self.filter_category_id != ALL
+
     @rx.event
     def on_load(self):
         if not self.has_permission(Action.PRODUCTS_LIST):
@@ -115,6 +120,7 @@ class ListProductsState(AppState):
         try:
             self.in_progress = True
             self._current_page = 1
+            self.is_filter_open = False
             self.search_str = None
             self.filter_category_id = ALL
             # Формат (label, id) — інвертований відносно (id, label) сервісу,

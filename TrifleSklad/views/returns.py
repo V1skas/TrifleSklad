@@ -19,7 +19,7 @@ from TrifleSklad.states.returns import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Movement) -> rx.Component:
@@ -96,64 +96,67 @@ def list_page() -> rx.Component:
 
 def _add_form() -> rx.Component:
     return rx.vstack(
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            value=AddReturnsState.current_date,
-            on_change=AddReturnsState.on_change_date,
-            type="date",
-            required=True,
-            width="100%",
-        ),
-        rx.text("*Звідки (площадка/відділ/клієнт):", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddReturnsState.list_source_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
-                ),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                value=AddReturnsState.current_date,
+                on_change=AddReturnsState.on_change_date,
+                type="date",
+                required=True,
                 width="100%",
             ),
-            required=True,
-            value=AddReturnsState.id_incoming_storage,
-            on_change=AddReturnsState.on_change_id_incoming_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити площадку/відділ/клієнта",
-            AddReturnsState.open_storage_create(StorageType.TECHNICAL_SITE, "incoming", True),
-        ),
-        rx.text("*Склад призначення:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddReturnsState.list_destination_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
+            rx.text("*Звідки (площадка/відділ/клієнт):", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddReturnsState.list_source_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddReturnsState.id_incoming_storage,
+                on_change=AddReturnsState.on_change_id_incoming_storage,
             ),
-            required=True,
-            value=AddReturnsState.id_destination_storage,
-            on_change=AddReturnsState.on_change_id_destination_storage,
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити площадку/відділ/клієнта",
+                AddReturnsState.open_storage_create(StorageType.TECHNICAL_SITE, "incoming", True),
+            ),
+            rx.text("*Склад призначення:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddReturnsState.list_destination_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddReturnsState.id_destination_storage,
+                on_change=AddReturnsState.on_change_id_destination_storage,
+            ),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити склад",
+                AddReturnsState.open_storage_create(StorageType.WAREHOUSE, "destination", False),
+            ),
+            storage_create_dialog(AddReturnsState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                AddReturnsState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                value=AddReturnsState.status,
+                on_change=AddReturnsState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=AddReturnsState.comment, on_change=AddReturnsState.on_change_comment, width="100%"),
         ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити склад",
-            AddReturnsState.open_storage_create(StorageType.WAREHOUSE, "destination", False),
-        ),
-        storage_create_dialog(AddReturnsState),
-        products_widget(width="100%"),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            AddReturnsState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            value=AddReturnsState.status,
-            on_change=AddReturnsState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=AddReturnsState.comment, on_change=AddReturnsState.on_change_comment, width="100%"),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -178,50 +181,53 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditReturnsState),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(value=EditReturnsState.item.date, type="date", required=True, disabled=True, width="100%"),
-        rx.text("*Звідки (площадка/відділ/клієнт):", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditReturnsState.list_source_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(value=EditReturnsState.item.date, type="date", required=True, disabled=True, width="100%"),
+            rx.text("*Звідки (площадка/відділ/клієнт):", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditReturnsState.list_source_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditReturnsState.is_view_only_edit,
+                value=EditReturnsState.id_incoming_storage,
+                on_change=EditReturnsState.on_change_id_incoming_storage,
             ),
-            required=True,
-            disabled=EditReturnsState.is_view_only_edit,
-            value=EditReturnsState.id_incoming_storage,
-            on_change=EditReturnsState.on_change_id_incoming_storage,
-        ),
-        rx.text("*Склад призначення:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditReturnsState.list_destination_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+            rx.text("*Склад призначення:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditReturnsState.list_destination_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditReturnsState.is_view_only_edit,
+                value=EditReturnsState.id_destination_storage,
+                on_change=EditReturnsState.on_change_id_destination_storage,
             ),
-            required=True,
-            disabled=EditReturnsState.is_view_only_edit,
-            value=EditReturnsState.id_destination_storage,
-            on_change=EditReturnsState.on_change_id_destination_storage,
+            full_edit.reason_field(EditReturnsState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                EditReturnsState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                value=EditReturnsState.status,
+                on_change=EditReturnsState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=EditReturnsState.item.comment, on_change=EditReturnsState.on_change_comment, width="100%"),
         ),
-        products_widget(width="100%"),
-        full_edit.reason_field(EditReturnsState),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            EditReturnsState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            value=EditReturnsState.status,
-            on_change=EditReturnsState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=EditReturnsState.item.comment, on_change=EditReturnsState.on_change_comment, width="100%"),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -293,15 +299,15 @@ def _cancel_conflict_dialog() -> rx.Component:
 def view_page_content() -> rx.Component:
     return rx.vstack(
         _cancel_conflict_dialog(),
-        rx.hstack(rx.text("Дата:", weight="medium"), rx.text(ViewReturnsState.item.date)),
-        rx.hstack(
-            rx.text("Звідки (площадка/відділ/клієнт):", weight="medium"),
-            rx.text(ViewReturnsState.item.incoming_storage.title),
+        titled_section(
+            "Загальна інформація",
+            field_row("Дата", ViewReturnsState.item.date),
+            field_row("Звідки (площадка/відділ/клієнт)", ViewReturnsState.item.incoming_storage.title),
+            field_row("Склад призначення", ViewReturnsState.item.destination_storage.title),
+            field_row("Статус", ViewReturnsState.item_status),
+            field_row("Коментар", ViewReturnsState.item.comment),
         ),
-        rx.hstack(rx.text("Склад призначення:", weight="medium"), rx.text(ViewReturnsState.item.destination_storage.title)),
-        products_widget(width="100%"),
-        rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewReturnsState.item_status)),
-        rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewReturnsState.item.comment)),
+        titled_section("Товари", products_widget(width="100%")),
         history_block(ViewReturnsState),
         spacing="3",
         align="stretch",

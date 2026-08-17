@@ -16,7 +16,7 @@ from TrifleSklad.states.request import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper, titled_section
 
 
 # ----- LIST -----
@@ -25,25 +25,26 @@ def _filter_card() -> rx.Component:
         ListRequestsState.is_filter_open,
         rx.card(
             rx.vstack(
-                rx.text("Статус:", size="2"),
-                rx.hstack(
-                    rx.foreach(
-                        ListRequestsState.statuses_for_filter,
-                        lambda s: rx.checkbox(
-                            s[1],
-                            checked=s[2],
-                            on_change=lambda checked: ListRequestsState.set_status(s[0], checked),
+                controls.filter_group(
+                    "Статус",
+                    rx.hstack(
+                        rx.foreach(
+                            ListRequestsState.statuses_for_filter,
+                            lambda s: rx.checkbox(
+                                s[1],
+                                checked=s[2],
+                                on_change=lambda checked: ListRequestsState.set_status(s[0], checked),
+                            ),
                         ),
+                        spacing="5",
+                        wrap="wrap",
+                        align="center",
                     ),
-                    spacing="4",
-                    wrap="wrap",
+                    height="auto",
                 ),
-                rx.hstack(
+                controls.filter_actions(
                     rx.button("Скинути", variant="soft", color_scheme="gray", on_click=ListRequestsState.reset_filters),
                     rx.button("Застосувати", on_click=ListRequestsState.apply_filters),
-                    spacing="3",
-                    justify="end",
-                    width="100%",
                 ),
                 spacing="3",
                 width="100%",
@@ -229,8 +230,9 @@ def _positions_editor(state) -> rx.Component:
 
 
 def _request_form(state) -> rx.Component:
-    return rx.box(
-        rx.vstack(
+    return rx.vstack(
+        titled_section(
+            "Загальна інформація",
             rx.text("*Тип заявки:"),
             rx.select.root(
                 rx.select.trigger(placeholder="Оберіть тип", width="100%"),
@@ -261,11 +263,12 @@ def _request_form(state) -> rx.Component:
                     spacing="2", width="100%", align="stretch",
                 ),
             ),
-            _positions_editor(state),
             rx.text("Коментар:"),
             controls.text_area_field(value=state.comment, on_change=state.set_comment, width="100%"),
-            spacing="3", align="stretch", width="100%",
         ),
+        titled_section("Товари", _positions_editor(state)),
+        spacing="3",
+        align="stretch",
         width="100%",
     )
 

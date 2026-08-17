@@ -20,7 +20,7 @@ from TrifleSklad.states.write_off import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Movement) -> rx.Component:
@@ -97,70 +97,73 @@ def list_page() -> rx.Component:
 
 def _add_form() -> rx.Component:
     return rx.vstack(
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            value=AddWriteOffState.current_date,
-            on_change=AddWriteOffState.on_change_date,
-            type="date",
-            required=True,
-            width="100%",
-        ),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        value=AddWriteOffState.search_name_incoming_storage,
-                        on_change=AddWriteOffState.on_change_search_name_incoming_storage,
-                        placeholder="Введіть назву для пошуку",
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                value=AddWriteOffState.current_date,
+                on_change=AddWriteOffState.on_change_date,
+                type="date",
+                required=True,
+                width="100%",
+            ),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            value=AddWriteOffState.search_name_incoming_storage,
+                            on_change=AddWriteOffState.on_change_search_name_incoming_storage,
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                        ),
+                        rx.foreach(
+                            AddWriteOffState.list_storages,
+                            lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        ),
                         width="100%",
-                    ),
-                    rx.foreach(
-                        AddWriteOffState.list_storages,
-                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
                     ),
                     width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddWriteOffState.id_incoming_storage,
+                on_change=AddWriteOffState.on_change_id_incoming_storage,
             ),
-            required=True,
-            value=AddWriteOffState.id_incoming_storage,
-            on_change=AddWriteOffState.on_change_id_incoming_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити склад",
-            AddWriteOffState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
-        ),
-        storage_create_dialog(AddWriteOffState),
-        rx.text("*Власник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddWriteOffState.list_owners,
-                    lambda owner: rx.select.item(owner[0], value=owner[1]),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити склад",
+                AddWriteOffState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
+            ),
+            storage_create_dialog(AddWriteOffState),
+            rx.text("*Власник:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddWriteOffState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddWriteOffState.id_incoming_owner,
+                on_change=AddWriteOffState.on_change_id_incoming_owner,
             ),
-            required=True,
-            value=AddWriteOffState.id_incoming_owner,
-            on_change=AddWriteOffState.on_change_id_incoming_owner,
+            create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddWriteOffState.open_owner_create("")),
+            owner_create_dialog(AddWriteOffState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                AddWriteOffState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                value=AddWriteOffState.status,
+                on_change=AddWriteOffState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=AddWriteOffState.comment, on_change=AddWriteOffState.on_change_comment, width="100%"),
         ),
-        create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddWriteOffState.open_owner_create("")),
-        owner_create_dialog(AddWriteOffState),
-        products_widget(width="100%"),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            AddWriteOffState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            value=AddWriteOffState.status,
-            on_change=AddWriteOffState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=AddWriteOffState.comment, on_change=AddWriteOffState.on_change_comment, width="100%"),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -185,50 +188,53 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditWriteOffState),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(value=EditWriteOffState.item.date, type="date", required=True, disabled=True, width="100%"),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditWriteOffState.list_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(value=EditWriteOffState.item.date, type="date", required=True, disabled=True, width="100%"),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditWriteOffState.list_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditWriteOffState.is_view_only_edit,
+                value=EditWriteOffState.id_incoming_storage,
+                on_change=EditWriteOffState.on_change_id_incoming_storage,
             ),
-            required=True,
-            disabled=EditWriteOffState.is_view_only_edit,
-            value=EditWriteOffState.id_incoming_storage,
-            on_change=EditWriteOffState.on_change_id_incoming_storage,
-        ),
-        rx.text("*Власник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditWriteOffState.list_owners,
-                    lambda owner: rx.select.item(owner[0], value=owner[1]),
+            rx.text("*Власник:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditWriteOffState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditWriteOffState.is_view_only_edit,
+                value=EditWriteOffState.id_incoming_owner,
+                on_change=EditWriteOffState.on_change_id_incoming_owner,
             ),
-            required=True,
-            disabled=EditWriteOffState.is_view_only_edit,
-            value=EditWriteOffState.id_incoming_owner,
-            on_change=EditWriteOffState.on_change_id_incoming_owner,
+            full_edit.reason_field(EditWriteOffState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                EditWriteOffState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                value=EditWriteOffState.status,
+                on_change=EditWriteOffState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=EditWriteOffState.item.comment, on_change=EditWriteOffState.on_change_comment, width="100%"),
         ),
-        products_widget(width="100%"),
-        full_edit.reason_field(EditWriteOffState),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            EditWriteOffState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            value=EditWriteOffState.status,
-            on_change=EditWriteOffState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=EditWriteOffState.item.comment, on_change=EditWriteOffState.on_change_comment, width="100%"),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -300,12 +306,15 @@ def _cancel_conflict_dialog() -> rx.Component:
 def view_page_content() -> rx.Component:
     return rx.vstack(
         _cancel_conflict_dialog(),
-        rx.hstack(rx.text("Дата:", weight="medium"), rx.text(ViewWriteOffState.item.date)),
-        rx.hstack(rx.text("Склад:", weight="medium"), rx.text(ViewWriteOffState.item.incoming_storage.title)),
-        rx.hstack(rx.text("Власник:", weight="medium"), rx.text(ViewWriteOffState.item.incoming_owner.title)),
-        products_widget(width="100%"),
-        rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewWriteOffState.item_status)),
-        rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewWriteOffState.item.comment)),
+        titled_section(
+            "Загальна інформація",
+            field_row("Дата", ViewWriteOffState.item.date),
+            field_row("Склад", ViewWriteOffState.item.incoming_storage.title),
+            field_row("Власник", ViewWriteOffState.item.incoming_owner.title),
+            field_row("Статус", ViewWriteOffState.item_status),
+            field_row("Коментар", ViewWriteOffState.item.comment),
+        ),
+        titled_section("Товари", products_widget(width="100%")),
         history_block(ViewWriteOffState),
         spacing="3",
         align="stretch",

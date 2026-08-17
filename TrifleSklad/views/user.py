@@ -9,7 +9,7 @@ from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.role_selector import role_selector
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _list_role_item(item: Role) -> rx.Component:
@@ -151,43 +151,55 @@ def _worker_select(value, on_change, workers) -> rx.Component:
 
 def add_page_content() -> rx.Component:
     return rx.vstack(
-        rx.text("*Логін:"),
-        controls.input_field(value=AddUserState.login, on_change=AddUserState.set_login, width="100%"),
-        rx.text("*Пароль:"),
-        controls.input_field(value=AddUserState.password, on_change=AddUserState.set_password, width="100%"),
-        rx.text("*Співробітник:"),
-        _worker_select(AddUserState.id_worker, AddUserState.set_id_worker, AddUserState.list_workers),
-        _roles_dialog(AddUserState),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    AddUserState.has_roles,
-                    rx.foreach(AddUserState.item.roles, _list_role_item),
-                    rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
-                ),
-                spacing="1",
-                width="100%",
-                height="100%",
-            ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
+        titled_section(
+            "Інформація",
+            rx.text("*Логін:"),
+            controls.input_field(value=AddUserState.login, on_change=AddUserState.set_login, width="100%"),
+            rx.text("*Пароль:"),
+            controls.input_field(value=AddUserState.password, on_change=AddUserState.set_password, width="100%"),
+            rx.text("*Співробітник:"),
+            _worker_select(AddUserState.id_worker, AddUserState.set_id_worker, AddUserState.list_workers),
         ),
-        _actions_dialog(AddUserState),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    AddUserState.has_actions,
-                    rx.foreach(AddUserState.item.actions, _list_action_item),
-                    rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+        titled_section(
+            "Права доступу",
+            _roles_dialog(AddUserState),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        AddUserState.has_roles,
+                        rx.foreach(AddUserState.item.roles, _list_role_item),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    # Overlay-скролбар (macOS) інакше малюється поверх правого
+                    # краю карток — див. те саме в page_wrapper (layouts.py).
+                    padding_right="0.75em",
                 ),
                 spacing="1",
                 width="100%",
-                height="100%",
+                # height="fit-content" + max_height — картка росте разом із
+                # вмістом (мало обрано — мало місця), але не безмежно.
+                height="fit-content",
+                max_height="30em",
             ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
+            _actions_dialog(AddUserState),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        AddUserState.has_actions,
+                        rx.foreach(AddUserState.item.actions, _list_action_item),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    padding_right="0.75em",
+                ),
+                spacing="1",
+                width="100%",
+                height="fit-content",
+                max_height="30em",
+            ),
         ),
         align="stretch",
         spacing="3",
@@ -211,43 +223,51 @@ def add_page() -> rx.Component:
 
 def edit_page_content() -> rx.Component:
     return rx.vstack(
-        rx.text("Логін:"),
-        controls.input_field(value=EditUserState.item.login, disabled=True, width="100%"),
-        rx.text("Пароль (залиште порожнім, щоб не змінювати):"),
-        controls.input_field(value=EditUserState.password, on_change=EditUserState.set_password, width="100%"),
-        rx.text("*Співробітник:"),
-        _worker_select(EditUserState.id_worker, EditUserState.set_id_worker, EditUserState.list_workers),
-        _roles_dialog(EditUserState),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    EditUserState.has_roles,
-                    rx.foreach(EditUserState.item.roles, _list_role_item),
-                    rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
-                ),
-                spacing="1",
-                width="100%",
-                height="100%",
-            ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
+        titled_section(
+            "Інформація",
+            rx.text("Логін:"),
+            controls.input_field(value=EditUserState.item.login, disabled=True, width="100%"),
+            rx.text("Пароль (залиште порожнім, щоб не змінювати):"),
+            controls.input_field(value=EditUserState.password, on_change=EditUserState.set_password, width="100%"),
+            rx.text("*Співробітник:"),
+            _worker_select(EditUserState.id_worker, EditUserState.set_id_worker, EditUserState.list_workers),
         ),
-        _actions_dialog(EditUserState),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    EditUserState.has_actions,
-                    rx.foreach(EditUserState.item.actions, _list_action_item),
-                    rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+        titled_section(
+            "Права доступу",
+            _roles_dialog(EditUserState),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        EditUserState.has_roles,
+                        rx.foreach(EditUserState.item.roles, _list_role_item),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    padding_right="0.75em",
                 ),
                 spacing="1",
                 width="100%",
-                height="100%",
+                height="fit-content",
+                max_height="30em",
             ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
+            _actions_dialog(EditUserState),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        EditUserState.has_actions,
+                        rx.foreach(EditUserState.item.actions, _list_action_item),
+                        rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    padding_right="0.75em",
+                ),
+                spacing="1",
+                width="100%",
+                height="fit-content",
+                max_height="30em",
+            ),
         ),
         align="stretch",
         spacing="3",
@@ -270,39 +290,47 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.heading(ViewUserState.item.login, size="7", width="100%"),
-        rx.hstack(rx.text("Співробітник:", weight="medium"), rx.text(ViewUserState.item.worker.fio), width="100%"),
-        rx.heading("Призначені ролі:", size="3", width="100%"),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    ViewUserState.has_roles,
-                    rx.foreach(ViewUserState.item.roles, _list_role_item),
-                    rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
-                ),
-                spacing="1",
-                width="100%",
-                height="100%",
-            ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
+        titled_section(
+            "Інформація",
+            field_row("Логін", ViewUserState.item.login),
+            field_row("Співробітник", ViewUserState.item.worker.fio),
         ),
-        rx.heading("Персональні дозволи:", size="3", width="100%"),
-        rx.scroll_area(
-            rx.vstack(
-                rx.cond(
-                    ViewUserState.has_actions,
-                    rx.foreach(ViewUserState.item.actions, _list_action_item),
-                    rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+        titled_section(
+            "Права доступу",
+            rx.text("Призначені ролі", weight="medium"),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        ViewUserState.has_roles,
+                        rx.foreach(ViewUserState.item.roles, _list_role_item),
+                        rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    padding_right="0.75em",
                 ),
                 spacing="1",
                 width="100%",
-                height="100%",
+                height="fit-content",
+                max_height="30em",
             ),
-            spacing="1",
-            width="100%",
-            max_height="16em",
+            rx.text("Персональні дозволи", weight="medium"),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.cond(
+                        ViewUserState.has_actions,
+                        rx.foreach(ViewUserState.item.actions, _list_action_item),
+                        rx.center(rx.text("Нічого не обрано"), width="100%", size="3"),
+                    ),
+                    spacing="1",
+                    width="100%",
+                    padding_right="0.75em",
+                ),
+                spacing="1",
+                width="100%",
+                height="fit-content",
+                max_height="30em",
+            ),
         ),
         history_block(ViewUserState),
         spacing="3",

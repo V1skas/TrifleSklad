@@ -11,9 +11,10 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.storage import StorageService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.list_filter_mixin import SearchFilterMixin
 
 
-class ListStorageState(AppState):
+class ListStorageState(SearchFilterMixin, AppState):
     items: Optional[Sequence[Storage]] = None
     in_progress: bool = True
 
@@ -46,6 +47,10 @@ class ListStorageState(AppState):
     def storage_type_options(self) -> List[Tuple[str, str]]:
         return [(title, str(t)) for t, title in storage_type_list.items()]
 
+    @rx.var
+    def has_active_filters(self) -> bool:
+        return bool(self.filter_title.strip() or self.filter_address.strip() or self.filter_type != "all")
+
     @rx.event
     def on_load(self):
         if not self.has_permission(Action.STORAGE_LIST):
@@ -57,6 +62,7 @@ class ListStorageState(AppState):
             self.filter_title = ""
             self.filter_address = ""
             self.filter_type = "all"
+            self.is_filter_open = False
             self.items = StorageService().get_list_items()
             self.in_progress = False
         except Exception:

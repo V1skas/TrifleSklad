@@ -8,38 +8,34 @@ def button_back(href: str, label: str = "Назад", **prop):
     return button_secondary(label, on_click=rx.redirect(href), **prop)
 
 
-def button_filter_toggle(is_open, on_click, **prop):
-    """Кнопка-перемикач панелі фільтрів. Підсвічується (primary) коли панель відкрита."""
-    return rx.cond(
-        is_open,
-        button_image_primary(name_icon="funnel", on_click=on_click, **prop),
-        button_image_secondary(name_icon="funnel", on_click=on_click, **prop),
+def filter_toggle_button(is_open, on_click, active=False, **prop) -> rx.Component:
+    """Кнопка-перемикач картки фільтра для шапки підсторінки. Підсвічується
+    (solid), коли фільтр застосовано (`active`), інакше ghost — незалежно
+    від того, відкрита панель чи згорнута."""
+    prop.setdefault("variant", rx.cond(active, "solid", "ghost"))
+    prop.setdefault("size", "3")
+    return rx.button(
+        rx.icon("filter", size=16),
+        "Фільтр",
+        on_click=on_click,
+        **prop,
     )
 
 
-def filter_panel(is_open, *fields, on_clear=None) -> rx.Component:
-    """Контейнер панелі фільтрів. Завжди присутній у DOM, видимість анімується через
-    `max-height` та `opacity` від `is_open` (Var[bool])."""
-    actions = rx.fragment()
-    if on_clear is not None:
-        actions = rx.hstack(
-            rx.spacer(),
-            button_secondary("Очистити", on_click=on_clear),
-            width="100%",
-        )
+def filter_shell(is_open, *content) -> rx.Component:
+    """Єдина сворачувана картка фільтра/пошуку — завжди присутня в DOM
+    (видимість анімується через max-height/opacity/margin-top від `is_open`).
+    Оформлення — звичайна `rx.card`, як у фільтрах «Заявок» і «Звітів». Кладеться
+    в несоскролливаемий слот `page_wrapper(filter_panel=...)` — між шапкою і тілом
+    сторінки, тому не прокручується разом із вмістом."""
     return rx.box(
-        rx.box(
+        rx.card(
             rx.vstack(
-                *fields,
-                actions,
+                *content,
                 spacing="3",
                 align="stretch",
                 width="100%",
             ),
-            padding="1rem",
-            border_radius="0.6rem",
-            background_color=rx.color("gray", 2),
-            border=f"1px solid {rx.color('gray', 5)}",
             width="100%",
         ),
         # max-height як проксі для анімації висоти: 0 → велике значення.
@@ -48,6 +44,82 @@ def filter_panel(is_open, *fields, on_clear=None) -> rx.Component:
         margin_top=rx.cond(is_open, "0", "-0.75rem"),
         overflow="hidden",
         transition="max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease",
+        width="100%",
+    )
+
+
+def filter_group(title: str, *content, action=None, wide: bool = False, **prop) -> rx.Component:
+    """Візуально відокремлений блок одного критерію фільтра — підпис-заголовок
+    (за потреби з контролом `action` праворуч, напр. перемикач «за датою») +
+    тонка акцентна рамка з легкою заливкою.
+
+    Тримай вміст в ОДИН рядок контролу (селект, поле пошуку, пара дат поруч) —
+    тоді всі блоки в `filter_grid` виходять однакової висоти й сітка лишається
+    рівною. Довгі набори прапорців клади не в сітку, а окремою смугою на всю
+    ширину (`filter_group(...)` просто наступним дочірнім елементом картки).
+
+    `wide=True` — блок займає дві колонки сітки (для вмісту, що не влазить в
+    одну, напр. пара полів дати). Розширення навмисно під медіазапитом: на
+    вузькому екрані, де сітка згортається в одну колонку, `span 2` створив би
+    другу неявну колонку й спричинив горизонтальне переповнення сторінки."""
+    prop.setdefault("width", "100%")
+    prop.setdefault("height", "100%")
+    if wide:
+        span = {"@media (min-width: 52em)": {"grid_column": "span 2"}}
+        prop["style"] = {**span, **prop.get("style", {})}
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.text(
+                    title,
+                    size="1",
+                    weight="bold",
+                    color=rx.color("accent", 11),
+                    style={"text_transform": "uppercase", "letter_spacing": "0.04em"},
+                    white_space="nowrap",
+                ),
+                rx.spacer(),
+                action if action is not None else rx.fragment(),
+                spacing="2",
+                align="center",
+                width="100%",
+                min_height="1.5em",
+            ),
+            *content,
+            spacing="2",
+            align="stretch",
+            width="100%",
+        ),
+        padding="0.6em 0.75em",
+        border=f"1px solid {rx.color('accent', 6)}",
+        border_radius="0.5em",
+        background_color=rx.color("accent", 2),
+        **prop,
+    )
+
+
+def filter_grid(*groups, min_col: str = "14em") -> rx.Component:
+    """Рівна сітка однорядкових блоків фільтра (`filter_group`): однакова ширина
+    колонок, вирівняна висота (`align-items: stretch`), автоперенос на новий
+    рядок. Разом із правилом «один рядок контролу на блок» дає акуратну сітку
+    без дір і різнобою."""
+    return rx.box(
+        *groups,
+        display="grid",
+        grid_template_columns=f"repeat(auto-fill, minmax({min_col}, 1fr))",
+        gap="0.75em",
+        align_items="stretch",
+        width="100%",
+    )
+
+
+def filter_actions(*buttons) -> rx.Component:
+    """Рядок кнопок картки фільтра — завжди праворуч, однаковий у всіх розділах."""
+    return rx.hstack(
+        rx.spacer(),
+        *buttons,
+        spacing="3",
+        align="center",
         width="100%",
     )
 

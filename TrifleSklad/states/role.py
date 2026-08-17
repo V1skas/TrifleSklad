@@ -57,7 +57,11 @@ class AddRoleState(AppState):
             yield rx.redirect(routes.WELCOME)
             return
         self.item = Role(title="", description="", actions=[])
-        yield ActionsPickerState.on_load(self.item.actions)
+        # list(...) — інакше в yield-подію потрапляє «жива» SQLAlchemy
+        # InstrumentedList; Reflex робить deepcopy аргументів події при
+        # ланцюжку подій, а deepcopy інструментованої колекції ламається на
+        # weakref власника (AttributeError: InstanceState має 'obj').
+        yield ActionsPickerState.on_load(list(self.item.actions))
 
     @rx.event
     def set_title(self, value: str):
@@ -127,7 +131,7 @@ class EditRoleState(AppState):
                 return
             self.item = item
             self.in_process = False
-            yield ActionsPickerState.on_load(self.item.actions)
+            yield ActionsPickerState.on_load(list(self.item.actions))
         except Exception:
             self.in_process = False
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")

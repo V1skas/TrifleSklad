@@ -23,7 +23,7 @@ from TrifleSklad.states.issue import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Tuple[int, Issue]) -> rx.Component:
@@ -152,111 +152,114 @@ def _request_picker() -> rx.Component:
 
 def _add_form() -> rx.Component:
     return rx.vstack(
-        _request_picker(),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            type="date",
-            required=True,
-            default_value=AddIssueState.item.movement.date,
-            width="100%",
-            on_change=AddIssueState.on_change_date,
-        ),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddIssueState.list_incoming_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
-                ),
+        titled_section(
+            "Загальна інформація",
+            _request_picker(),
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                type="date",
+                required=True,
+                default_value=AddIssueState.item.movement.date,
                 width="100%",
+                on_change=AddIssueState.on_change_date,
             ),
-            required=True,
-            value=AddIssueState.id_incoming_storage,
-            on_change=AddIssueState.on_change_id_incoming_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити склад",
-            AddIssueState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
-        ),
-        rx.text("*Власник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddIssueState.list_owners,
-                    lambda owner: rx.select.item(owner[0], value=owner[1]),
-                ),
-                width="100%",
-            ),
-            required=True,
-            value=AddIssueState.id_incoming_owner,
-            on_change=AddIssueState.on_change_id_incoming_owner,
-        ),
-        create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddIssueState.open_owner_create("")),
-        owner_create_dialog(AddIssueState),
-        rx.text("*Місце призначення:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        placeholder="Введіть назву для пошуку",
-                        width="100%",
-                        value=AddIssueState.search_name_destination_storage,
-                        on_change=AddIssueState.on_change_search_name_destination_storage,
-                    ),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
                     rx.foreach(
-                        AddIssueState.list_destination_storages,
-                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        AddIssueState.list_incoming_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
                     ),
                     width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddIssueState.id_incoming_storage,
+                on_change=AddIssueState.on_change_id_incoming_storage,
             ),
-            required=True,
-            value=AddIssueState.id_destination_storage,
-            on_change=AddIssueState.on_change_id_destination_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити площадку/відділ",
-            AddIssueState.open_storage_create(StorageType.TECHNICAL_SITE, "destination", True),
-        ),
-        storage_create_dialog(AddIssueState),
-        rx.text("*Одержувач:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddIssueState.list_workers,
-                    lambda worker: rx.select.item(worker[0], value=worker[1]),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити склад",
+                AddIssueState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
+            ),
+            rx.text("*Власник:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddIssueState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddIssueState.id_incoming_owner,
+                on_change=AddIssueState.on_change_id_incoming_owner,
             ),
-            required=True,
-            value=AddIssueState.id_recipient,
-            on_change=AddIssueState.on_change_id_recipient,
+            create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddIssueState.open_owner_create("")),
+            owner_create_dialog(AddIssueState),
+            rx.text("*Місце призначення:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                            value=AddIssueState.search_name_destination_storage,
+                            on_change=AddIssueState.on_change_search_name_destination_storage,
+                        ),
+                        rx.foreach(
+                            AddIssueState.list_destination_storages,
+                            lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        ),
+                        width="100%",
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddIssueState.id_destination_storage,
+                on_change=AddIssueState.on_change_id_destination_storage,
+            ),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити площадку/відділ",
+                AddIssueState.open_storage_create(StorageType.TECHNICAL_SITE, "destination", True),
+            ),
+            storage_create_dialog(AddIssueState),
+            rx.text("*Одержувач:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddIssueState.list_workers,
+                        lambda worker: rx.select.item(worker[0], value=worker[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddIssueState.id_recipient,
+                on_change=AddIssueState.on_change_id_recipient,
+            ),
+            create_lookup_button(Action.WORKERS_CREATE, "Створити співробітника", AddIssueState.open_worker_create),
+            worker_create_dialog(AddIssueState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                AddIssueState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                width="100%",
+                value=AddIssueState.status,
+                on_change=AddIssueState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(
+                width="100%",
+                value=AddIssueState.item.movement.comment,
+                on_change=AddIssueState.on_change_comment,
+            ),
         ),
-        create_lookup_button(Action.WORKERS_CREATE, "Створити співробітника", AddIssueState.open_worker_create),
-        worker_create_dialog(AddIssueState),
-        products_widget(width="100%"),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            AddIssueState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            width="100%",
-            value=AddIssueState.status,
-            on_change=AddIssueState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(
-            width="100%",
-            value=AddIssueState.item.movement.comment,
-            on_change=AddIssueState.on_change_comment,
-        ),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -281,114 +284,117 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditIssueState),
-        rx.cond(
-            EditIssueState.has_source_request,
-            rx.hstack(
-                rx.text("Рух сформовано за заявкою", size="2", color=rx.color("gray", 11)),
-                rx.link(
-                    f"№{EditIssueState.source_request_id}",
-                    href=f"{routes.CATALOG_REQUESTS_VIEW_ID}{EditIssueState.source_request_id}",
-                    size="2",
-                ),
-                spacing="1",
-                align="center",
-            ),
-        ),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            type="date",
-            required=True,
-            disabled=EditIssueState.is_view_only_edit,
-            default_value=EditIssueState.item.movement.date,
-            width="100%",
-            on_change=EditIssueState.on_change_date,
-        ),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditIssueState.list_incoming_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
-                ),
-                width="100%",
-            ),
-            disabled=EditIssueState.is_view_only_edit,
-            required=True,
-            value=EditIssueState.id_incoming_storage,
-            on_change=EditIssueState.on_change_id_incoming_storage,
-        ),
-        rx.text("*Власник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditIssueState.list_owners,
-                    lambda owner: rx.select.item(owner[0], value=owner[1]),
-                ),
-                width="100%",
-            ),
-            required=True,
-            disabled=EditIssueState.is_view_only_edit,
-            value=EditIssueState.id_incoming_owner,
-            on_change=EditIssueState.on_change_id_incoming_owner,
-        ),
-        rx.text("*Місце призначення:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        placeholder="Введіть назву для пошуку",
-                        width="100%",
-                        value=EditIssueState.search_name_destination_storage,
-                        on_change=EditIssueState.on_change_search_name_destination_storage,
+        titled_section(
+            "Загальна інформація",
+            rx.cond(
+                EditIssueState.has_source_request,
+                rx.hstack(
+                    rx.text("Рух сформовано за заявкою", size="2", color=rx.color("gray", 11)),
+                    rx.link(
+                        f"№{EditIssueState.source_request_id}",
+                        href=f"{routes.CATALOG_REQUESTS_VIEW_ID}{EditIssueState.source_request_id}",
+                        size="2",
                     ),
+                    spacing="1",
+                    align="center",
+                ),
+            ),
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                type="date",
+                required=True,
+                disabled=EditIssueState.is_view_only_edit,
+                default_value=EditIssueState.item.movement.date,
+                width="100%",
+                on_change=EditIssueState.on_change_date,
+            ),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
                     rx.foreach(
-                        EditIssueState.list_destination_storages,
-                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        EditIssueState.list_incoming_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
                     ),
                     width="100%",
                 ),
-                width="100%",
+                disabled=EditIssueState.is_view_only_edit,
+                required=True,
+                value=EditIssueState.id_incoming_storage,
+                on_change=EditIssueState.on_change_id_incoming_storage,
             ),
-            required=True,
-            disabled=EditIssueState.is_view_only_edit,
-            value=EditIssueState.id_destination_storage,
-            on_change=EditIssueState.on_change_id_destination_storage,
-        ),
-        rx.text("*Одержувач:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditIssueState.list_workers,
-                    lambda worker: rx.select.item(worker[0], value=worker[1]),
+            rx.text("*Власник:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditIssueState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditIssueState.is_view_only_edit,
+                value=EditIssueState.id_incoming_owner,
+                on_change=EditIssueState.on_change_id_incoming_owner,
             ),
-            required=True,
-            disabled=EditIssueState.is_view_only_edit,
-            value=EditIssueState.id_recipient,
-            on_change=EditIssueState.on_change_id_recipient,
+            rx.text("*Місце призначення:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                            value=EditIssueState.search_name_destination_storage,
+                            on_change=EditIssueState.on_change_search_name_destination_storage,
+                        ),
+                        rx.foreach(
+                            EditIssueState.list_destination_storages,
+                            lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        ),
+                        width="100%",
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditIssueState.is_view_only_edit,
+                value=EditIssueState.id_destination_storage,
+                on_change=EditIssueState.on_change_id_destination_storage,
+            ),
+            rx.text("*Одержувач:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditIssueState.list_workers,
+                        lambda worker: rx.select.item(worker[0], value=worker[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditIssueState.is_view_only_edit,
+                value=EditIssueState.id_recipient,
+                on_change=EditIssueState.on_change_id_recipient,
+            ),
+            full_edit.reason_field(EditIssueState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                EditIssueState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                width="100%",
+                value=EditIssueState.status,
+                on_change=EditIssueState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(
+                width="100%",
+                value=EditIssueState.item.movement.comment,
+                on_change=EditIssueState.on_change_comment,
+            ),
         ),
-        products_widget(width="100%"),
-        full_edit.reason_field(EditIssueState),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            EditIssueState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            width="100%",
-            value=EditIssueState.status,
-            on_change=EditIssueState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(
-            width="100%",
-            value=EditIssueState.item.movement.comment,
-            on_change=EditIssueState.on_change_comment,
-        ),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -460,14 +466,17 @@ def _cancel_conflict_dialog() -> rx.Component:
 def view_page_content() -> rx.Component:
     return rx.vstack(
         _cancel_conflict_dialog(),
-        rx.text(f"Дата: {ViewIssueState.item.movement.date}"),
-        rx.text(f"Склад: {ViewIssueState.item.movement.incoming_storage.title}"),
-        rx.text(f"Власник: {ViewIssueState.item.movement.incoming_owner.title}"),
-        rx.text(f"Місце призначення: {ViewIssueState.item.movement.destination_storage.title}"),
-        rx.text(f"Одержувач: {ViewIssueState.item.recipient.fio}"),
-        rx.text(f"Статус: {ViewIssueState.item_status}"),
-        rx.text(f"Коментар: {ViewIssueState.item.movement.comment}"),
-        products_widget(width="100%"),
+        titled_section(
+            "Загальна інформація",
+            field_row("Дата", ViewIssueState.item.movement.date),
+            field_row("Склад", ViewIssueState.item.movement.incoming_storage.title),
+            field_row("Власник", ViewIssueState.item.movement.incoming_owner.title),
+            field_row("Місце призначення", ViewIssueState.item.movement.destination_storage.title),
+            field_row("Одержувач", ViewIssueState.item.recipient.fio),
+            field_row("Статус", ViewIssueState.item_status),
+            field_row("Коментар", ViewIssueState.item.movement.comment),
+        ),
+        titled_section("Товари", products_widget(width="100%")),
         history_block(ViewIssueState),
         spacing="3",
         align="stretch",

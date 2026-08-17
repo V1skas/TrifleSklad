@@ -18,8 +18,10 @@ from TrifleSklad.views.templates.layouts import (
     NESTED_DETAIL_TD,
     NESTED_DETAIL_TH,
     NESTED_DETAIL_THEAD,
+    field_row,
     header_subpage,
     page_wrapper,
+    titled_section,
 )
 
 
@@ -167,23 +169,26 @@ def _view_positions_table() -> rx.Component:
 def view_page_content() -> rx.Component:
     return rx.vstack(
         _cancel_conflict_dialog(),
-        rx.hstack(rx.text("Дата:", weight="medium"), rx.text(ViewSaleReturnsState.item.movement.date)),
-        rx.hstack(
-            rx.text("Вихідний продаж:", weight="medium"),
-            rx.link(f"№{ViewSaleReturnsState.item.id_sale}", href=ViewSaleReturnsState.source_sale_url),
+        titled_section(
+            "Загальна інформація",
+            field_row("Дата", ViewSaleReturnsState.item.movement.date),
+            field_row(
+                "Вихідний продаж",
+                rx.link(f"№{ViewSaleReturnsState.item.id_sale}", href=ViewSaleReturnsState.source_sale_url),
+            ),
+            field_row("Склад призначення", ViewSaleReturnsState.item.movement.destination_storage.title),
+            field_row("Статус", ViewSaleReturnsState.item_status),
+            field_row("Коментар", ViewSaleReturnsState.item.movement.comment),
         ),
-        rx.hstack(
-            rx.text("Склад призначення:", weight="medium"),
-            rx.text(ViewSaleReturnsState.item.movement.destination_storage.title),
+        titled_section(
+            "Товари",
+            _view_positions_table(),
+            rx.hstack(
+                rx.spacer(),
+                rx.heading(f"Загальна компенсована вартість: {ViewSaleReturnsState.total_cost}", size="4"),
+                width="100%",
+            ),
         ),
-        _view_positions_table(),
-        rx.hstack(
-            rx.spacer(),
-            rx.heading(f"Загальна компенсована вартість: {ViewSaleReturnsState.total_cost}", size="4"),
-            width="100%",
-        ),
-        rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewSaleReturnsState.item_status)),
-        rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewSaleReturnsState.item.movement.comment)),
         history_block(ViewSaleReturnsState),
         spacing="3",
         align="stretch",
@@ -439,40 +444,43 @@ def _sale_selector() -> rx.Component:
 
 def _add_form() -> rx.Component:
     return rx.vstack(
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            value=AddSaleReturnsState.current_date,
-            on_change=AddSaleReturnsState.on_change_date,
-            type="date",
-            required=True,
-            width="100%",
-        ),
-        _sale_selector(),
-        rx.text("*Склад призначення:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddSaleReturnsState.list_warehouses,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
-                ),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                value=AddSaleReturnsState.current_date,
+                on_change=AddSaleReturnsState.on_change_date,
+                type="date",
+                required=True,
                 width="100%",
             ),
-            required=True,
-            value=AddSaleReturnsState.id_destination_storage,
-            on_change=AddSaleReturnsState.on_change_id_destination_storage,
+            _sale_selector(),
+            rx.text("*Склад призначення:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddSaleReturnsState.list_warehouses,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddSaleReturnsState.id_destination_storage,
+                on_change=AddSaleReturnsState.on_change_id_destination_storage,
+            ),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                AddSaleReturnsState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                value=AddSaleReturnsState.status,
+                on_change=AddSaleReturnsState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=AddSaleReturnsState.comment, on_change=AddSaleReturnsState.on_change_comment, width="100%"),
         ),
-        rx.cond(AddSaleReturnsState.has_sale, _units_section(AddSaleReturnsState)),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            AddSaleReturnsState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            value=AddSaleReturnsState.status,
-            on_change=AddSaleReturnsState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=AddSaleReturnsState.comment, on_change=AddSaleReturnsState.on_change_comment, width="100%"),
+        rx.cond(AddSaleReturnsState.has_sale, titled_section("Товари", _units_section(AddSaleReturnsState))),
         spacing="3",
         align="stretch",
         width="100%",
@@ -496,50 +504,53 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditSaleReturnsState),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(value=EditSaleReturnsState.item.movement.date, type="date", required=True, disabled=True, width="100%"),
-        rx.text("*Вихідний продаж:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditSaleReturnsState.list_sales,
-                    lambda sale: rx.select.item(sale[0], value=sale[1], width="100%"),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(value=EditSaleReturnsState.item.movement.date, type="date", required=True, disabled=True, width="100%"),
+            rx.text("*Вихідний продаж:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditSaleReturnsState.list_sales,
+                        lambda sale: rx.select.item(sale[0], value=sale[1], width="100%"),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditSaleReturnsState.is_view_only_edit,
+                value=EditSaleReturnsState.selected_sale_id,
+                on_change=EditSaleReturnsState.on_change_sale,
             ),
-            required=True,
-            disabled=EditSaleReturnsState.is_view_only_edit,
-            value=EditSaleReturnsState.selected_sale_id,
-            on_change=EditSaleReturnsState.on_change_sale,
-        ),
-        rx.text("*Склад призначення:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditSaleReturnsState.list_warehouses,
-                    lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+            rx.text("*Склад призначення:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditSaleReturnsState.list_warehouses,
+                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditSaleReturnsState.is_view_only_edit,
+                value=EditSaleReturnsState.id_destination_storage,
+                on_change=EditSaleReturnsState.on_change_id_destination_storage,
             ),
-            required=True,
-            disabled=EditSaleReturnsState.is_view_only_edit,
-            value=EditSaleReturnsState.id_destination_storage,
-            on_change=EditSaleReturnsState.on_change_id_destination_storage,
+            full_edit.reason_field(EditSaleReturnsState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                EditSaleReturnsState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                value=EditSaleReturnsState.status,
+                on_change=EditSaleReturnsState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=EditSaleReturnsState.item.movement.comment, on_change=EditSaleReturnsState.on_change_comment, width="100%"),
         ),
-        _units_section(EditSaleReturnsState, read_only=EditSaleReturnsState.is_view_only_edit),
-        full_edit.reason_field(EditSaleReturnsState),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            EditSaleReturnsState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            value=EditSaleReturnsState.status,
-            on_change=EditSaleReturnsState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=EditSaleReturnsState.item.movement.comment, on_change=EditSaleReturnsState.on_change_comment, width="100%"),
+        titled_section("Товари", _units_section(EditSaleReturnsState, read_only=EditSaleReturnsState.is_view_only_edit)),
         spacing="3",
         align="stretch",
         width="100%",

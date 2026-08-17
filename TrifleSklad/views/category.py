@@ -13,15 +13,29 @@ from TrifleSklad.states.category import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
+
+
+def _category_cell(item: ProductCategory) -> rx.Component:
+    """Одна клітинка з назвою: батьківські — жирним, дочірні — з відступом і
+    ненав'язливим маркером гілки. Дані приходять уже впорядкованими
+    (батько → одразу його діти) з `ProductCategoryService().get_list_items()`."""
+    return rx.cond(
+        item.id_parent,
+        rx.hstack(
+            rx.text("└", color=rx.color("accent", 8), flex_shrink="0"),
+            rx.text(item.title, color=rx.color("gray", 11)),
+            spacing="2",
+            align="center",
+            padding_left="1.5em",
+        ),
+        rx.text(item.title, weight="bold"),
+    )
 
 
 def _table_row(item: ProductCategory) -> rx.Component:
     return rx.table.row(
-        rx.table.row_header_cell(
-            rx.cond(item.id_parent, rx.text(f"— {item.title}"), rx.text(item.title, weight="bold")),
-            align="left",
-        ),
+        rx.table.row_header_cell(_category_cell(item), align="left"),
         on_click=rx.redirect(routes.CATALOG_CATEGORIES_VIEW_ID + item.id.to_string()),
         cursor="pointer",
         _hover={"background_color": rx.color("accent", 3)},
@@ -36,9 +50,7 @@ def _table() -> rx.Component:
             ),
             background_color=rx.color("accent", 9),
         ),
-        rx.table.body(
-            rx.foreach(ListCategoriesState.items, _table_row),
-        ),
+        rx.table.body(rx.foreach(ListCategoriesState.items, _table_row)),
         variant="surface",
         width="100%",
     )
@@ -81,16 +93,14 @@ def _parent_select(value, on_change, options) -> rx.Component:
 
 
 def add_page_content() -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Назва", weight="medium"),
         controls.input_field(value=AddCategoriesState.title, on_change=AddCategoriesState.set_title, placeholder="Назва", width="100%"),
         rx.text("Батьківська категорія", weight="medium"),
         _parent_select(AddCategoriesState.parent_id, AddCategoriesState.set_parent_id, AddCategoriesState.list_parent_categories),
         rx.text("Опис", weight="medium"),
         controls.text_area_field(value=AddCategoriesState.description, on_change=AddCategoriesState.set_description, placeholder="Опис", width="100%"),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -109,7 +119,8 @@ def add_page() -> rx.Component:
 
 
 def edit_page_content() -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Назва", weight="medium"),
         controls.input_field(value=EditCategoriesState.title, on_change=EditCategoriesState.set_title, placeholder="Назва", width="100%"),
         rx.cond(
@@ -121,9 +132,6 @@ def edit_page_content() -> rx.Component:
         ),
         rx.text("Опис", weight="medium"),
         controls.text_area_field(value=EditCategoriesState.description, on_change=EditCategoriesState.set_description, placeholder="Опис", width="100%"),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -151,23 +159,24 @@ def _child_row(item: ProductCategory) -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.hstack(rx.text("Назва:", weight="medium"), rx.text(ViewCategoriesState.title), width="100%"),
-        rx.cond(
-            ViewCategoriesState.parent_title != "",
-            rx.hstack(rx.text("Батьківська категорія:", weight="medium"), rx.text(ViewCategoriesState.parent_title), width="100%"),
+        titled_section(
+            "Інформація",
+            field_row("Назва", ViewCategoriesState.title),
+            rx.cond(
+                ViewCategoriesState.parent_title != "",
+                field_row("Батьківська категорія", ViewCategoriesState.parent_title),
+            ),
+            field_row("Опис", ViewCategoriesState.description),
         ),
-        rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewCategoriesState.description), width="100%"),
         rx.cond(
             ViewCategoriesState.children.length() > 0,
-            rx.vstack(
-                rx.text("Підкатегорії:", weight="medium"),
+            titled_section(
+                "Підкатегорії",
                 rx.table.root(
                     rx.table.body(rx.foreach(ViewCategoriesState.children, _child_row)),
                     variant="surface",
                     width="100%",
                 ),
-                width="100%",
-                align="stretch",
             ),
         ),
         history_block(ViewCategoriesState),

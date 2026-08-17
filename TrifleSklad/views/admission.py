@@ -27,7 +27,7 @@ from TrifleSklad.states.admission import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _create_category_dialog() -> rx.Component:
@@ -696,31 +696,39 @@ def _cancel_conflict_dialog() -> rx.Component:
 def view_page_content() -> rx.Component:
     return rx.vstack(
         _cancel_conflict_dialog(),
-        rx.hstack(rx.text("Дата:", weight="medium"), rx.text(ViewAdmissionState.item.movement.date)),
-        rx.hstack(rx.text("Постачальник:", weight="medium"), rx.text(ViewAdmissionState.item.supplier.title)),
-        rx.hstack(rx.text("Одержувач:", weight="medium"), rx.text(ViewAdmissionState.item.movement.destination_owner.title)),
-        rx.hstack(rx.text("Склад:", weight="medium"), rx.text(ViewAdmissionState.item.movement.destination_storage.title)),
-        rx.text("Товари з каталогу:", width="100%"),
-        _view_admission_products_catalog_table(),
-        rx.dialog.root(
-            rx.dialog.content(
-                rx.dialog.title("Інформація про товар"),
-                _movement_product_catalog_detailed_view_form(),
-                width="30em",
-            ),
-            open=ViewAdmissionState.dialog_open,
-            on_open_change=ViewAdmissionState.close_dialog,
+        titled_section(
+            "Загальна інформація",
+            field_row("Дата", ViewAdmissionState.item.movement.date),
+            field_row("Постачальник", ViewAdmissionState.item.supplier.title),
+            field_row("Одержувач", ViewAdmissionState.item.movement.destination_owner.title),
+            field_row("Склад", ViewAdmissionState.item.movement.destination_storage.title),
+            field_row("Статус", ViewAdmissionState.item_status),
+            field_row("Коментар", ViewAdmissionState.item.movement.comment),
         ),
-        rx.hstack(rx.text("Сума без ПДВ:", weight="medium"), rx.text(ViewAdmissionState.subtotal_display)),
-        rx.hstack(rx.text("Ставка ПДВ:", weight="medium"), rx.text(ViewAdmissionState.nds_rate_title)),
-        rx.hstack(rx.text("Сума ПДВ:", weight="medium"), rx.text(ViewAdmissionState.nds_amount_display)),
-        rx.hstack(rx.text("Разом з ПДВ:", weight="medium"), rx.text(ViewAdmissionState.total_display)),
-        rx.hstack(rx.text("ПДВ включений у ціну:", weight="medium"), rx.text(rx.cond(ViewAdmissionState.item.flag_nds, "Так", "Ні"))),
-        rx.hstack(rx.text("Спосіб оплати:", weight="medium"), rx.text(ViewAdmissionState.item.payment_type.title)),
-        rx.hstack(rx.text("Номер накладної оплати:", weight="medium"), rx.text(ViewAdmissionState.invoice_number)),
-        rx.hstack(rx.text("Курс долара:", weight="medium"), rx.text(ViewAdmissionState.item.dollar_rate)),
-        rx.hstack(rx.text("Статус:", weight="medium"), rx.text(ViewAdmissionState.item_status)),
-        rx.hstack(rx.text("Коментар:", weight="medium"), rx.text(ViewAdmissionState.item.movement.comment)),
+        titled_section(
+            "Фінанси",
+            field_row("Сума без ПДВ", ViewAdmissionState.subtotal_display),
+            field_row("Ставка ПДВ", ViewAdmissionState.nds_rate_title),
+            field_row("Сума ПДВ", ViewAdmissionState.nds_amount_display),
+            field_row("Разом з ПДВ", ViewAdmissionState.total_display),
+            field_row("ПДВ включений у ціну", rx.cond(ViewAdmissionState.item.flag_nds, "Так", "Ні")),
+            field_row("Спосіб оплати", ViewAdmissionState.item.payment_type.title),
+            field_row("Номер накладної оплати", ViewAdmissionState.invoice_number),
+            field_row("Курс долара", ViewAdmissionState.item.dollar_rate),
+        ),
+        titled_section(
+            "Товари",
+            _view_admission_products_catalog_table(),
+            rx.dialog.root(
+                rx.dialog.content(
+                    rx.dialog.title("Інформація про товар"),
+                    _movement_product_catalog_detailed_view_form(),
+                    width="30em",
+                ),
+                open=ViewAdmissionState.dialog_open,
+                on_open_change=ViewAdmissionState.close_dialog,
+            ),
+        ),
         history_block(ViewAdmissionState),
         spacing="3",
         align="stretch",
@@ -836,131 +844,63 @@ def list_page() -> rx.Component:
 
 def _add_form() -> rx.Component:
     return rx.vstack(
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(type="date", required=True, default_value=AddAdmissionState.item.movement.date, width="100%", on_change=AddAdmissionState.on_change_date),
-        rx.text("*Постачальник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(AddAdmissionState.list_suppliers, lambda supplier: rx.select.item(supplier[0], value=supplier[1])),
-                width="100%",
-            ),
-            required=True,
-            value=AddAdmissionState.id_supplier,
-            on_change=AddAdmissionState.on_change_id_supplier,
-        ),
-        create_lookup_button(Action.SUPPLIERS_CREATE, "Створити постачальника", AddAdmissionState.open_supplier_create),
-        supplier_create_dialog(AddAdmissionState),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        placeholder="Введіть назву для пошуку",
-                        width="100%",
-                        value=AddAdmissionState.search_name_destination_storage,
-                        on_change=AddAdmissionState.on_change_search_name_destination_storage,
-                    ),
-                    rx.foreach(AddAdmissionState.list_storages, lambda storage: rx.select.item(storage[0], value=storage[1], width="100%")),
-                    width="100%",
-                ),
-                width="100%",
-            ),
-            required=True,
-            value=AddAdmissionState.id_destination_storage,
-            on_change=AddAdmissionState.on_change_id_destination_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити склад",
-            AddAdmissionState.open_storage_create(StorageType.WAREHOUSE, "destination", False),
-        ),
-        storage_create_dialog(AddAdmissionState),
-        rx.text("*Одержувач:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(AddAdmissionState.list_owners, lambda owner: rx.select.item(owner[0], value=owner[1])),
-                width="100%",
-            ),
-            required=True,
-            value=AddAdmissionState.id_destination_owner,
-            on_change=AddAdmissionState.on_change_id_destination_owner,
-        ),
-        create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddAdmissionState.open_owner_create("")),
-        owner_create_dialog(AddAdmissionState),
-        rx.text("*Товари з каталогу:", weight="medium"),
-        _add_admission_products_catalog_dialog(),
-        rx.cond(
-            AddAdmissionState.has_item_movement_products_catalog,
-            _add_admission_products_catalog_table(),
-            rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
-        ),
-        rx.button("Додати", on_click=AddAdmissionState.add_product_catalog_dialog_open),
-        rx.text("*Спосіб оплати:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(AddAdmissionState.list_payment_types, lambda payment_type: rx.select.item(payment_type[0], value=payment_type[1])),
-                width="100%",
-            ),
-            required=True,
-            value=AddAdmissionState.id_payment_type,
-            on_change=AddAdmissionState.on_change_id_payment_type,
-        ),
-        create_lookup_button(Action.PAYMENT_TYPE_CREATE, "Створити тип оплати", AddAdmissionState.open_payment_type_create),
-        payment_type_create_dialog(AddAdmissionState),
-        rx.text("Номер накладної оплати:", weight="medium"),
-        controls.input_field(value=AddAdmissionState.invoice_number, on_change=AddAdmissionState.on_change_invoice_number),
-        rx.text("Ставка ПДВ:", weight="medium"),
-        rx.hstack(
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(type="date", required=True, default_value=AddAdmissionState.item.movement.date, width="100%", on_change=AddAdmissionState.on_change_date),
+            rx.text("*Постачальник:", weight="medium"),
             rx.select.root(
-                # flex="1"+min_width="0" на тригері (не на select.root — той
-                # не рендерить власний DOM-стилізовний елемент) замість
-                # width="100%": селект тут ділить рядок із кнопкою-скидання,
-                # а Radix SelectTrigger має дефолтний flex-shrink:0, тому
-                # width="100%" не давав йому стиснутись під сусіда — кнопка
-                # вилазила за межі рядка.
-                rx.select.trigger(placeholder="Без ПДВ", flex="1", min_width="0"),
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
-                    rx.select.item("Без ПДВ", value="None"),
-                    rx.foreach(AddAdmissionState.list_nds_rates, lambda nr: rx.select.item(nr[0], value=nr[1])),
+                    rx.foreach(AddAdmissionState.list_suppliers, lambda supplier: rx.select.item(supplier[0], value=supplier[1])),
                     width="100%",
                 ),
-                value=AddAdmissionState.id_nds_rate,
-                on_change=AddAdmissionState.on_change_id_nds_rate,
+                required=True,
+                value=AddAdmissionState.id_supplier,
+                on_change=AddAdmissionState.on_change_id_supplier,
             ),
-            rx.button(
-                rx.icon("x", size=16),
-                type="button",
-                variant="soft",
-                color_scheme="gray",
-                title="Скинути ставку ПДВ",
-                disabled=AddAdmissionState.id_nds_rate == "",
-                on_click=AddAdmissionState.on_change_id_nds_rate(""),
+            create_lookup_button(Action.SUPPLIERS_CREATE, "Створити постачальника", AddAdmissionState.open_supplier_create),
+            supplier_create_dialog(AddAdmissionState),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                            value=AddAdmissionState.search_name_destination_storage,
+                            on_change=AddAdmissionState.on_change_search_name_destination_storage,
+                        ),
+                        rx.foreach(AddAdmissionState.list_storages, lambda storage: rx.select.item(storage[0], value=storage[1], width="100%")),
+                        width="100%",
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddAdmissionState.id_destination_storage,
+                on_change=AddAdmissionState.on_change_id_destination_storage,
             ),
-            width="100%",
-            align="center",
-        ),
-        create_lookup_button(Action.NDS_RATES_CREATE, "Створити ставку ПДВ", AddAdmissionState.open_nds_rate_create),
-        nds_rate_create_dialog(AddAdmissionState),
-        rx.hstack(
-            rx.switch(default_value=False, value=AddAdmissionState.flag_nds, on_change=AddAdmissionState.on_change_flag_nds),
-            rx.text("Ціна в рядках вказана з ПДВ"),
-        ),
-        rx.vstack(
-            rx.hstack(rx.text("Сума без ПДВ:"), rx.text(AddAdmissionState.subtotal_display)),
-            rx.hstack(rx.text("Сума ПДВ:"), rx.text(AddAdmissionState.nds_amount_display)),
-            rx.hstack(rx.text("Разом з ПДВ:"), rx.text(AddAdmissionState.total_display)),
-            width="100%",
-        ),
-        rx.hstack(
-            rx.text("Курс долара:"),
-            controls.input_field(required=True, value=AddAdmissionState.dollar_rate, on_change=AddAdmissionState.on_change_dollar_rate),
-        ),
-        rx.hstack(
-            rx.text("*Статус:"),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити склад",
+                AddAdmissionState.open_storage_create(StorageType.WAREHOUSE, "destination", False),
+            ),
+            storage_create_dialog(AddAdmissionState),
+            rx.text("*Одержувач:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(AddAdmissionState.list_owners, lambda owner: rx.select.item(owner[0], value=owner[1])),
+                    width="100%",
+                ),
+                required=True,
+                value=AddAdmissionState.id_destination_owner,
+                on_change=AddAdmissionState.on_change_id_destination_owner,
+            ),
+            create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddAdmissionState.open_owner_create("")),
+            owner_create_dialog(AddAdmissionState),
+            rx.text("*Статус:", weight="medium"),
             rx.select(
                 AddAdmissionState.editable_statuses,
                 placeholder="Оберіть зі списку",
@@ -968,9 +908,84 @@ def _add_form() -> rx.Component:
                 value=AddAdmissionState.status,
                 on_change=AddAdmissionState.on_change_status,
             ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=AddAdmissionState.item.movement.comment, on_change=AddAdmissionState.on_change_comment, width="100%"),
         ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=AddAdmissionState.item.movement.comment, on_change=AddAdmissionState.on_change_comment, width="100%"),
+        titled_section(
+            "Фінанси",
+            rx.text("*Спосіб оплати:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(AddAdmissionState.list_payment_types, lambda payment_type: rx.select.item(payment_type[0], value=payment_type[1])),
+                    width="100%",
+                ),
+                required=True,
+                value=AddAdmissionState.id_payment_type,
+                on_change=AddAdmissionState.on_change_id_payment_type,
+            ),
+            create_lookup_button(Action.PAYMENT_TYPE_CREATE, "Створити тип оплати", AddAdmissionState.open_payment_type_create),
+            payment_type_create_dialog(AddAdmissionState),
+            rx.text("Номер накладної оплати:", weight="medium"),
+            controls.input_field(value=AddAdmissionState.invoice_number, on_change=AddAdmissionState.on_change_invoice_number),
+            rx.text("Ставка ПДВ:", weight="medium"),
+            rx.hstack(
+                rx.select.root(
+                    # flex="1"+min_width="0" на тригері (не на select.root — той
+                    # не рендерить власний DOM-стилізовний елемент) замість
+                    # width="100%": селект тут ділить рядок із кнопкою-скидання,
+                    # а Radix SelectTrigger має дефолтний flex-shrink:0, тому
+                    # width="100%" не давав йому стиснутись під сусіда — кнопка
+                    # вилазила за межі рядка.
+                    rx.select.trigger(placeholder="Без ПДВ", flex="1", min_width="0"),
+                    rx.select.content(
+                        rx.select.item("Без ПДВ", value="None"),
+                        rx.foreach(AddAdmissionState.list_nds_rates, lambda nr: rx.select.item(nr[0], value=nr[1])),
+                        width="100%",
+                    ),
+                    value=AddAdmissionState.id_nds_rate,
+                    on_change=AddAdmissionState.on_change_id_nds_rate,
+                ),
+                rx.button(
+                    rx.icon("x", size=16),
+                    type="button",
+                    variant="soft",
+                    color_scheme="gray",
+                    title="Скинути ставку ПДВ",
+                    disabled=AddAdmissionState.id_nds_rate == "",
+                    on_click=AddAdmissionState.on_change_id_nds_rate(""),
+                ),
+                width="100%",
+                align="center",
+            ),
+            create_lookup_button(Action.NDS_RATES_CREATE, "Створити ставку ПДВ", AddAdmissionState.open_nds_rate_create),
+            nds_rate_create_dialog(AddAdmissionState),
+            rx.hstack(
+                rx.switch(default_value=False, value=AddAdmissionState.flag_nds, on_change=AddAdmissionState.on_change_flag_nds),
+                rx.text("Ціна в рядках вказана з ПДВ"),
+            ),
+            rx.vstack(
+                rx.hstack(rx.text("Сума без ПДВ:"), rx.text(AddAdmissionState.subtotal_display)),
+                rx.hstack(rx.text("Сума ПДВ:"), rx.text(AddAdmissionState.nds_amount_display)),
+                rx.hstack(rx.text("Разом з ПДВ:"), rx.text(AddAdmissionState.total_display)),
+                width="100%",
+            ),
+            rx.hstack(
+                rx.text("Курс долара:"),
+                controls.input_field(required=True, value=AddAdmissionState.dollar_rate, on_change=AddAdmissionState.on_change_dollar_rate),
+            ),
+        ),
+        titled_section(
+            "Товари",
+            rx.text("*Товари з каталогу:", weight="medium"),
+            _add_admission_products_catalog_dialog(),
+            rx.cond(
+                AddAdmissionState.has_item_movement_products_catalog,
+                _add_admission_products_catalog_table(),
+                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+            ),
+            rx.button("Додати", on_click=AddAdmissionState.add_product_catalog_dialog_open),
+        ),
         spacing="3",
         align="stretch",
         width="100%",
@@ -995,128 +1010,137 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditAdmissionState),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(type="date", required=True, default_value=EditAdmissionState.item.movement.date, disabled=EditAdmissionState.is_view_only_edit, on_change=EditAdmissionState.on_change_date, width="100%"),
-        rx.text("*Постачальник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(EditAdmissionState.list_suppliers, lambda supplier: rx.select.item(supplier[0], value=supplier[1])),
-                width="100%",
-            ),
-            required=True,
-            disabled=EditAdmissionState.is_view_only_edit,
-            value=EditAdmissionState.id_supplier,
-            default_value=EditAdmissionState.id_supplier,
-            on_change=EditAdmissionState.on_change_id_supplier,
-        ),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        placeholder="Введіть назву для пошуку",
-                        width="100%",
-                        value=EditAdmissionState.search_name_destination_storage,
-                        on_change=EditAdmissionState.on_change_search_name_destination_storage,
-                    ),
-                    rx.foreach(EditAdmissionState.list_storages, lambda storage: rx.select.item(storage[0], value=storage[1], width="100%")),
-                    width="100%",
-                ),
-                width="100%",
-            ),
-            required=True,
-            disabled=EditAdmissionState.is_view_only_edit,
-            value=EditAdmissionState.id_destination_storage,
-            default_value=EditAdmissionState.id_destination_storage,
-            on_change=EditAdmissionState.on_change_id_destination_storage,
-        ),
-        rx.text("*Одержувач:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(EditAdmissionState.list_owners, lambda owner: rx.select.item(owner[0], value=owner[1])),
-                width="100%",
-            ),
-            required=True,
-            disabled=EditAdmissionState.is_view_only_edit,
-            value=EditAdmissionState.id_destination_owner,
-            on_change=EditAdmissionState.on_change_id_destination_owner,
-        ),
-        rx.text("*Товари з каталогу:", weight="medium"),
-        _edit_admission_products_catalog_dialog(),
-        _edit_admission_add_product_button(),
-        rx.cond(
-            EditAdmissionState.has_item_movement_products_catalog,
-            _edit_admission_products_catalog_table(),
-            rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
-        ),
-        rx.text("*Спосіб оплати:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(EditAdmissionState.list_payment_types, lambda payment_type: rx.select.item(payment_type[0], value=payment_type[1])),
-                width="100%",
-            ),
-            required=True,
-            disabled=EditAdmissionState.is_view_only_edit,
-            value=EditAdmissionState.id_payment_type,
-            on_change=EditAdmissionState.on_change_id_payment_type,
-        ),
-        rx.text("Номер накладної оплати:", weight="medium"),
-        controls.input_field(value=EditAdmissionState.invoice_number, on_change=EditAdmissionState.on_change_invoice_number),
-        rx.text("Ставка ПДВ:", weight="medium"),
-        rx.hstack(
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(type="date", required=True, default_value=EditAdmissionState.item.movement.date, disabled=EditAdmissionState.is_view_only_edit, on_change=EditAdmissionState.on_change_date, width="100%"),
+            rx.text("*Постачальник:", weight="medium"),
             rx.select.root(
-                rx.select.trigger(placeholder="Без ПДВ", flex="1", min_width="0"),
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
                 rx.select.content(
-                    rx.select.item("Без ПДВ", value="None"),
-                    rx.foreach(EditAdmissionState.list_nds_rates, lambda nr: rx.select.item(nr[0], value=nr[1])),
+                    rx.foreach(EditAdmissionState.list_suppliers, lambda supplier: rx.select.item(supplier[0], value=supplier[1])),
                     width="100%",
                 ),
-                value=EditAdmissionState.id_nds_rate,
-                on_change=EditAdmissionState.on_change_id_nds_rate,
-            ),
-            rx.button(
-                rx.icon("x", size=16),
-                type="button",
-                variant="soft",
-                color_scheme="gray",
-                title="Скинути ставку ПДВ",
-                disabled=EditAdmissionState.id_nds_rate == "",
-                on_click=EditAdmissionState.on_change_id_nds_rate(""),
-            ),
-            width="100%",
-            align="center",
-        ),
-        rx.hstack(
-            rx.switch(default_value=False, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.flag_nds, on_change=EditAdmissionState.on_change_flag_nds),
-            rx.text("Ціна в рядках вказана з ПДВ"),
-        ),
-        rx.vstack(
-            rx.hstack(rx.text("Сума без ПДВ:"), rx.text(EditAdmissionState.subtotal_display)),
-            rx.hstack(rx.text("Сума ПДВ:"), rx.text(EditAdmissionState.nds_amount_display)),
-            rx.hstack(rx.text("Разом з ПДВ:"), rx.text(EditAdmissionState.total_display)),
-            width="100%",
-        ),
-        rx.hstack(
-            rx.text("Курс долара:"),
-            controls.input_field(required=True, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.dollar_rate, on_change=EditAdmissionState.on_change_dollar_rate),
-        ),
-        rx.hstack(
-            rx.text("*Статус:"),
-            rx.select(
-                EditAdmissionState.editable_statuses,
-                placeholder="Оберіть зі списку",
                 required=True,
-                value=EditAdmissionState.status,
-                on_change=EditAdmissionState.on_change_status,
+                disabled=EditAdmissionState.is_view_only_edit,
+                value=EditAdmissionState.id_supplier,
+                default_value=EditAdmissionState.id_supplier,
+                on_change=EditAdmissionState.on_change_id_supplier,
+            ),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                            value=EditAdmissionState.search_name_destination_storage,
+                            on_change=EditAdmissionState.on_change_search_name_destination_storage,
+                        ),
+                        rx.foreach(EditAdmissionState.list_storages, lambda storage: rx.select.item(storage[0], value=storage[1], width="100%")),
+                        width="100%",
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditAdmissionState.is_view_only_edit,
+                value=EditAdmissionState.id_destination_storage,
+                default_value=EditAdmissionState.id_destination_storage,
+                on_change=EditAdmissionState.on_change_id_destination_storage,
+            ),
+            rx.text("*Одержувач:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(EditAdmissionState.list_owners, lambda owner: rx.select.item(owner[0], value=owner[1])),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditAdmissionState.is_view_only_edit,
+                value=EditAdmissionState.id_destination_owner,
+                on_change=EditAdmissionState.on_change_id_destination_owner,
+            ),
+            rx.hstack(
+                rx.text("*Статус:"),
+                rx.select(
+                    EditAdmissionState.editable_statuses,
+                    placeholder="Оберіть зі списку",
+                    required=True,
+                    value=EditAdmissionState.status,
+                    on_change=EditAdmissionState.on_change_status,
+                ),
+            ),
+            full_edit.reason_field(EditAdmissionState),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment, width="100%"),
+        ),
+        titled_section(
+            "Фінанси",
+            rx.text("*Спосіб оплати:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(EditAdmissionState.list_payment_types, lambda payment_type: rx.select.item(payment_type[0], value=payment_type[1])),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditAdmissionState.is_view_only_edit,
+                value=EditAdmissionState.id_payment_type,
+                on_change=EditAdmissionState.on_change_id_payment_type,
+            ),
+            rx.text("Номер накладної оплати:", weight="medium"),
+            controls.input_field(value=EditAdmissionState.invoice_number, on_change=EditAdmissionState.on_change_invoice_number),
+            rx.text("Ставка ПДВ:", weight="medium"),
+            rx.hstack(
+                rx.select.root(
+                    rx.select.trigger(placeholder="Без ПДВ", flex="1", min_width="0"),
+                    rx.select.content(
+                        rx.select.item("Без ПДВ", value="None"),
+                        rx.foreach(EditAdmissionState.list_nds_rates, lambda nr: rx.select.item(nr[0], value=nr[1])),
+                        width="100%",
+                    ),
+                    value=EditAdmissionState.id_nds_rate,
+                    on_change=EditAdmissionState.on_change_id_nds_rate,
+                ),
+                rx.button(
+                    rx.icon("x", size=16),
+                    type="button",
+                    variant="soft",
+                    color_scheme="gray",
+                    title="Скинути ставку ПДВ",
+                    disabled=EditAdmissionState.id_nds_rate == "",
+                    on_click=EditAdmissionState.on_change_id_nds_rate(""),
+                ),
+                width="100%",
+                align="center",
+            ),
+            rx.hstack(
+                rx.switch(default_value=False, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.flag_nds, on_change=EditAdmissionState.on_change_flag_nds),
+                rx.text("Ціна в рядках вказана з ПДВ"),
+            ),
+            rx.vstack(
+                rx.hstack(rx.text("Сума без ПДВ:"), rx.text(EditAdmissionState.subtotal_display)),
+                rx.hstack(rx.text("Сума ПДВ:"), rx.text(EditAdmissionState.nds_amount_display)),
+                rx.hstack(rx.text("Разом з ПДВ:"), rx.text(EditAdmissionState.total_display)),
+                width="100%",
+            ),
+            rx.hstack(
+                rx.text("Курс долара:"),
+                controls.input_field(required=True, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.dollar_rate, on_change=EditAdmissionState.on_change_dollar_rate),
             ),
         ),
-        full_edit.reason_field(EditAdmissionState),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment, width="100%"),
+        titled_section(
+            "Товари",
+            rx.text("*Товари з каталогу:", weight="medium"),
+            _edit_admission_products_catalog_dialog(),
+            _edit_admission_add_product_button(),
+            rx.cond(
+                EditAdmissionState.has_item_movement_products_catalog,
+                _edit_admission_products_catalog_table(),
+                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+            ),
+        ),
         spacing="3",
         align="stretch",
         width="100%",

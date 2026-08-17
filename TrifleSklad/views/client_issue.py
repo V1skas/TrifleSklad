@@ -23,7 +23,7 @@ from TrifleSklad.states.client_issue import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls, full_edit
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Tuple[int, ClientIssue]) -> rx.Component:
@@ -114,123 +114,126 @@ def list_page() -> rx.Component:
 
 def _add_form() -> rx.Component:
     return rx.vstack(
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            type="date",
-            required=True,
-            default_value=AddClientIssueState.item.movement.date,
-            width="100%",
-            on_change=AddClientIssueState.on_change_date,
-        ),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddClientIssueState.list_incoming_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
-                ),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                type="date",
+                required=True,
+                default_value=AddClientIssueState.item.movement.date,
                 width="100%",
+                on_change=AddClientIssueState.on_change_date,
             ),
-            required=True,
-            value=AddClientIssueState.id_incoming_storage,
-            on_change=AddClientIssueState.on_change_id_incoming_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити склад",
-            AddClientIssueState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
-        ),
-        rx.text("*Власник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddClientIssueState.list_owners,
-                    lambda owner: rx.select.item(owner[0], value=owner[1]),
-                ),
-                width="100%",
-            ),
-            required=True,
-            value=AddClientIssueState.id_incoming_owner,
-            on_change=AddClientIssueState.on_change_id_incoming_owner,
-        ),
-        create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddClientIssueState.open_owner_create("")),
-        owner_create_dialog(AddClientIssueState),
-        rx.text("*Клієнт:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        placeholder="Введіть назву для пошуку",
-                        width="100%",
-                        value=AddClientIssueState.search_name_destination_storage,
-                        on_change=AddClientIssueState.on_change_search_name_destination_storage,
-                    ),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
                     rx.foreach(
-                        AddClientIssueState.list_destination_storages,
-                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        AddClientIssueState.list_incoming_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
                     ),
                     width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddClientIssueState.id_incoming_storage,
+                on_change=AddClientIssueState.on_change_id_incoming_storage,
             ),
-            required=True,
-            value=AddClientIssueState.id_destination_storage,
-            on_change=AddClientIssueState.on_change_id_destination_storage,
-        ),
-        create_lookup_button(
-            Action.STORAGE_CREATE,
-            "Створити клієнта",
-            AddClientIssueState.open_storage_create(StorageType.CLIENT, "destination", False),
-        ),
-        storage_create_dialog(AddClientIssueState),
-        rx.text("Номер договору:", weight="medium"),
-        controls.input_field(
-            width="100%",
-            value=AddClientIssueState.item.contract_number,
-            on_change=AddClientIssueState.on_change_contract_number,
-        ),
-        rx.text("*Адреса встановлення:", weight="medium"),
-        controls.input_field(
-            required=True,
-            width="100%",
-            value=AddClientIssueState.item.installation_address,
-            on_change=AddClientIssueState.on_change_installation_address,
-        ),
-        rx.text("*Відповідальний:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    AddClientIssueState.list_workers,
-                    lambda worker: rx.select.item(worker[0], value=worker[1]),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити склад",
+                AddClientIssueState.open_storage_create(StorageType.WAREHOUSE, "incoming", False),
+            ),
+            rx.text("*Власник:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddClientIssueState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                value=AddClientIssueState.id_incoming_owner,
+                on_change=AddClientIssueState.on_change_id_incoming_owner,
             ),
-            required=True,
-            value=AddClientIssueState.id_recipient,
-            on_change=AddClientIssueState.on_change_id_recipient,
+            create_lookup_button(Action.OWNERS_CREATE, "Створити власника", AddClientIssueState.open_owner_create("")),
+            owner_create_dialog(AddClientIssueState),
+            rx.text("*Клієнт:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                            value=AddClientIssueState.search_name_destination_storage,
+                            on_change=AddClientIssueState.on_change_search_name_destination_storage,
+                        ),
+                        rx.foreach(
+                            AddClientIssueState.list_destination_storages,
+                            lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        ),
+                        width="100%",
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddClientIssueState.id_destination_storage,
+                on_change=AddClientIssueState.on_change_id_destination_storage,
+            ),
+            create_lookup_button(
+                Action.STORAGE_CREATE,
+                "Створити клієнта",
+                AddClientIssueState.open_storage_create(StorageType.CLIENT, "destination", False),
+            ),
+            storage_create_dialog(AddClientIssueState),
+            rx.text("Номер договору:", weight="medium"),
+            controls.input_field(
+                width="100%",
+                value=AddClientIssueState.item.contract_number,
+                on_change=AddClientIssueState.on_change_contract_number,
+            ),
+            rx.text("*Адреса встановлення:", weight="medium"),
+            controls.input_field(
+                required=True,
+                width="100%",
+                value=AddClientIssueState.item.installation_address,
+                on_change=AddClientIssueState.on_change_installation_address,
+            ),
+            rx.text("*Відповідальний:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        AddClientIssueState.list_workers,
+                        lambda worker: rx.select.item(worker[0], value=worker[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                value=AddClientIssueState.id_recipient,
+                on_change=AddClientIssueState.on_change_id_recipient,
+            ),
+            create_lookup_button(Action.WORKERS_CREATE, "Створити співробітника", AddClientIssueState.open_worker_create),
+            worker_create_dialog(AddClientIssueState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                AddClientIssueState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                width="100%",
+                value=AddClientIssueState.status,
+                on_change=AddClientIssueState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(
+                width="100%",
+                value=AddClientIssueState.item.movement.comment,
+                on_change=AddClientIssueState.on_change_comment,
+            ),
         ),
-        create_lookup_button(Action.WORKERS_CREATE, "Створити співробітника", AddClientIssueState.open_worker_create),
-        worker_create_dialog(AddClientIssueState),
-        products_widget(width="100%"),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            AddClientIssueState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            width="100%",
-            value=AddClientIssueState.status,
-            on_change=AddClientIssueState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(
-            width="100%",
-            value=AddClientIssueState.item.movement.comment,
-            on_change=AddClientIssueState.on_change_comment,
-        ),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -255,114 +258,117 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditClientIssueState),
-        rx.text("*Дата:", weight="medium"),
-        controls.input_field(
-            type="date",
-            required=True,
-            disabled=EditClientIssueState.is_view_only_edit,
-            default_value=EditClientIssueState.item.movement.date,
-            width="100%",
-            on_change=EditClientIssueState.on_change_date,
-        ),
-        rx.text("*Склад:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditClientIssueState.list_incoming_storages,
-                    lambda storage: rx.select.item(storage[0], value=storage[1]),
-                ),
+        titled_section(
+            "Загальна інформація",
+            rx.text("*Дата:", weight="medium"),
+            controls.input_field(
+                type="date",
+                required=True,
+                disabled=EditClientIssueState.is_view_only_edit,
+                default_value=EditClientIssueState.item.movement.date,
                 width="100%",
+                on_change=EditClientIssueState.on_change_date,
             ),
-            disabled=EditClientIssueState.is_view_only_edit,
-            required=True,
-            value=EditClientIssueState.id_incoming_storage,
-            on_change=EditClientIssueState.on_change_id_incoming_storage,
-        ),
-        rx.text("*Власник:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditClientIssueState.list_owners,
-                    lambda owner: rx.select.item(owner[0], value=owner[1]),
-                ),
-                width="100%",
-            ),
-            required=True,
-            disabled=EditClientIssueState.is_view_only_edit,
-            value=EditClientIssueState.id_incoming_owner,
-            on_change=EditClientIssueState.on_change_id_incoming_owner,
-        ),
-        rx.text("*Клієнт:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.vstack(
-                    controls.search_field(
-                        placeholder="Введіть назву для пошуку",
-                        width="100%",
-                        value=EditClientIssueState.search_name_destination_storage,
-                        on_change=EditClientIssueState.on_change_search_name_destination_storage,
-                    ),
+            rx.text("*Склад:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
                     rx.foreach(
-                        EditClientIssueState.list_destination_storages,
-                        lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        EditClientIssueState.list_incoming_storages,
+                        lambda storage: rx.select.item(storage[0], value=storage[1]),
                     ),
                     width="100%",
                 ),
-                width="100%",
+                disabled=EditClientIssueState.is_view_only_edit,
+                required=True,
+                value=EditClientIssueState.id_incoming_storage,
+                on_change=EditClientIssueState.on_change_id_incoming_storage,
             ),
-            required=True,
-            disabled=EditClientIssueState.is_view_only_edit,
-            value=EditClientIssueState.id_destination_storage,
-            on_change=EditClientIssueState.on_change_id_destination_storage,
-        ),
-        rx.text("Номер договору:", weight="medium"),
-        controls.input_field(
-            width="100%",
-            value=EditClientIssueState.item.contract_number,
-            on_change=EditClientIssueState.on_change_contract_number,
-        ),
-        rx.text("*Адреса встановлення:", weight="medium"),
-        controls.input_field(
-            required=True,
-            width="100%",
-            value=EditClientIssueState.item.installation_address,
-            on_change=EditClientIssueState.on_change_installation_address,
-        ),
-        rx.text("*Відповідальний:", weight="medium"),
-        rx.select.root(
-            rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
-            rx.select.content(
-                rx.foreach(
-                    EditClientIssueState.list_workers,
-                    lambda worker: rx.select.item(worker[0], value=worker[1]),
+            rx.text("*Власник:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditClientIssueState.list_owners,
+                        lambda owner: rx.select.item(owner[0], value=owner[1]),
+                    ),
+                    width="100%",
                 ),
-                width="100%",
+                required=True,
+                disabled=EditClientIssueState.is_view_only_edit,
+                value=EditClientIssueState.id_incoming_owner,
+                on_change=EditClientIssueState.on_change_id_incoming_owner,
             ),
-            required=True,
-            disabled=EditClientIssueState.is_view_only_edit,
-            value=EditClientIssueState.id_recipient,
-            on_change=EditClientIssueState.on_change_id_recipient,
+            rx.text("*Клієнт:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.vstack(
+                        controls.search_field(
+                            placeholder="Введіть назву для пошуку",
+                            width="100%",
+                            value=EditClientIssueState.search_name_destination_storage,
+                            on_change=EditClientIssueState.on_change_search_name_destination_storage,
+                        ),
+                        rx.foreach(
+                            EditClientIssueState.list_destination_storages,
+                            lambda storage: rx.select.item(storage[0], value=storage[1], width="100%"),
+                        ),
+                        width="100%",
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditClientIssueState.is_view_only_edit,
+                value=EditClientIssueState.id_destination_storage,
+                on_change=EditClientIssueState.on_change_id_destination_storage,
+            ),
+            rx.text("Номер договору:", weight="medium"),
+            controls.input_field(
+                width="100%",
+                value=EditClientIssueState.item.contract_number,
+                on_change=EditClientIssueState.on_change_contract_number,
+            ),
+            rx.text("*Адреса встановлення:", weight="medium"),
+            controls.input_field(
+                required=True,
+                width="100%",
+                value=EditClientIssueState.item.installation_address,
+                on_change=EditClientIssueState.on_change_installation_address,
+            ),
+            rx.text("*Відповідальний:", weight="medium"),
+            rx.select.root(
+                rx.select.trigger(placeholder="Оберіть зі списку", width="100%"),
+                rx.select.content(
+                    rx.foreach(
+                        EditClientIssueState.list_workers,
+                        lambda worker: rx.select.item(worker[0], value=worker[1]),
+                    ),
+                    width="100%",
+                ),
+                required=True,
+                disabled=EditClientIssueState.is_view_only_edit,
+                value=EditClientIssueState.id_recipient,
+                on_change=EditClientIssueState.on_change_id_recipient,
+            ),
+            full_edit.reason_field(EditClientIssueState),
+            rx.text("*Статус:", weight="medium"),
+            rx.select(
+                EditClientIssueState.editable_statuses,
+                placeholder="Оберіть зі списку",
+                required=True,
+                width="100%",
+                value=EditClientIssueState.status,
+                on_change=EditClientIssueState.on_change_status,
+            ),
+            rx.text("Коментар:", weight="medium"),
+            controls.text_area_field(
+                width="100%",
+                value=EditClientIssueState.item.movement.comment,
+                on_change=EditClientIssueState.on_change_comment,
+            ),
         ),
-        products_widget(width="100%"),
-        full_edit.reason_field(EditClientIssueState),
-        rx.text("*Статус:", weight="medium"),
-        rx.select(
-            EditClientIssueState.editable_statuses,
-            placeholder="Оберіть зі списку",
-            required=True,
-            width="100%",
-            value=EditClientIssueState.status,
-            on_change=EditClientIssueState.on_change_status,
-        ),
-        rx.text("Коментар:", weight="medium"),
-        controls.text_area_field(
-            width="100%",
-            value=EditClientIssueState.item.movement.comment,
-            on_change=EditClientIssueState.on_change_comment,
-        ),
+        titled_section("Товари", products_widget(width="100%")),
         spacing="3",
         align="stretch",
         width="100%",
@@ -434,16 +440,19 @@ def _cancel_conflict_dialog() -> rx.Component:
 def view_page_content() -> rx.Component:
     return rx.vstack(
         _cancel_conflict_dialog(),
-        rx.text(f"Дата: {ViewClientIssueState.item.movement.date}"),
-        rx.text(f"Склад: {ViewClientIssueState.item.movement.incoming_storage.title}"),
-        rx.text(f"Власник: {ViewClientIssueState.item.movement.incoming_owner.title}"),
-        rx.text(f"Клієнт: {ViewClientIssueState.item.movement.destination_storage.title}"),
-        rx.text(f"Номер договору: {ViewClientIssueState.item.contract_number}"),
-        rx.text(f"Адреса встановлення: {ViewClientIssueState.item.installation_address}"),
-        rx.text(f"Відповідальний: {ViewClientIssueState.item.recipient.fio}"),
-        rx.text(f"Статус: {ViewClientIssueState.item_status}"),
-        rx.text(f"Коментар: {ViewClientIssueState.item.movement.comment}"),
-        products_widget(width="100%"),
+        titled_section(
+            "Загальна інформація",
+            field_row("Дата", ViewClientIssueState.item.movement.date),
+            field_row("Склад", ViewClientIssueState.item.movement.incoming_storage.title),
+            field_row("Власник", ViewClientIssueState.item.movement.incoming_owner.title),
+            field_row("Клієнт", ViewClientIssueState.item.movement.destination_storage.title),
+            field_row("Номер договору", ViewClientIssueState.item.contract_number),
+            field_row("Адреса встановлення", ViewClientIssueState.item.installation_address),
+            field_row("Відповідальний", ViewClientIssueState.item.recipient.fio),
+            field_row("Статус", ViewClientIssueState.item_status),
+            field_row("Коментар", ViewClientIssueState.item.movement.comment),
+        ),
+        titled_section("Товари", products_widget(width="100%")),
         history_block(ViewClientIssueState),
         spacing="3",
         align="stretch",

@@ -13,7 +13,7 @@ from TrifleSklad.states.storage import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
 
 
 def _table_row(item: Storage) -> rx.Component:
@@ -43,52 +43,60 @@ def _table() -> rx.Component:
     )
 
 
-def list_page_content() -> rx.Component:
-    return rx.vstack(
-        rx.hstack(
-            controls.search_field(
-                rx.input.slot(rx.icon("search")),
-                value=ListStorageState.filter_title,
-                on_change=ListStorageState.set_filter_title,
-                placeholder="Пошук за назвою...",
-                flex="1",
-                min_width="0",
-            ),
-            controls.search_field(
-                value=ListStorageState.filter_address,
-                on_change=ListStorageState.set_filter_address,
-                placeholder="Пошук за адресою...",
-                flex="1",
-                min_width="0",
-            ),
-            rx.select.root(
-                # width/flex_shrink — на trigger, не на root: rx.select.root
-                # не рендерить власний стилізовний DOM-елемент, тож пропси
-                # розміру на ньому мовчки ігноруються (той самий баг, що вже
-                # чинили на селекті ставки ПДВ у admission.py).
-                rx.select.trigger(placeholder="Тип", width="14em", flex_shrink="0"),
-                rx.select.content(
-                    rx.select.item("Всі", value="all"),
-                    rx.foreach(
-                        ListStorageState.storage_type_options,
-                        lambda opt: rx.select.item(opt[0], value=opt[1]),
-                    ),
+def _filter_shell() -> rx.Component:
+    return controls.filter_shell(
+        ListStorageState.is_filter_open,
+        controls.filter_grid(
+            controls.filter_group(
+                "Назва",
+                controls.search_field(
+                    rx.input.slot(rx.icon("search")),
+                    value=ListStorageState.filter_title,
+                    on_change=ListStorageState.set_filter_title,
+                    placeholder="Пошук за назвою",
                     width="100%",
                 ),
-                value=ListStorageState.filter_type,
-                on_change=ListStorageState.set_filter_type,
             ),
-            spacing="3",
-            width="100%",
-            align="center",
+            controls.filter_group(
+                "Адреса",
+                controls.search_field(
+                    rx.input.slot(rx.icon("search")),
+                    value=ListStorageState.filter_address,
+                    on_change=ListStorageState.set_filter_address,
+                    placeholder="Пошук за адресою",
+                    width="100%",
+                ),
+            ),
+            controls.filter_group(
+                "Тип",
+                rx.select.root(
+                    # width — на trigger, не на root: rx.select.root не рендерить
+                    # власний стилізовний DOM-елемент, тож пропси розміру на ньому
+                    # мовчки ігноруються (той самий баг, що вже чинили на селекті
+                    # ставки ПДВ у admission.py).
+                    rx.select.trigger(placeholder="Всі", width="100%"),
+                    rx.select.content(
+                        rx.select.item("Всі", value="all"),
+                        rx.foreach(
+                            ListStorageState.storage_type_options,
+                            lambda opt: rx.select.item(opt[0], value=opt[1]),
+                        ),
+                        width="100%",
+                    ),
+                    value=ListStorageState.filter_type,
+                    on_change=ListStorageState.set_filter_type,
+                    width="100%",
+                ),
+            ),
         ),
-        rx.cond(
-            ListStorageState.has_items,
-            _table(),
-            controls.empty_placeholder(),
-        ),
-        spacing="3",
-        width="100%",
+    )
+
+
+def list_page_content() -> rx.Component:
+    return rx.cond(
+        ListStorageState.has_items,
+        _table(),
+        controls.empty_placeholder(),
     )
 
 
@@ -97,6 +105,11 @@ def list_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Об'єкти підприємства",
+            controls.filter_toggle_button(
+                ListStorageState.is_filter_open,
+                ListStorageState.toggle_filter,
+                active=ListStorageState.has_active_filters,
+            ),
             rx.cond(
                 ListStorageState.get_user_actions.contains(Action.STORAGE_CREATE),
                 controls.button_primary("Створити", on_click=ListStorageState.on_click_add),
@@ -104,6 +117,7 @@ def list_page() -> rx.Component:
             width="100%",
         ),
         rx.skeleton(list_page_content(), loading=ListStorageState.in_progress, height="100%"),
+        filter_panel=_filter_shell(),
         on_mount=ListStorageState.on_load,
     )
 
@@ -131,7 +145,8 @@ def _worker_select(value, on_change, workers) -> rx.Component:
 
 
 def add_page_content() -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Тип", weight="medium"),
         _type_select(AddStorageState.storage_type_id, AddStorageState.set_storage_type_id),
         rx.text("*Назва", weight="medium"),
@@ -148,9 +163,6 @@ def add_page_content() -> rx.Component:
             align="center",
             spacing="2",
         ),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -169,7 +181,8 @@ def add_page() -> rx.Component:
 
 
 def edit_page_content() -> rx.Component:
-    return rx.vstack(
+    return titled_section(
+        "Інформація",
         rx.text("*Тип", weight="medium"),
         _type_select(EditStorageState.storage_type_id, EditStorageState.set_storage_type_id),
         rx.text("*Назва", weight="medium"),
@@ -186,9 +199,6 @@ def edit_page_content() -> rx.Component:
             align="center",
             spacing="2",
         ),
-        spacing="3",
-        align="stretch",
-        width="100%",
     )
 
 
@@ -207,15 +217,14 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.hstack(rx.text("Тип:", weight="medium"), rx.text(ViewStorageState.storage_type), width="100%"),
-        rx.hstack(rx.text("Назва:", weight="medium"), rx.text(ViewStorageState.title), width="100%"),
-        rx.hstack(rx.text("Адреса:", weight="medium"), rx.text(ViewStorageState.address), width="100%"),
-        rx.hstack(rx.text("Відповідальний:", weight="medium"), rx.text(ViewStorageState.responsible), width="100%"),
-        rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewStorageState.description), width="100%"),
-        rx.hstack(
-            rx.text("За замовчуванням для рухів:", weight="medium"),
-            rx.text(rx.cond(ViewStorageState.is_default, "Так", "Ні")),
-            width="100%",
+        titled_section(
+            "Інформація",
+            field_row("Тип", ViewStorageState.storage_type),
+            field_row("Назва", ViewStorageState.title),
+            field_row("Адреса", ViewStorageState.address),
+            field_row("Відповідальний", ViewStorageState.responsible),
+            field_row("Опис", ViewStorageState.description),
+            field_row("За замовчуванням для рухів", rx.cond(ViewStorageState.is_default, "Так", "Ні")),
         ),
         history_block(ViewStorageState),
         spacing="3",

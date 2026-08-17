@@ -14,7 +14,15 @@ from TrifleSklad.states.product import (
 from TrifleSklad.views.auth import require_login
 from TrifleSklad.views.templates import controls
 from TrifleSklad.views.templates.history import history_block
-from TrifleSklad.views.templates.layouts import header_subpage, page_wrapper
+from TrifleSklad.views.templates.layouts import field_row, header_subpage, page_wrapper, titled_section
+
+
+def _bool_badge(value) -> rx.Component:
+    return rx.cond(
+        value,
+        rx.badge("Так", color_scheme="grass", variant="soft"),
+        rx.badge("Ні", color_scheme="gray", variant="soft"),
+    )
 
 
 def _table_row(item: ProductCatalog) -> rx.Component:
@@ -22,7 +30,7 @@ def _table_row(item: ProductCatalog) -> rx.Component:
         rx.table.row_header_cell(item.title, align="left"),
         rx.table.cell(item.category.title),
         rx.table.cell(item.unit),
-        rx.table.cell(rx.cond(item.divisible, rx.text("Так"), rx.text("Ні"))),
+        rx.table.cell(_bool_badge(item.divisible)),
         rx.table.cell(
             rx.cond(
                 item.no_fixed_capacity,
@@ -30,7 +38,7 @@ def _table_row(item: ProductCatalog) -> rx.Component:
                 rx.cond(item.divisible, rx.text(item.capacity), rx.text("-")),
             )
         ),
-        rx.table.cell(rx.cond(item.uniq, rx.text("Так"), rx.text("Ні"))),
+        rx.table.cell(_bool_badge(item.uniq)),
         on_click=rx.redirect(routes.CATALOG_PRODUCTS_VIEW_ID + item.id.to_string()),
         cursor="pointer",
         _hover={"background_color": rx.color("accent", 3)},
@@ -58,34 +66,45 @@ def _table() -> rx.Component:
     )
 
 
+def _filter_shell() -> rx.Component:
+    return controls.filter_shell(
+        ListProductsState.is_filter_open,
+        controls.filter_grid(
+            controls.filter_group(
+                "Пошук",
+                controls.search_field(
+                    rx.input.slot(rx.icon("search")),
+                    placeholder="Назва товару",
+                    value=ListProductsState.get_search_str,
+                    on_change=ListProductsState.set_search_str,
+                    width="100%",
+                ),
+            ),
+            controls.filter_group(
+                "Категорія",
+                rx.select.root(
+                    # width — на trigger, не на root (rx.select.root не рендерить
+                    # власний стилізовний DOM-елемент).
+                    rx.select.trigger(placeholder="Усі категорії", width="100%"),
+                    rx.select.content(
+                        rx.select.item("Усі категорії", value=ALL),
+                        rx.foreach(
+                            ListProductsState.list_categories,
+                            lambda c: rx.select.item(c[0], value=c[1]),
+                        ),
+                        width="100%",
+                    ),
+                    value=ListProductsState.filter_category_id,
+                    on_change=ListProductsState.set_filter_category_id,
+                    width="100%",
+                ),
+            ),
+        ),
+    )
+
+
 def list_page_content() -> rx.Component:
     return rx.vstack(
-        rx.hstack(
-            controls.search_field(
-                placeholder="Пошук за назвою",
-                value=ListProductsState.get_search_str,
-                on_change=ListProductsState.set_search_str,
-                flex="1",
-                min_width="0",
-            ),
-            rx.select.root(
-                # width/flex_shrink — на trigger, не на root (rx.select.root
-                # не рендерить власний стилізовний DOM-елемент).
-                rx.select.trigger(placeholder="Усі категорії", width="16em", flex_shrink="0"),
-                rx.select.content(
-                    rx.select.item("Усі категорії", value=ALL),
-                    rx.foreach(
-                        ListProductsState.list_categories,
-                        lambda c: rx.select.item(c[0], value=c[1]),
-                    ),
-                ),
-                value=ListProductsState.filter_category_id,
-                on_change=ListProductsState.set_filter_category_id,
-            ),
-            width="100%",
-            spacing="3",
-            align="center",
-        ),
         rx.cond(
             ListProductsState.has_items,
             _table(),
@@ -102,6 +121,11 @@ def list_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Каталог ТМЦ",
+            controls.filter_toggle_button(
+                ListProductsState.is_filter_open,
+                ListProductsState.toggle_filter,
+                active=ListProductsState.has_active_filters,
+            ),
             rx.cond(
                 ListProductsState.get_user_actions.contains(Action.PRODUCTS_CREATE),
                 controls.button_primary("Створити", on_click=ListProductsState.on_click_add),
@@ -109,6 +133,7 @@ def list_page() -> rx.Component:
             width="100%",
         ),
         rx.skeleton(list_page_content(), loading=ListProductsState.in_progress, height="100%"),
+        filter_panel=_filter_shell(),
         on_mount=ListProductsState.on_load,
     )
 
@@ -182,44 +207,50 @@ def _units_datalist(state) -> rx.Component:
 
 def _form_fields(state, uniq_disabled: bool) -> rx.Component:
     return rx.vstack(
-        rx.text("*Назва", weight="medium"),
-        controls.input_field(value=state.title, on_change=state.set_title, width="100%"),
-        rx.text("Опис", weight="medium"),
-        controls.text_area_field(value=state.description, on_change=state.set_description, width="100%"),
-        rx.text("*Категорія", weight="medium"),
-        _category_select_row(state),
-        rx.text("Одиниця виміру", weight="medium"),
-        controls.input_field(list="units-datalist", value=state.unit, on_change=state.set_unit, width="100%"),
-        _units_datalist(state),
-        rx.text("Місткість", weight="medium"),
-        controls.input_field(
-            value=state.capacity,
-            on_change=state.set_capacity,
-            width="100%",
-            disabled=state.uniq | state.no_fixed_capacity,
+        titled_section(
+            "Основна інформація",
+            rx.text("*Назва", weight="medium"),
+            controls.input_field(value=state.title, on_change=state.set_title, width="100%"),
+            rx.text("Опис", weight="medium"),
+            controls.text_area_field(value=state.description, on_change=state.set_description, width="100%"),
+            rx.text("*Категорія", weight="medium"),
+            _category_select_row(state),
+            rx.text("Одиниця виміру", weight="medium"),
+            controls.input_field(list="units-datalist", value=state.unit, on_change=state.set_unit, width="100%"),
+            _units_datalist(state),
         ),
-        rx.checkbox(
-            "Має серійний номер",
-            checked=state.uniq,
-            on_change=state.set_uniq,
-            size="3",
-            disabled=uniq_disabled,
-        ),
-        rx.checkbox(
-            "Подільний",
-            checked=state.divisible,
-            on_change=state.set_divisible,
-            size="3",
-            disabled=uniq_disabled or state.uniq,
-        ),
-        # Тумблер доступний лише для подільного неунікального ТМЦ; на редагуванні
-        # не блокується — кількість завжди рахується за залишком (Product.count).
-        rx.checkbox(
-            "Без фіксованої ємності",
-            checked=state.no_fixed_capacity,
-            on_change=state.set_no_fixed_capacity,
-            size="3",
-            disabled=state.uniq | ~state.divisible,
+        titled_section(
+            "Параметри обліку",
+            rx.text("Місткість", weight="medium"),
+            controls.input_field(
+                value=state.capacity,
+                on_change=state.set_capacity,
+                width="100%",
+                disabled=state.uniq | state.no_fixed_capacity,
+            ),
+            rx.checkbox(
+                "Має серійний номер",
+                checked=state.uniq,
+                on_change=state.set_uniq,
+                size="3",
+                disabled=uniq_disabled,
+            ),
+            rx.checkbox(
+                "Подільний",
+                checked=state.divisible,
+                on_change=state.set_divisible,
+                size="3",
+                disabled=uniq_disabled or state.uniq,
+            ),
+            # Тумблер доступний лише для подільного неунікального ТМЦ; на редагуванні
+            # не блокується — кількість завжди рахується за залишком (Product.count).
+            rx.checkbox(
+                "Без фіксованої ємності",
+                checked=state.no_fixed_capacity,
+                on_change=state.set_no_fixed_capacity,
+                size="3",
+                disabled=state.uniq | ~state.divisible,
+            ),
         ),
         spacing="3",
         align="stretch",
@@ -258,36 +289,26 @@ def edit_page() -> rx.Component:
 
 def view_page_content() -> rx.Component:
     return rx.vstack(
-        rx.hstack(rx.text("Назва:", weight="medium"), rx.text(ViewProductsState.title), width="100%"),
-        rx.hstack(rx.text("Опис:", weight="medium"), rx.text(ViewProductsState.description), width="100%"),
-        rx.hstack(rx.text("Категорія:", weight="medium"), rx.text(ViewProductsState.category), width="100%"),
-        rx.hstack(rx.text("Одиниця виміру:", weight="medium"), rx.text(ViewProductsState.unit), width="100%"),
-        rx.hstack(rx.text("Кількість:", weight="medium"), rx.text(ViewProductsState.count), width="100%"),
-        rx.hstack(
-            rx.text("Подільний:", weight="medium"),
-            rx.text(rx.cond(ViewProductsState.divisible, "Так", "Ні")),
-            width="100%",
+        titled_section(
+            "Основна інформація",
+            field_row("Назва", ViewProductsState.title),
+            field_row("Опис", ViewProductsState.description),
+            field_row("Категорія", ViewProductsState.category),
+            field_row("Одиниця виміру", ViewProductsState.unit),
         ),
-        rx.cond(
-            ViewProductsState.divisible,
-            rx.hstack(
-                rx.text("Місткість:", weight="medium"),
-                rx.text(rx.cond(ViewProductsState.no_fixed_capacity, "∞", ViewProductsState.capacity)),
-                width="100%",
+        titled_section(
+            "Параметри обліку",
+            field_row("Кількість", ViewProductsState.count),
+            field_row("Подільний", rx.cond(ViewProductsState.divisible, "Так", "Ні")),
+            rx.cond(
+                ViewProductsState.divisible,
+                field_row("Місткість", rx.cond(ViewProductsState.no_fixed_capacity, "∞", ViewProductsState.capacity)),
             ),
-        ),
-        rx.cond(
-            ViewProductsState.divisible,
-            rx.hstack(
-                rx.text("Без фіксованої ємності:", weight="medium"),
-                rx.text(rx.cond(ViewProductsState.no_fixed_capacity, "Так", "Ні")),
-                width="100%",
+            rx.cond(
+                ViewProductsState.divisible,
+                field_row("Без фіксованої ємності", rx.cond(ViewProductsState.no_fixed_capacity, "Так", "Ні")),
             ),
-        ),
-        rx.hstack(
-            rx.text("Має серійний номер:", weight="medium"),
-            rx.text(rx.cond(ViewProductsState.uniq, "Так", "Ні")),
-            width="100%",
+            field_row("Має серійний номер", rx.cond(ViewProductsState.uniq, "Так", "Ні")),
         ),
         history_block(ViewProductsState),
         spacing="3",

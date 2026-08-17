@@ -5,9 +5,11 @@ from TrifleSklad.views.templates import controls
 
 
 def filter_select(label: str, value, options, on_change) -> rx.Component:
-    """Селект-фільтр зі сентинелом «Усі» (ALL). options — список (назва, id-рядок)."""
-    return rx.vstack(
-        rx.text(label, size="2"),
+    """Селект-фільтр зі сентинелом «Усі» (ALL) як окремий візуально
+    відокремлений блок фільтра (`controls.filter_group`), щоб критерії в картці
+    не зливались. options — список (назва, id-рядок)."""
+    return controls.filter_group(
+        label,
         rx.select.root(
             rx.select.trigger(placeholder="Усі", width="100%"),
             rx.select.content(
@@ -19,8 +21,6 @@ def filter_select(label: str, value, options, on_change) -> rx.Component:
             on_change=on_change,
             width="100%",
         ),
-        spacing="1",
-        min_width="12em",
     )
 
 
@@ -38,6 +38,11 @@ def _date_input(value, on_change, enabled) -> rx.Component:
         padding="0.4em 0.6em",
         background_color=rx.color("gray", 1),
         color=rx.color("gray", 12),
+        width="100%",
+        # Нативний date-input має власну мінімальну ширину під «дд.мм.рррр» +
+        # іконку календаря; без цього flex стискає поле і дата обрізається.
+        min_width="7em",
+        flex="1",
     )
 
 
@@ -56,76 +61,67 @@ def filter_card(State, *extra) -> rx.Component:
     """Картка фільтра за датою та статусами — з'являється по кнопці «Фільтр».
     `*extra` — додаткові контроли фільтра секції (склад/власник/відповідальний),
     рендеряться між статусами та кнопками дій."""
-    return rx.cond(
+    return controls.filter_shell(
         State.is_filter_open,
-        rx.card(
-            rx.vstack(
+        controls.filter_grid(
+            controls.filter_group(
+                "Період",
+                # Обидві дати в один рядок — блок лишається заввишки як
+                # сусідні селекти, тож сітка виходить рівною.
                 rx.hstack(
-                    rx.text("Фільтрувати за датою", size="2"),
-                    rx.switch(
-                        checked=State.filter_date_enabled,
-                        on_change=State.on_change_filter_date_enabled,
+                    _date_input(
+                        State.filter_date_from,
+                        State.on_change_filter_date_from,
+                        State.filter_date_enabled,
+                    ),
+                    rx.text("—", size="2", flex_shrink="0"),
+                    _date_input(
+                        State.filter_date_to,
+                        State.on_change_filter_date_to,
+                        State.filter_date_enabled,
                     ),
                     spacing="2",
                     align="center",
-                ),
-                rx.hstack(
-                    rx.vstack(
-                        rx.text("Дата від:", size="2"),
-                        _date_input(
-                            State.filter_date_from,
-                            State.on_change_filter_date_from,
-                            State.filter_date_enabled,
-                        ),
-                        spacing="1",
-                    ),
-                    rx.vstack(
-                        rx.text("Дата до:", size="2"),
-                        _date_input(
-                            State.filter_date_to,
-                            State.on_change_filter_date_to,
-                            State.filter_date_enabled,
-                        ),
-                        spacing="1",
-                    ),
-                    spacing="4",
-                    wrap="wrap",
-                ),
-                rx.text("Статуси:", size="2"),
-                rx.hstack(
-                    rx.foreach(
-                        State.statuses_for_filter,
-                        lambda s: rx.checkbox(
-                            s[1],
-                            checked=s[2],
-                            on_change=lambda checked: State.set_status(s[0], checked),
-                        ),
-                    ),
-                    spacing="4",
-                    wrap="wrap",
-                ),
-                rx.hstack(
-                    *extra,
-                    spacing="4",
-                    wrap="wrap",
                     width="100%",
                 ),
-                rx.hstack(
-                    rx.button(
-                        "Скинути",
-                        variant="soft",
-                        color_scheme="gray",
-                        on_click=State.reset_filters,
-                    ),
-                    rx.button("Застосувати", on_click=State.apply_filters),
-                    spacing="3",
-                    justify="end",
-                    width="100%",
+                # Перемикач — у шапці блока, щоб не додавати зайвий рядок.
+                action=rx.switch(
+                    checked=State.filter_date_enabled,
+                    on_change=State.on_change_filter_date_enabled,
+                    size="1",
                 ),
-                spacing="3",
-                width="100%",
+                # Дві дати не влазять в одну колонку сітки — блок на дві.
+                wide=True,
             ),
-            width="100%",
+            *extra,
+        ),
+        # Прапорці — окремою смугою на всю ширину: у ряд вони займають один
+        # рядок, тоді як у вузькій колонці сітки розтягли б блок по висоті.
+        controls.filter_group(
+            "Статуси",
+            rx.hstack(
+                rx.foreach(
+                    State.statuses_for_filter,
+                    lambda s: rx.checkbox(
+                        s[1],
+                        checked=s[2],
+                        on_change=lambda checked: State.set_status(s[0], checked),
+                    ),
+                ),
+                spacing="5",
+                wrap="wrap",
+                align="center",
+            ),
+            height="auto",
+        ),
+        controls.filter_actions(
+            rx.button(
+                "Скинути",
+                variant="soft",
+                color_scheme="gray",
+                on_click=State.reset_filters,
+            ),
+            rx.button("Застосувати", on_click=State.apply_filters),
         ),
     )
 

@@ -9,9 +9,10 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.supplier import SupplierService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.list_filter_mixin import SearchFilterMixin
 
 
-class ListSupplierState(AppState):
+class ListSupplierState(SearchFilterMixin, AppState):
     items: Optional[Sequence[Supplier]] = None
     in_progress: bool = True
     filter_title: str = ""
@@ -29,6 +30,10 @@ class ListSupplierState(AppState):
     def has_items(self) -> bool:
         return len(self.filtered_items) > 0
 
+    @rx.var
+    def has_active_filters(self) -> bool:
+        return self.filter_title.strip() != ""
+
     @rx.event
     def on_load(self):
         if not self.has_permission(Action.SUPPLIERS_LIST):
@@ -38,6 +43,7 @@ class ListSupplierState(AppState):
         try:
             self.in_progress = True
             self.filter_title = ""
+            self.is_filter_open = False
             self.items = SupplierService().get_list_items()
             self.in_progress = False
         except Exception:
