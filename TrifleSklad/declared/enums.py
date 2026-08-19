@@ -95,7 +95,7 @@ def sale_line_cost(price: float, units: List[Tuple[int, bool, int]]) -> float:
 
 
 def admission_nds_split(
-    lines: List[Tuple[int, float]], rate_percent: float, price_includes_nds: bool
+    lines: List[Tuple[float, float]], rate_percent: float, price_includes_nds: bool
 ) -> Tuple[float, float, float]:
     """(база, ПДВ, разом) для постачання. lines = [(count, price), ...];
     rate_percent — ставка ПДВ у відсотках; price_includes_nds — `Admission.flag_nds`

@@ -247,6 +247,102 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
                 width="100%",
             ),
         ),
+        rx.cond(
+            MovementProductCatalogAddEditFormState.selected_divisible
+            & ~MovementProductCatalogAddEditFormState.selected_no_fixed_capacity
+            & (MovementProductCatalogAddEditFormState.selected_capacity > 0),
+            rx.vstack(
+                rx.hstack(
+                    rx.text("Задати ємність усім:", size="2"),
+                    controls.input_field(
+                        type="number",
+                        min="0",
+                        step="any",
+                        placeholder="Порожньо — повна ємність",
+                        value=MovementProductCatalogAddEditFormState.bulk_capacity,
+                        on_change=MovementProductCatalogAddEditFormState.on_change_bulk_capacity,
+                    ),
+                    width="100%",
+                ),
+                rx.hstack(
+                    rx.text("Задати вартість усім:", size="2"),
+                    controls.input_field(
+                        type="number",
+                        min="0",
+                        step="0.01",
+                        placeholder="Порожньо — пропорційно",
+                        value=MovementProductCatalogAddEditFormState.bulk_price,
+                        on_change=MovementProductCatalogAddEditFormState.on_change_bulk_price,
+                    ),
+                    width="100%",
+                ),
+                rx.accordion.root(
+                    rx.accordion.item(
+                        header=rx.text("Одиниці"),
+                        content=rx.scroll_area(
+                            rx.vstack(
+                                rx.text(
+                                    "Ємність — порожньо чи повне значення означає повну одиницю. "
+                                    "Вартість — порожньо означає пропорційно заповненню від базової ціни; "
+                                    "вказана вручну закріплюється за одиницею.",
+                                    size="1", color="gray",
+                                ),
+                                rx.foreach(
+                                    MovementProductCatalogAddEditFormState.unit_rows,
+                                    lambda row: rx.hstack(
+                                        rx.text(f"№{row[0] + 1}:", size="2", width="3em"),
+                                        controls.input_field(
+                                            type="number",
+                                            min="0",
+                                            step="any",
+                                            max=MovementProductCatalogAddEditFormState.selected_capacity,
+                                            is_invalid=row[2],
+                                            color_scheme=rx.cond(row[2], "red", "None"),
+                                            style=rx.cond(
+                                                row[2],
+                                                {"border": "2px solid red", "box-shadow": "0 0 0 1px red"},
+                                                {},
+                                            ),
+                                            value=row[1],
+                                            on_change=MovementProductCatalogAddEditFormState.on_change_unit_amount(row[0]),
+                                            width="30%",
+                                        ),
+                                        rx.text(f"/ {MovementProductCatalogAddEditFormState.selected_capacity}", size="2", color="gray"),
+                                        controls.input_field(
+                                            type="number",
+                                            min="0",
+                                            step="0.01",
+                                            placeholder="розрахунок",
+                                            is_invalid=row[4],
+                                            color_scheme=rx.cond(row[4], "red", "None"),
+                                            style=rx.cond(
+                                                row[4],
+                                                {"border": "2px solid red", "box-shadow": "0 0 0 1px red"},
+                                                {},
+                                            ),
+                                            value=row[3],
+                                            on_change=MovementProductCatalogAddEditFormState.on_change_unit_price(row[0]),
+                                            width="40%",
+                                        ),
+                                        width="100%",
+                                        align="center",
+                                    ),
+                                ),
+                                width="100%",
+                            ),
+                            padding="0.5em",
+                            width="100%",
+                            height="11em",
+                        ),
+                    ),
+                    collapsible=True,
+                    variant="outline",
+                    width="100%",
+                ),
+                width="100%",
+                spacing="2",
+            ),
+        ),
         rx.hstack(
             rx.text("Вартість за одиницю:"),
             controls.input_field(

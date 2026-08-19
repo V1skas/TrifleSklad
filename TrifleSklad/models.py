@@ -255,6 +255,9 @@ class Product(rx.Model, table=True):
     is_deleted: bool = Field(default=False, nullable=False)
     # Виключено з бухгалтерського обліку (виставляється при оформленні повернення).
     excluded_from_accounting: bool = Field(default=False, nullable=False)
+    # Ручна вартість саме цієї одиниці при постачанні (TS-53). NULL — вартість
+    # рахується пропорційно заповненню від базової ціни позиції.
+    price: Optional[float] = Field(default=None, nullable=True)
 
     # Relationship
     product_catalog: Optional[ProductCatalog] = Relationship(back_populates="products")

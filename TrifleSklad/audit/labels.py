@@ -161,6 +161,7 @@ def snapshot_unit_rows(units: Optional[List[Any]]) -> List[SimpleNamespace]:
             id_product_catalog=unit.id_product_catalog,
             serial_number=unit.serial_number,
             count=unit.count,
+            price=getattr(unit, "price", None),
         )
         for unit in (units or [])
     ]
@@ -176,6 +177,8 @@ def _unit_label(unit: Any) -> str:
         chunks.append(f"s/n {unit.serial_number}")
     if getattr(unit, "count", None) is not None:
         chunks.append(f"залишок {format_amount(unit.count)}")
+    if getattr(unit, "price", None) is not None:
+        chunks.append(f"ціна {format_amount(unit.price)}")
     return " · ".join(chunks) if chunks else MISSING_LABEL
 
 

@@ -57,15 +57,57 @@ def _parse_positive_float(value: str) -> Optional[float]:
     return parsed if parsed > 0 else None
 
 
+def _parse_nonneg_float(value: str) -> Optional[float]:
+    """Розбирає рядок у невід'ємне дробове число; інакше None. На відміну від
+    `_parse_positive_float` — для ручної ціни одиниці, де 0 є допустимим
+    значенням (TS-53)."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
 def _residual_label(pc: MovementProductsCatalog) -> str:
-    """Загальний обсяг позиції для колонки «Залишок». Для звичайного подільного —
-    к-сть одиниць × стандартна ємність; для подільного без фіксованої ємності —
-    сума ємностей створених одиниць (Product.count); для неподільного — прочерк."""
+    """Загальний обсяг позиції для колонки «Залишок» — сума ємностей створених
+    одиниць (Product.count). Для повністю заповненої позиції дає той самий
+    результат, що і count × capacity, але коректно враховує й неповну останню
+    одиницю (TS-53); для неподільного — прочерк."""
     if pc.product is None or not pc.product.divisible:
         return "—"
-    if pc.product.no_fixed_capacity:
-        return format_amount(sum((p.count or 0) for p in pc.products))
-    return str(pc.count * (pc.product.capacity or 0))
+    return format_amount(sum((p.count or 0) for p in pc.products))
+
+
+def _admission_unit_lines(pc: MovementProductsCatalog) -> List[Tuple[float, float]]:
+    """(к-сть, ціна) на КОЖНУ одиницю позиції — для `admission_nds_split` і
+    суми рядка (TS-53). Ручна ціна одиниці (`Product.price`) — абсолютна
+    (к-сть=1, без пропорції); без ручної ціни — базова ціна позиції: пропорційно
+    заповненню для подільного ТМЦ із фіксованою ємністю, інакше повна (за
+    фактичну одиницю, як і раніше)."""
+    base_price = pc.price
+    product = pc.product
+    fixed_divisible = bool(
+        product is not None
+        and product.divisible
+        and not product.no_fixed_capacity
+        and product.capacity
+    )
+    units = pc.products or []
+    if not units:
+        return [(pc.count, base_price)]
+    lines: List[Tuple[float, float]] = []
+    for unit in units:
+        if unit.price is not None:
+            lines.append((1.0, unit.price))
+        elif fixed_divisible:
+            lines.append(((unit.count or 0) / product.capacity, base_price))
+        else:
+            lines.append((1.0, base_price))
+    return lines
+
+
+def _line_cost(pc: MovementProductsCatalog) -> float:
+    return sum(qty * price for qty, price in _admission_unit_lines(pc))
 
 
 class MovementProductCatalogAddEditFormState(rx.State):
@@ -86,6 +128,19 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # кожної позиції постачання (одна на всі одиниці позиції).
     selected_no_fixed_capacity: bool = False
     entered_capacity: str = ""
+    # Подільний ТМЦ із фіксованою ємністю: кожна одиниця позиції може бути
+    # залита не повністю (TS-53) — «Кількість» лишається загальним числом
+    # одиниць, а ємність кожної редагується окремо. Сирі рядки паралельно
+    # `item.products` (як `price_input` тримає сиру ціну), щоб float не
+    # переформатувався в полі під час набору.
+    unit_amounts: List[str] = []
+    # Ручна ціна конкретної одиниці (закріплюється за нею, без пропорції);
+    # "" — override відсутній, ціна рахується пропорційно від базової.
+    unit_prices: List[str] = []
+    # Масові поля-дії: пишуть однакове значення в усі `unit_amounts`/
+    # `unit_prices` одразу (з подальшою можливістю пооднічного доуточнення).
+    bulk_capacity: str = ""
+    bulk_price: str = ""
 
     search_catalog: str = ""
 
@@ -128,6 +183,28 @@ class MovementProductCatalogAddEditFormState(rx.State):
         return [(index, product) for index, product in enumerate(self.item.products)]
 
     @rx.var
+    def unit_rows(self) -> List[Tuple[int, str, bool, str, bool]]:
+        """(індекс, ємність, помилка ємності, ціна, помилка ціни) — для
+        акордеону «Одиниці» (лише подільний ТМЦ із фіксованою ємністю,
+        TS-53). `unit_amounts`/`unit_prices` завжди однакової довжини —
+        підтримується `_sync_unit_rows`."""
+        if not self._units_editable():
+            return []
+        prices = self.unit_prices
+        return [
+            (
+                i,
+                amount,
+                amount.strip() != "" and self._parse_unit_amount(amount) is None,
+                prices[i] if i < len(prices) else "",
+                (prices[i].strip() != "" and self._parse_unit_price(prices[i]) is None)
+                if i < len(prices)
+                else False,
+            )
+            for i, amount in enumerate(self.unit_amounts)
+        ]
+
+    @rx.var
     def has_errors(self) -> bool:
         return (
             self.error_count
@@ -136,6 +213,20 @@ class MovementProductCatalogAddEditFormState(rx.State):
             or (
                 self.selected_no_fixed_capacity
                 and _parse_positive_float(self.entered_capacity) is None
+            )
+            or (
+                self._units_editable()
+                and any(
+                    a.strip() != "" and self._parse_unit_amount(a) is None
+                    for a in self.unit_amounts
+                )
+            )
+            or (
+                self._units_editable()
+                and any(
+                    p.strip() != "" and self._parse_unit_price(p) is None
+                    for p in self.unit_prices
+                )
             )
         )
 
@@ -176,8 +267,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
     def price(self) -> str:
         return self.price_input
 
-    def _per_unit_count(self) -> float:
-        # Без фіксованої ємності — беремо ручну ємність (дробову) для цієї позиції.
+    def _full_unit_count(self) -> float:
+        """Ємність ПОВНОЇ одиниці позиції (значення за замовчуванням, поки
+        конкретну одиницю не зроблено неповною — див. `_apply_units`)."""
         if self.selected_divisible and self.selected_no_fixed_capacity:
             parsed = _parse_positive_float(self.entered_capacity)
             return parsed if parsed is not None else 0
@@ -185,13 +277,109 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return self.selected_capacity
         return 1
 
+    def _units_editable(self) -> bool:
+        """Пооднічне редагування ємності/ціни стосується лише подільного ТМЦ
+        із фіксованою ємністю (TS-53) — не no_fixed (там ємність і так ручна,
+        одна на всю позицію) і не неподільного."""
+        return (
+            self.selected_divisible
+            and not self.selected_no_fixed_capacity
+            and self.selected_capacity > 0
+        )
+
+    def _parse_unit_amount(self, value: str) -> Optional[float]:
+        if not self._units_editable():
+            return None
+        parsed = _parse_positive_float(value)
+        if parsed is None or parsed > self.selected_capacity:
+            return None
+        return parsed
+
+    def _parse_unit_price(self, value: str) -> Optional[float]:
+        """Розбирає ручну ціну одиниці (override). Порожнє чи невірне
+        значення — None (override відсутній, ціна рахується пропорційно)."""
+        if not self._units_editable():
+            return None
+        return _parse_nonneg_float(value)
+
+    def _sync_unit_rows(self):
+        """Приводить довжину `unit_amounts`/`unit_prices` до к-сті одиниць
+        позиції — нові одиниці за замовчуванням повні, без ручної ціни."""
+        full_label = format_amount(self._full_unit_count())
+        target_len = len(self.item.products)
+        amounts = list(self.unit_amounts[:target_len])
+        amounts += [full_label] * (target_len - len(amounts))
+        self.unit_amounts = amounts
+        prices = list(self.unit_prices[:target_len])
+        prices += [""] * (target_len - len(prices))
+        self.unit_prices = prices
+
+    def _apply_units(self):
+        """Єдина точка запису Product.count/Product.price по всіх одиницях
+        позиції (TS-53). no_fixed — усі одиниці отримують введену вручну
+        ємність позиції, override ціни не підтримується; подільний із
+        фіксованою ємністю — кожна одиниця за власними `unit_amounts[i]`/
+        `unit_prices[i]` (порожнє/невірне — повна ємність / без override);
+        неподільний — count=1, без override ціни."""
+        units = self.item.products
+        if self.selected_divisible and self.selected_no_fixed_capacity:
+            full = self._full_unit_count()
+            for unit in units:
+                unit.count = full
+                unit.price = None
+            return
+        if self._units_editable():
+            full = self._full_unit_count()
+            for i, unit in enumerate(units):
+                amount = self._parse_unit_amount(self.unit_amounts[i]) if i < len(self.unit_amounts) else None
+                unit.count = amount if amount is not None else full
+                price_text = self.unit_prices[i] if i < len(self.unit_prices) else ""
+                unit.price = self._parse_unit_price(price_text)
+            return
+        for unit in units:
+            unit.count = 1
+            unit.price = None
+
     @rx.event
     def on_change_entered_capacity(self, value: str):
         self.entered_capacity = value
         self.error_capacity = _parse_positive_float(value) is None
-        per_unit = self._per_unit_count()
-        for unit in self.item.products:
-            unit.count = per_unit
+        self._apply_units()
+
+    @rx.event
+    def on_change_unit_amount(self, index: int, value: str):
+        if index < 0 or index >= len(self.unit_amounts):
+            return
+        amounts = list(self.unit_amounts)
+        amounts[index] = value
+        self.unit_amounts = amounts
+        self._apply_units()
+
+    @rx.event
+    def on_change_unit_price(self, index: int, value: str):
+        if index < 0 or index >= len(self.unit_prices):
+            return
+        prices = list(self.unit_prices)
+        prices[index] = value
+        self.unit_prices = prices
+        self._apply_units()
+
+    @rx.event
+    def on_change_bulk_capacity(self, value: str):
+        """Задає введене значення одразу всім `unit_amounts` (порожнє —
+        скидає до повної ємності по кожній одиниці); подальше пооднічне
+        доуточнення (`on_change_unit_amount`) лишається доступним."""
+        self.bulk_capacity = value
+        self.unit_amounts = [value] * len(self.unit_amounts)
+        self._apply_units()
+
+    @rx.event
+    def on_change_bulk_price(self, value: str):
+        """Задає введену ціну одразу всім одиницям (порожнє — знімає override
+        з усіх, повертає пропорційний розрахунок)."""
+        self.bulk_price = value
+        self.unit_prices = [value] * len(self.unit_prices)
+        self._apply_units()
 
     @rx.event
     def on_change_search_catalog(self, value: str):
@@ -210,6 +398,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.selected_no_fixed_capacity = False
         self.entered_capacity = ""
         self.error_capacity = False
+        self.unit_amounts = []
+        self.unit_prices = []
+        self.bulk_capacity = ""
+        self.bulk_price = ""
 
     @rx.event
     def on_change_filter_category(self, value: str):
@@ -234,13 +426,17 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.selected_no_fixed_capacity = bool(selected.no_fixed_capacity)
         self.entered_capacity = ""
         self.error_capacity = False
+        self.unit_amounts = []
+        self.unit_prices = []
+        self.bulk_capacity = ""
+        self.bulk_price = ""
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
                 self.item.products[i].serial_number = ""
-        per_unit = self._per_unit_count()
         for unit in self.item.products:
             unit.id_product_catalog = self.item.product.id
-            unit.count = per_unit
+        self._sync_unit_rows()
+        self._apply_units()
         self.is_product_uniq = self.item.product.uniq
 
     @rx.event
@@ -262,9 +458,11 @@ class MovementProductCatalogAddEditFormState(rx.State):
         list_len = len(self.item.products)
         if int(value) < list_len:
             self.item.products = self.item.products[: int(value)]
+            self._sync_unit_rows()
+            self._apply_units()
             return
 
-        per_unit = self._per_unit_count()
+        full = self._full_unit_count()
         for _ in range(int(value) - list_len):
             self.item.products.append(
                 Product(
@@ -272,9 +470,11 @@ class MovementProductCatalogAddEditFormState(rx.State):
                     id_storage=-1,
                     id_owner=-1,
                     serial_number="",
-                    count=per_unit,
+                    count=full,
                 )
             )
+        self._sync_unit_rows()
+        self._apply_units()
 
     @rx.event
     def on_change_serial_numbers(self, index: int, value: str):
@@ -355,6 +555,20 @@ class MovementProductCatalogAddEditFormState(rx.State):
             else ""
         )
         self.error_capacity = False
+        # Відновлюємо введені ємності й закріплені ціни кожної одиниці позиції
+        # (TS-53) — за `selected_*`, уже виставленими вище.
+        self.unit_amounts = (
+            [format_amount(p.count) for p in item.products]
+            if self._units_editable()
+            else []
+        )
+        self.unit_prices = (
+            [format_amount(p.price) if p.price is not None else "" for p in item.products]
+            if self._units_editable()
+            else []
+        )
+        self.bulk_capacity = ""
+        self.bulk_price = ""
         self.id_product_catalog_entered = True
         self.id_product_catalog_in_cache = (
             str(item.product.id) if item.product is not None else ""
@@ -379,6 +593,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.selected_no_fixed_capacity = False
         self.entered_capacity = ""
         self.error_capacity = False
+        self.unit_amounts = []
+        self.unit_prices = []
+        self.bulk_capacity = ""
+        self.bulk_price = ""
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
         self.search_catalog = ""
@@ -483,10 +701,14 @@ class MovementProductCatalogAddEditFormState(rx.State):
                 self.selected_no_fixed_capacity = bool(catalog.no_fixed_capacity)
                 self.entered_capacity = ""
                 self.error_capacity = False
-                per_unit = self._per_unit_count()
+                self.unit_amounts = []
+                self.unit_prices = []
+                self.bulk_capacity = ""
+                self.bulk_price = ""
                 for unit in self.item.products:
                     unit.id_product_catalog = catalog.id
-                    unit.count = per_unit
+                self._sync_unit_rows()
+                self._apply_units()
                 break
 
     @rx.event
@@ -801,7 +1023,11 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
     def _nds_split(self) -> Tuple[float, float, float]:
         """(база, ПДВ, разом) поточного переліку позицій — спільна формула
         `declared.admission_nds_split`, одна для UI і для серверного перерахунку."""
-        lines = [(pc.count, pc.price) for pc in self.item.movement.products_catalog]
+        lines = [
+            line
+            for pc in self.item.movement.products_catalog
+            for line in _admission_unit_lines(pc)
+        ]
         return admission_nds_split(lines, self._get_nds_rate_value(), self.item.flag_nds)
 
     def _recompute_total(self):
@@ -1005,7 +1231,7 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
         self,
     ) -> List[Tuple[int, MovementProductsCatalog, str, str, str]]:
         return [
-            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price), _residual_label(pc))
+            (index, pc, _format_money(pc.price), _format_money(_line_cost(pc)), _residual_label(pc))
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
@@ -1245,7 +1471,11 @@ class EditAdmissionState(FullEditMixin, AppState):
         `declared.admission_nds_split`, одна для UI і для серверного перерахунку."""
         if self.item is None:
             return 0.0, 0.0, 0.0
-        lines = [(pc.count, pc.price) for pc in self.item.movement.products_catalog]
+        lines = [
+            line
+            for pc in self.item.movement.products_catalog
+            for line in _admission_unit_lines(pc)
+        ]
         return admission_nds_split(lines, self._get_nds_rate_value(), self.item.flag_nds)
 
     def _recompute_total(self):
@@ -1357,7 +1587,7 @@ class EditAdmissionState(FullEditMixin, AppState):
         if self.item is None:
             return []
         return [
-            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price))
+            (index, pc, _format_money(pc.price), _format_money(_line_cost(pc)))
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
@@ -1673,7 +1903,7 @@ class ViewAdmissionState(AuditHistoryMixin, AppState):
         self,
     ) -> List[Tuple[int, MovementProductsCatalog, str, str, str]]:
         return [
-            (index, pc, _format_money(pc.price), _format_money(pc.count * pc.price), _residual_label(pc))
+            (index, pc, _format_money(pc.price), _format_money(_line_cost(pc)), _residual_label(pc))
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
@@ -1699,7 +1929,11 @@ class ViewAdmissionState(AuditHistoryMixin, AppState):
         """(база, ПДВ, разом) — спільна формула `declared.admission_nds_split`.
         Ставка тут береться з завантаженого relationship `Admission.nds_rate`
         (у View немає кешу ставок, як в Add/Edit)."""
-        lines = [(pc.count, pc.price) for pc in self.item.movement.products_catalog]
+        lines = [
+            line
+            for pc in self.item.movement.products_catalog
+            for line in _admission_unit_lines(pc)
+        ]
         rate = self.item.nds_rate.rate if self.item.nds_rate is not None else 0.0
         return admission_nds_split(lines, rate, self.item.flag_nds)
 
