@@ -28,5 +28,9 @@ ENV DB_URL="sqlite:///data/reflex.db"
 
 ENTRYPOINT [ "sh", "entrypoint.sh" ]
 
-# Запускаем Reflex. В режиме prod он сам будет раздавать и статику, и логику.
-CMD ["uv", "run", "reflex", "run", "--env", "prod"]
+# Запускаем Reflex. В режиме prod (Reflex 0.9) фронтенд и бэкенд работают на
+# ОДНОМ порту — раздаётся и статика, и WebSocket-логика. Явно задаём порт 80,
+# чтобы вшитый во фронтенд адрес бэкенда (env.json) совпадал с опубликованным
+# портом контейнера и WebSocket подключался same-origin, без привязки к
+# конкретному внешнему адресу.
+CMD ["uv", "run", "reflex", "run", "--env", "prod", "--backend-port", "80"]
