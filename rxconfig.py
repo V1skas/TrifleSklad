@@ -6,14 +6,13 @@ import reflex as rx
 # підключення приходить через змінну оточення DB_URL.
 DB_URL = os.environ.get("DB_URL", "sqlite:///reflex.db")
 
-API_URL = os.environ.get("API_URL", "http://localhost:8000")
-DEPLOY_URL = os.environ.get("DEPLOY_URL", "http://localhost:3000")
-
 config = rx.Config(
     app_name="TrifleSklad",
     db_url=DB_URL,
-    api_url=API_URL,
-    deploy_url=DEPLOY_URL,
+    # api_url/deploy_url навмисно НЕ задаються — Reflex сам піднімає бекенд і
+    # фронтенд на дефолтних портах, без прив'язки збірки фронтенду до
+    # конкретної зовнішньої адреси. (Механіка API_URL/DEPLOY_URL з оточення
+    # була потрібна лише для запуску фронтенду за nginx — тут не використовується.)
     # У Reflex 0.9 auto-setters вимкнені за замовчуванням (на відміну від 0.7.4,
     # де вони діяли неявно) — усі `set_*` тепер мають бути оголошені явно.
     # Явний прапорець `state_auto_setters=False` сам став депрекейтним (це вже
