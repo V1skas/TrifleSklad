@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import ClassVar, List, Optional
 
-from sqlalchemy import Column, DateTime, func
+from sqlalchemy import Column, DateTime, Text, func
 from sqlmodel import Field, Relationship
 
 import reflex as rx
@@ -102,7 +102,10 @@ class AuditLog(rx.Model, table=True):
     action: str = Field(nullable=False)  # "create" | "update" | "delete"
     table_name: str = Field(nullable=False, index=True)  # slug сутності = префікс права
     record_id: str = Field(nullable=False, index=True)  # str: уніфіковано (PK User — login)
-    changes: str = Field(nullable=False)  # JSON: BaseAuditAction.model_dump_json()
+    # JSON: BaseAuditAction.model_dump_json(). TEXT, а не VARCHAR — JSON може
+    # бути великим (напр. правка ролі з десятками прав), а VARCHAR(255) від
+    # AutoString на MySQL переповнюється (SQLite довжину не перевіряє).
+    changes: str = Field(sa_column=Column("changes", Text, nullable=False))
     created_at: datetime = Field(
         default_factory=now_local,
         sa_column=Column("created_at", DateTime, nullable=False, server_default=func.current_timestamp()),
