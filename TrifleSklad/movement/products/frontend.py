@@ -6,6 +6,17 @@ from TrifleSklad import routes
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products.backend import ProductsMovementListState
 from TrifleSklad.movement.products_selector.frontend import selector as products_selector
+from TrifleSklad.views.templates import controls
+from TrifleSklad.views.templates.layouts import (
+    NESTED_DETAIL_TABLE,
+    NESTED_DETAIL_TD,
+    NESTED_DETAIL_TH,
+    NESTED_DETAIL_THEAD,
+)
+
+# Вузька колонка вкладеної таблиці (по вмісту, без переносів).
+_TD_TIGHT = {**NESTED_DETAIL_TD, "width": "1%", "white_space": "nowrap"}
+_TH_TIGHT = {**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}
 
 
 def dialog():
@@ -35,25 +46,25 @@ def dialog():
 
 def serial_cell_text(item: Tuple[int, Product]):
     # Серійний номер показуємо лише для ТМЦ, у якого він має бути (uniq).
-    return rx.table.cell(
+    return rx.el.td(
         rx.cond(
             item[1].product_catalog.uniq,
             rx.text(rx.cond(item[1].serial_number, item[1].serial_number, "—")),
             rx.text("—", color="gray"),
         ),
-        width="1%", white_space="nowrap",
+        style=_TD_TIGHT,
     )
 
 def divisible_cell_text(item: Tuple[int, Product]):
     # Залишок (обсяг) показуємо лише для подільного ТМЦ — щоб бачити, скільки
     # одиниць виміру було переміщено/видано/продано/списано.
-    return rx.table.cell(
+    return rx.el.td(
         rx.cond(
             item[1].product_catalog.divisible,
             rx.text(item[1].count),
             rx.text("—", color="gray"),
         ),
-        width="1%", white_space="nowrap",
+        style=_TD_TIGHT,
     )
 
 def split_controls(item: Tuple[int, Product]):
@@ -68,7 +79,7 @@ def split_controls(item: Tuple[int, Product]):
         ),
         rx.cond(
             ProductsMovementListState.split_mode[item[1].id],
-            rx.input(
+            controls.input_field(
                 type="number",
                 min=1,
                 max=item[1].count - 1,
@@ -76,7 +87,6 @@ def split_controls(item: Tuple[int, Product]):
                 on_change=lambda value: ProductsMovementListState.set_split_amount(item[1].id, value),
                 placeholder="Обсяг",
                 width="6em",
-                size="1",
             ),
         ),
         spacing="2",
@@ -87,15 +97,14 @@ def serial_cell_input(item: Tuple[int, Product]):
     # Для ТМЦ із серійним номером (uniq) — поле s/n, інакше прочерк. Червона
     # рамка (помилка) лише там, де s/n обов'язковий (require_serial) і не заповнений;
     # при переміщенні поле необов'язкове — рамку не підсвічуємо.
-    return rx.table.cell(
+    return rx.el.td(
         rx.cond(
             item[1].product_catalog.uniq,
-            rx.input(
+            controls.input_field(
                 type="text",
                 value=item[1].serial_number,
                 on_change=lambda value: ProductsMovementListState.set_serial_number(item[1].id, value),
                 placeholder="Серійний номер",
-                size="1",
                 style=rx.cond(
                     item[1].serial_number,
                     {},
@@ -108,35 +117,63 @@ def serial_cell_input(item: Tuple[int, Product]):
             ),
             rx.text("—", color="gray"),
         ),
-        width="1%", white_space="nowrap",
+        style=_TD_TIGHT,
+    )
+
+def excluded_badge_cell(item: Tuple[int, Product]):
+    return rx.el.td(
+        rx.cond(
+            item[1].excluded_from_accounting,
+            rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+            rx.text("—", color="gray"),
+        ),
+        style=_TD_TIGHT,
     )
 
 # Внутрішні рядки одиниць ТМЦ (показуються при розгортанні позиції каталогу)
 # ======================
 def unit_row_view(item: Tuple[int, Product]):
     # Перегляд: клік по одиниці → її детальна сторінка.
-    return rx.table.row(
-        rx.table.cell(item[1].id, width="1%", white_space="nowrap"),
+    return rx.el.tr(
+        rx.el.td(item[1].id, style=_TD_TIGHT),
         serial_cell_text(item),
         divisible_cell_text(item),
+        excluded_badge_cell(item),
         on_click=rx.redirect(f"{routes.REPORTS_UNITS_VIEW_ID}{item[1].id}"),
         cursor="pointer",
         _hover={"background_color": rx.color("accent", 4)},
     )
 
+def excluded_cell(item: Tuple[int, Product]):
+    # Редагована позначка — лише там, де вмикається (повернення); інакше —
+    # інформаційний бейдж поточного стану (як у перегляді).
+    return rx.cond(
+        ProductsMovementListState.show_excluded,
+        rx.el.td(
+            rx.checkbox(
+                checked=ProductsMovementListState.excluded[item[1].id],
+                on_change=lambda value: ProductsMovementListState.set_excluded(item[1].id, value),
+            ),
+            style=_TD_TIGHT,
+        ),
+        excluded_badge_cell(item),
+    )
+
 def unit_row_edit(item: Tuple[int, Product]):
     # Додавання/редагування: контроли поділу/серійного номера + видалення.
-    return rx.table.row(
-        rx.table.cell(item[1].id, width="1%", white_space="nowrap"),
-        rx.table.cell(
+    return rx.el.tr(
+        rx.el.td(item[1].id, style=_TD_TIGHT),
+        rx.el.td(
             rx.cond(item[1].product_catalog.divisible, rx.text(item[1].count), rx.text("—", color="gray")),
-            width="1%", white_space="nowrap",
+            style=_TD_TIGHT,
         ),
-        rx.table.cell(
+        rx.el.td(
             rx.cond(item[1].product_catalog.divisible, split_controls(item), rx.text("Цілком", color="gray")),
+            style=NESTED_DETAIL_TD,
         ),
         rx.cond(ProductsMovementListState.serial_visible, serial_cell_input(item)),
-        rx.table.cell(
+        excluded_cell(item),
+        rx.el.td(
             rx.button(
                 "Видалити",
                 color_scheme="red",
@@ -144,43 +181,49 @@ def unit_row_edit(item: Tuple[int, Product]):
                 type="button",
                 on_click=ProductsMovementListState.on_remove_selected(item[0]),
             ),
-            width="1%", white_space="nowrap",
+            style=_TD_TIGHT,
         ),
     )
 
 def units_subtable(group):
     # Вкладена таблиця одиниць однієї позиції каталогу (group[6] — перелік одиниць).
-    return rx.table.root(
-        rx.table.header(
+    # Сирий rx.el.table (не rx.table.root) — Radix Table.Root безумовно загортає
+    # <table> у ScrollArea з height:100%, яка всередині <td> (display:table-cell)
+    # у Safari нестабільно резолвиться в 0 по-рядково, і контент розгорнутого
+    # рядка (найчастіше останнього) не зʼявляється. Див. NESTED_DETAIL_* у
+    # layouts.py — той самий підхід, що в перегляді продажу/повернення продажу.
+    return rx.el.table(
+        rx.el.thead(
             rx.cond(
                 ProductsMovementListState.is_view_mode,
-                rx.table.row(
-                    rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                    rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2)),
-                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.el.tr(
+                    rx.el.th("ID ТМЦ", style=_TH_TIGHT),
+                    rx.el.th("Серійний номер", style=NESTED_DETAIL_TH),
+                    rx.el.th("Залишок", style=_TH_TIGHT),
+                    rx.el.th("Поза обліком", style=_TH_TIGHT),
                 ),
-                rx.table.row(
-                    rx.table.column_header_cell("ID ТМЦ", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                    rx.table.column_header_cell("Залишок", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
-                    rx.table.column_header_cell("Передача", color=rx.color("accent", 2)),
+                rx.el.tr(
+                    rx.el.th("ID ТМЦ", style=_TH_TIGHT),
+                    rx.el.th("Залишок", style=_TH_TIGHT),
+                    rx.el.th("Передача", style=NESTED_DETAIL_TH),
                     rx.cond(
                         ProductsMovementListState.serial_visible,
-                        rx.table.column_header_cell("Серійний номер", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                        rx.el.th("Серійний номер", style=_TH_TIGHT),
                     ),
-                    rx.table.column_header_cell("Дія", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                    rx.el.th("Поза обліком", style=_TH_TIGHT),
+                    rx.el.th("Дія", style=_TH_TIGHT),
                 ),
             ),
-            background_color=rx.color("accent", 6),
+            style=NESTED_DETAIL_THEAD,
         ),
-        rx.table.body(
+        rx.el.tbody(
             rx.cond(
                 ProductsMovementListState.is_view_mode,
                 rx.foreach(group[6], unit_row_view),
                 rx.foreach(group[6], unit_row_edit),
             ),
         ),
-        variant="surface",
-        width="100%",
+        style=NESTED_DETAIL_TABLE,
     )
 # ======================
 
@@ -217,14 +260,13 @@ def group_fragment(group):
                 ProductsMovementListState.require_price,
                 rx.fragment(
                     rx.table.cell(
-                        rx.input(
+                        controls.input_field(
                             type="number",
                             min=0,
                             step="0.01",
                             value=ProductsMovementListState.prices[group[0]],
                             on_change=lambda value: ProductsMovementListState.set_price(group[0], value),
                             placeholder="Ціна за одиницю",
-                            size="1",
                             width="11em",
                         ),
                         width="1%", white_space="nowrap",
@@ -280,12 +322,15 @@ def table():
         rx.table.body(
             rx.foreach(ProductsMovementListState.grouped, group_fragment),
 
-            height="100%",
             width="100%"
         ),
 
+        # Без height="100%": у Radix `.rt-TableRootTable` має `height: 0` +
+        # `overflow: hidden` (variant=surface) і є flex-елементом ScrollArea.
+        # Поки висота батька auto, таблиця росте по контенту; щойно вона стає
+        # визначеною (height:100%), ScrollArea фіксується й розгорнуті рядки
+        # обрізаються. Висота тут не потрібна — віджет живе у vstack по контенту.
         variant="surface",
-        height="100%",
         width="100%"
     )
 
@@ -311,27 +356,24 @@ def serial_range_bar(group):
         ProductsMovementListState.serial_visible & ~ProductsMovementListState.is_view_mode & group[4],
         rx.vstack(
             rx.hstack(
-                rx.input(
+                controls.input_field(
                     placeholder="Маска, напр. СН-{n}",
                     value=ProductsMovementListState.serial_mask[catalog_id],
                     on_change=lambda value: ProductsMovementListState.on_change_serial_mask(catalog_id, value),
-                    size="2",
                     width="40%",
                 ),
-                rx.input(
+                controls.input_field(
                     placeholder="Від",
                     type="text",
                     value=ProductsMovementListState.serial_range_from[catalog_id],
                     on_change=lambda value: ProductsMovementListState.on_change_serial_range_from(catalog_id, value),
-                    size="2",
                     width="20%",
                 ),
-                rx.input(
+                controls.input_field(
                     placeholder="До",
                     type="text",
                     value=ProductsMovementListState.serial_range_to[catalog_id],
                     on_change=lambda value: ProductsMovementListState.on_change_serial_range_to(catalog_id, value),
-                    size="2",
                     width="20%",
                 ),
                 rx.button(
@@ -363,7 +405,7 @@ def index(*args, **kwargs):
             rx.heading("Товари:", size="3"),
             rx.spacer(),
             rx.cond(ProductsMovementListState.is_view_mode,
-                    rx.Component(),
+                    rx.fragment(),
                     rx.button("Додати",
                                 type="button",
                                 disabled=rx.cond(ProductsMovementListState.ability_open_dialog, False, True),

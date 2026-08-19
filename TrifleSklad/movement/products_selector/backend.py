@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 
 import reflex as rx
 
-from TrifleSklad.dao import ProductCatalogDAO, ProductDAO
+from TrifleSklad.dao_legacy import ProductCatalogDAO, ProductDAO
 from TrifleSklad.models import Product
 
 
@@ -27,10 +27,12 @@ class ProductsSelectorState(rx.State):
     catalog_options: List[Tuple[str, str]] = []
     filter_category: str = ALL          # id категорії або ALL
     filter_catalog: str = ALL           # id позиції каталогу або ALL
+    filter_accounting: str = ALL        # ALL / "included" / "excluded"
 
     # Метадані обраної позиції каталогу (для міри / прогресу / валідації).
     sel_divisible: bool = False
     sel_capacity: int = 0
+    sel_no_fixed_capacity: bool = False
     sel_unit: str = ""
 
     # Загальна доступна кількість обраної позиції каталогу на місці/власнику
@@ -70,6 +72,7 @@ class ProductsSelectorState(rx.State):
         self.catalog_options = []
         self.filter_category = ALL
         self.filter_catalog = ALL
+        self.filter_accounting = ALL
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
@@ -105,6 +108,8 @@ class ProductsSelectorState(rx.State):
         if len(self.available) > 0:
             return True
         catalog_id = self._catalog_id_value()
+        if catalog_id == -1:
+            return len(self.selected) > 0
         return any(
             item.product_catalog is not None
             and item.product_catalog.id == catalog_id
@@ -113,9 +118,11 @@ class ProductsSelectorState(rx.State):
 
     @rx.var
     def get_selected_items(self) -> List[Tuple[int, Product]]:
-        # Показуємо лише обрані одиниці поточної позиції каталогу (повний перелік
-        # selected лишається для повернення назовні). index — id одиниці.
+        # Без обраної позиції каталогу показуємо всі обрані одиниці; з обраною —
+        # лише її. Повний перелік selected завжди лишається для повернення назовні.
         catalog_id = self._catalog_id_value()
+        if catalog_id == -1:
+            return [(item.id, item) for item in self.selected]
         return [
             (item.id, item)
             for item in self.selected
@@ -228,10 +235,12 @@ class ProductsSelectorState(rx.State):
         if catalog is None:
             self.sel_divisible = False
             self.sel_capacity = 0
+            self.sel_no_fixed_capacity = False
             self.sel_unit = ""
             return
         self.sel_divisible = catalog.divisible
         self.sel_capacity = catalog.capacity
+        self.sel_no_fixed_capacity = bool(catalog.no_fixed_capacity)
         self.sel_unit = catalog.unit
 
     def _load_catalog_totals(self) -> None:
@@ -245,13 +254,8 @@ class ProductsSelectorState(rx.State):
         )
 
     def _load_page(self, reset: bool) -> None:
-        # Список вантажиться лише коли обрано позицію каталогу.
-        catalog_id = self._catalog_id_value()
-        if catalog_id == -1:
-            self.available = []
-            self._offset = 0
-            self.has_more = False
-            return
+        # Список доступний одразу: без обраної позиції — усі ТМЦ місця/власника,
+        # звужені за категорією та текстовим пошуком.
         if reset:
             self._offset = 0
             self.available = []
@@ -260,7 +264,9 @@ class ProductsSelectorState(rx.State):
             storage_id=self.filter_by_storage,
             exclude_ids=self._excluded_ids(),
             search=self.filter_search,
-            catalog_id=catalog_id,
+            catalog_id=self._catalog_id_value(),
+            category_id=self._category_id_value(),
+            accounting=self.filter_accounting,
             offset=self._offset,
             limit=self._limit,
         )
@@ -286,14 +292,15 @@ class ProductsSelectorState(rx.State):
         products: List[int] = [],
     ) -> None:
         """Ініціалізація діалогу: задає місце/власника, перелік виключень,
-        завантажує опції категорій. Список одиниць не вантажиться, доки не
-        обрано позицію каталогу."""
+        завантажує опції категорій/каталогу та повний список одиниць. Усі
+        фільтри доступні одразу, каскад не блокує."""
         self.filter_by_owner = owner
         self.filter_by_storage = storage
         self.exclude_products = products
         self.filter_search = ""
         self.filter_category = ALL
         self.filter_catalog = ALL
+        self.filter_accounting = ALL
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
@@ -305,10 +312,10 @@ class ProductsSelectorState(rx.State):
             (title, str(cid))
             for cid, title in ProductDAO.get_categories_by_owner_storage(owner, storage)
         ]
-        self.catalog_options = []
-        self.available = []
+        self._reload_catalog_options()
         self._offset = 0
         self.has_more = False
+        self._load_page(reset=True)
     # ======================
 
     # Action handlers
@@ -334,6 +341,7 @@ class ProductsSelectorState(rx.State):
     def reset_filters(self):
         self.filter_category = ALL
         self.filter_catalog = ALL
+        self.filter_accounting = ALL
         self.filter_search = ""
         self.mass_count = ""
         self.mass_measure = ""
@@ -342,38 +350,35 @@ class ProductsSelectorState(rx.State):
         self.sel_unit = ""
         self.total_units = 0
         self.total_measure = 0
-        self.catalog_options = []
-        self.available = []
-        self._offset = 0
-        self.has_more = False
+        self._reload_catalog_options()
+        self.is_loading = True
+        yield
+        self._load_page(reset=True)
+        self.is_loading = False
 
     @rx.event
     def change_filter_category(self, value: str):
         self.filter_category = value
-        # Скидаємо обрану позицію та список — каскад починається спочатку.
+        # Скидаємо обрану позицію каталогу; список звужуємо до категорії.
         self.filter_catalog = ALL
         self.sel_divisible = False
         self.sel_capacity = 0
         self.sel_unit = ""
         self.mass_count = ""
         self.mass_measure = ""
-        self.available = []
-        self._offset = 0
-        self.has_more = False
         self._reload_catalog_options()
+        self.is_loading = True
+        yield
+        self._load_page(reset=True)
+        self.is_loading = False
 
     @rx.event
     def change_filter_catalog(self, value: str):
+        # Текстовий пошук не скидаємо — доступний одразу й переживає зміну позиції.
         self.filter_catalog = value
-        self.filter_search = ""
         self._load_catalog_meta()
         self._load_catalog_totals()
         self._sync_mass_fields()
-        if self._catalog_id_value() == -1:
-            self.available = []
-            self._offset = 0
-            self.has_more = False
-            return
         self.is_loading = True
         yield
         self._load_page(reset=True)
@@ -383,6 +388,22 @@ class ProductsSelectorState(rx.State):
     def change_filter_search(self, value: str):
         self.filter_search = value
         return ProductsSelectorState.apply_filters
+
+    @rx.event
+    def change_filter_accounting(self, value: str):
+        self.filter_accounting = value
+        self.is_loading = True
+        yield
+        self._load_page(reset=True)
+        self.is_loading = False
+
+    @rx.event
+    def set_mass_count(self, value: str):
+        self.mass_count = value
+
+    @rx.event
+    def set_mass_measure(self, value: str):
+        self.mass_measure = value
 
     @rx.event
     def apply_mass_count(self):
@@ -412,6 +433,7 @@ class ProductsSelectorState(rx.State):
             exclude_ids=self._excluded_ids(),
             full_only=self.sel_divisible,
             capacity=self.sel_capacity,
+            no_fixed=self.sel_no_fixed_capacity,
             limit=target,
         )
         self.selected = self.selected + units

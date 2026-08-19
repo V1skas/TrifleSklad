@@ -3,8 +3,9 @@ from typing import List, Tuple
 
 import reflex as rx
 
-from TrifleSklad.dao import OwnerDAO, StorageDAO
+from TrifleSklad.dao_legacy import OwnerDAO, StorageDAO
 from TrifleSklad.declared import StorageType, movements_status_list
+from TrifleSklad.utils.clock import now_local
 
 # Сентинел «без фільтра» для select-ів (Radix забороняє порожнє value у item).
 ALL = "all"
@@ -101,7 +102,7 @@ class MovementListFilterMixin(rx.State, mixin=True):
         self.list_owners = [(o.title, str(o.id)) for o in OwnerDAO.get_all()]
 
     def _reset_list_state(self) -> None:
-        today = date.today().isoformat()
+        today = now_local().date().isoformat()
         self._current_page = 1
         self.is_filter_open = False
         self.filter_date_enabled = False
@@ -165,7 +166,7 @@ class MovementListFilterMixin(rx.State, mixin=True):
 
     @rx.event
     def reset_filters(self):
-        today = date.today().isoformat()
+        today = now_local().date().isoformat()
         self.filter_date_enabled = False
         self.filter_date_from = today
         self.filter_date_to = today

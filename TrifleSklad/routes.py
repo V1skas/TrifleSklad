@@ -18,7 +18,7 @@ ADMIN_ROLES_VIEW_ID = "/admin/roles/view/"
 ADMIN_ROLES_EDIT_ID = "/admin/roles/edit/"
 ADMIN_ROLES_ADD = "/admin/roles/add/"
 
-ADMIN_USERS = "/admin/users"
+ADMIN_USERS = "/admin/users/"
 ADMIN_USERS_VIEW_ID = "/admin/users/view/"
 ADMIN_USERS_EDIT_ID = "/admin/users/edit/"
 ADMIN_USERS_ADD = "/admin/users/add/"

@@ -1,13 +1,25 @@
-from typing import List, Optional
+from datetime import datetime
+from typing import ClassVar, List, Optional
 
+from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, Relationship
 
 import reflex as rx
+
+from TrifleSklad.utils.clock import now_local
+
+# `rx.Model` завжди оголошує успадковане `id: Optional[int] = Field(primary_key=True)`.
+# У SQLModel 0.0.39 (на відміну від 0.0.24, з якою створювались наявні таблиці)
+# це поле лишається РЕАЛЬНОЮ мапленою колонкою навіть якщо підклас визначає свій
+# власний (складений) первинний ключ — фізичні таблиці цієї колонки не мають.
+# `id: ClassVar[None] = None` виключає поле з pydantic/SQLAlchemy-мапінгу повністю
+# (без міграції) для таблиць із самостійним PK, перелічених нижче.
 
 
 class RolesActions(rx.Model, table=True):
     __tablename__ = "roles_actions" # type: ignore
 
+    id: ClassVar[None] = None
     # Table columns
     role_id: int = Field(default=None, foreign_key="roles.id", primary_key=True)
     action_id: int = Field(default=None, foreign_key="actions.id", primary_key=True)
@@ -16,6 +28,7 @@ class RolesActions(rx.Model, table=True):
 class UsersActions(rx.Model, table=True):
     __tablename__ = "users_actions" # type: ignore
 
+    id: ClassVar[None] = None
     # Table columns
     id_user: str = Field(default=None, foreign_key="users.login", primary_key=True)
     id_action: int = Field(default=None, foreign_key="actions.id", primary_key=True)
@@ -24,6 +37,7 @@ class UsersActions(rx.Model, table=True):
 class UsersRoles(rx.Model, table=True):
     __tablename__ = "users_roles" # type: ignore
 
+    id: ClassVar[None] = None
     # Table columns
     id_user: str = Field(default=None, foreign_key="users.login", primary_key=True)
     id_role: int = Field(default=None, foreign_key="roles.id", primary_key=True)
@@ -63,20 +77,54 @@ class AuthToken(rx.Model, table=True):
     id: int = Field(primary_key=True, nullable=True) # type: ignore
     token: str = Field(nullable=False, unique=True)
     id_user: str = Field(foreign_key="users.login", nullable=False)
+    # Ковзне вікно сесії: expires_at продовжується при кожному require_auth
+    # (див. services/auth.py::AuthService.get_auth_token), last_activity_at —
+    # для довідки/діагностики.
+    expires_at: datetime = Field(
+        default_factory=now_local,
+        sa_column=Column("expires_at", DateTime, nullable=False, server_default=func.current_timestamp()),
+    )
+    last_activity_at: datetime = Field(
+        default_factory=now_local,
+        sa_column=Column("last_activity_at", DateTime, nullable=False, server_default=func.current_timestamp()),
+    )
 
     # Relationships
     user: Optional['User'] = Relationship(back_populates="auth_tokens")
 
 
+class AuditLog(rx.Model, table=True):
+    __tablename__ = "audit_log" # type: ignore
+
+    # Table columns
+    id: int = Field(primary_key=True) # type: ignore
+    id_user: str = Field(foreign_key="users.login", nullable=False)
+    action: str = Field(nullable=False)  # "create" | "update" | "delete"
+    table_name: str = Field(nullable=False, index=True)  # slug сутності = префікс права
+    record_id: str = Field(nullable=False, index=True)  # str: уніфіковано (PK User — login)
+    changes: str = Field(nullable=False)  # JSON: BaseAuditAction.model_dump_json()
+    created_at: datetime = Field(
+        default_factory=now_local,
+        sa_column=Column("created_at", DateTime, nullable=False, server_default=func.current_timestamp()),
+    )
+
+    # Relationships
+    user: Optional['User'] = Relationship()
+
+
 class User(rx.Model, table=True):
     __tablename__ = "users" # type: ignore
 
+    id: ClassVar[None] = None
     # Table columns
     login: str = Field(primary_key=True)
     id_worker: int = Field(default=None, foreign_key="workers.id")
     salt: str = Field(nullable=False)
     password_hash: str = Field(nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
+    # Лічильник версії прав — звіряється з AppState.permissions_version_seen
+    # для миттєвого застосування змін прав/ролі без релогіну.
+    permissions_version: int = Field(default=0, nullable=False)
 
     # Relationships
     actions: Optional[List[Action]] = Relationship(link_model=UsersActions)
@@ -131,6 +179,9 @@ class ProductCatalog(rx.Model, table=True):
     divisible: bool = Field(default=False, nullable=False)
     uniq: bool = Field(default=False, nullable=False)
     capacity: int = Field(default=0, nullable=False)
+    # Подільний ТМЦ без фіксованої ємності: capacity не задається в каталозі, а
+    # вводиться вручну при кожному постачанні; ємність одиниці живе в Product.count.
+    no_fixed_capacity: bool = Field(default=False, nullable=False)
     count: float = Field(default=0, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
@@ -150,7 +201,6 @@ class Owner(rx.Model, table=True):
     is_deleted: bool = Field(default=False, nullable=False)
 
     # Relationships
-    owner: Optional[List['Product']] = Relationship(back_populates="owner")
     products: Optional[List['Product']] = Relationship(back_populates="owner")
 
 class Supplier(rx.Model, table=True):
@@ -199,8 +249,15 @@ class Product(rx.Model, table=True):
     id_owner: int = Field(foreign_key="owners.id", nullable=False)
     # Для подільного ТМЦ: посилання на одиницю-«батька», від якої відділили цю частину.
     id_parent: Optional[int] = Field(default=None, foreign_key="products.id", nullable=True)
-    count: int = Field(default=1, nullable=False)
+    # Поточна ємність/залишок одиниці. Дробове число — для подільного ТМЦ без
+    # фіксованої ємності ємність вводиться вручну і може бути дробовою (напр. 0.75).
+    count: float = Field(default=1, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
+    # Виключено з бухгалтерського обліку (виставляється при оформленні повернення).
+    excluded_from_accounting: bool = Field(default=False, nullable=False)
+    # Ручна вартість саме цієї одиниці при постачанні (TS-53). NULL — вартість
+    # рахується пропорційно заповненню від базової ціни позиції.
+    price: Optional[float] = Field(default=None, nullable=True)
 
     # Relationship
     product_catalog: Optional[ProductCatalog] = Relationship(back_populates="products")
@@ -211,6 +268,7 @@ class Product(rx.Model, table=True):
 class MovementProducts(rx.Model, table=True):
     __tablename__ = "movements_products"
 
+    id: ClassVar[None] = None
     # Table columns
     id_movement_product: int = Field(primary_key=True, foreign_key="movements_products_catalog.id")
     id_product: int = Field(primary_key=True, foreign_key="products.id")
@@ -285,6 +343,7 @@ class NDSRate(rx.Model, table=True):
     title: str = Field(nullable=False, unique=True)
     rate: float = Field(default=0.0, nullable=False)
     description: Optional[str] = Field(nullable=True)
+    is_default: bool = Field(default=False, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
 
 
@@ -339,6 +398,7 @@ class Sale(rx.Model, table=True):
     # Table columns
     id: int = Field(primary_key=True, foreign_key="movements.id")
     id_responsible: int = Field(foreign_key="workers.id", nullable=False)
+    client_info: Optional[str] = Field(default=None, nullable=True)
 
     # Relationship
     responsible: Optional[Worker] = Relationship(back_populates="sales")

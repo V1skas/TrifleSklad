@@ -17,7 +17,7 @@ from typing import List, Tuple
 import reflex as rx
 
 from TrifleSklad.actions import Action as ActionEnum
-from TrifleSklad.dao import (
+from TrifleSklad.dao_legacy import (
     NDSRateDAO,
     OwnerDAO,
     PaymentTypeDAO,
@@ -95,7 +95,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.event
     async def create_supplier(self):
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.SUPPLIERS_CREATE):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.SUPPLIERS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.sup_title.strip() == "":
             return rx.toast.error("Вкажіть назву постачальника!")
@@ -108,7 +109,7 @@ class LookupCreatorsMixin(rx.State, mixin=True):
             contact_phone=self.sup_contact_phone.strip(),
             edrpou=self.sup_edrpou.strip(),
         )
-        flag, text, new_id = SupplierDAO.add_one(supplier)
+        flag, text, new_id = SupplierDAO.add_one(supplier, app_state.user.login)
         if not flag:
             return rx.toast.error(text)
         self.supplier_create_open = False
@@ -152,7 +153,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.event
     async def create_owner(self):
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.OWNERS_CREATE):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.OWNERS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.owner_title.strip() == "":
             return rx.toast.error("Вкажіть назву власника!")
@@ -160,7 +162,7 @@ class LookupCreatorsMixin(rx.State, mixin=True):
             title=self.owner_title.strip(),
             description=self.owner_description.strip() or None,
         )
-        flag, text, new_id = OwnerDAO.add_one(owner)
+        flag, text, new_id = OwnerDAO.add_one(owner, app_state.user.login)
         if not flag:
             return rx.toast.error(text)
         self.owner_create_open = False
@@ -200,7 +202,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.event
     async def create_payment_type(self):
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.PAYMENT_TYPE_CREATE):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.PAYMENT_TYPE_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.pt_title.strip() == "":
             return rx.toast.error("Вкажіть назву типу оплати!")
@@ -208,7 +211,7 @@ class LookupCreatorsMixin(rx.State, mixin=True):
             title=self.pt_title.strip(),
             description=self.pt_description.strip() or None,
         )
-        flag, text, new_id = PaymentTypeDAO.add_one(payment_type)
+        flag, text, new_id = PaymentTypeDAO.add_one(payment_type, app_state.user.login)
         if not flag:
             return rx.toast.error(text)
         self.payment_type_create_open = False
@@ -254,7 +257,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.event
     async def create_nds_rate(self):
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.NDS_RATES_CREATE):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.NDS_RATES_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.nds_title.strip() == "":
             return rx.toast.error("Вкажіть назву ставки ПДВ!")
@@ -267,7 +271,7 @@ class LookupCreatorsMixin(rx.State, mixin=True):
             rate=rate,
             description=self.nds_description.strip() or None,
         )
-        flag, text, new_id = NDSRateDAO.add_one(nds_rate)
+        flag, text, new_id = NDSRateDAO.add_one(nds_rate, app_state.user.login)
         if not flag:
             return rx.toast.error(text)
         self.nds_rate_create_open = False
@@ -319,7 +323,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.event
     async def create_worker(self):
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.WORKERS_CREATE):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.WORKERS_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.wrk_fio.strip() == "":
             return rx.toast.error("Вкажіть ПІБ співробітника!")
@@ -329,7 +334,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
                 "phone_number": self.wrk_phone_number.strip() or None,
                 "email": self.wrk_email.strip() or None,
                 "position": self.wrk_position.strip() or None,
-            }
+            },
+            app_state.user.login,
         )
         if not flag:
             return rx.toast.error(text)
@@ -417,7 +423,8 @@ class LookupCreatorsMixin(rx.State, mixin=True):
 
     @rx.event
     async def create_storage(self):
-        if not (await self.get_state(AppState)).has_permission(ActionEnum.STORAGE_CREATE):
+        app_state = await self.get_state(AppState)
+        if not app_state.has_permission(ActionEnum.STORAGE_CREATE):
             return rx.toast.error("У Вас немає дозволу на виконання цієї дії!")
         if self.st_title.strip() == "":
             return rx.toast.error("Вкажіть назву місця зберігання!")
@@ -430,7 +437,7 @@ class LookupCreatorsMixin(rx.State, mixin=True):
             address=self.st_address.strip(),
             id_responsible=int(self.st_id_responsible),
         )
-        flag, text, new_id = StorageDAO.add_one(storage)
+        flag, text, new_id = StorageDAO.add_one(storage, app_state.user.login)
         if not flag:
             return rx.toast.error(text)
         self.storage_create_open = False

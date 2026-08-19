@@ -2,8 +2,8 @@ from typing import Dict, List, Optional, Tuple
 
 import reflex as rx
 
-from TrifleSklad.dao import ProductDAO
-from TrifleSklad.declared import generate_serial_range, sale_line_cost
+from TrifleSklad.dao_legacy import ProductDAO
+from TrifleSklad.declared import format_amount, generate_serial_range, sale_line_cost
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
@@ -21,6 +21,11 @@ class ProductsMovementListState(rx.State):
     # ключ — id одиниці товару.
     split_mode: Dict[int, bool] = {}
     split_amount: Dict[int, str] = {}
+
+    # Позначка «поза бухгалтерським обліком», ключ — id одиниці товару.
+    # Видима лише там, де вмикається (повернення — set_show_excluded(True)).
+    excluded: Dict[int, bool] = {}
+    show_excluded: bool = False
 
     # Розгорнуті позиції каталогу в таблиці (клік по рядку розкриває перелік
     # одиниць). Ключ — id позиції каталогу.
@@ -45,14 +50,20 @@ class ProductsMovementListState(rx.State):
     require_price: bool = False
     prices: Dict[int, str] = {}
 
-    products_selector_state: Optional[ProductsSelectorState] = None
+    # Одиниці, що вже входили в рух на момент відкриття форми редагування —
+    # потрібні, щоб відрізнити «стару» одиницю від щойно доданої.
+    preloaded_ids: List[int] = []
+
+    _products_selector_state: Optional[ProductsSelectorState] = None
 
     async def on_load(self):
         # FUTURE: обследовать работу, возможно есть способ лучше
-        self.products_selector_state = await self.get_state(ProductsSelectorState)
-        self.products_selector_state.clear()
+        self._products_selector_state = await self.get_state(ProductsSelectorState)
+        self._products_selector_state.clear()
         self.split_mode = {}
         self.split_amount = {}
+        self.excluded = {}
+        self.show_excluded = False
         self.expanded_catalogs = {}
         self.require_owner = True
         self.require_serial = False
@@ -69,6 +80,7 @@ class ProductsMovementListState(rx.State):
         self.filter_by_owner = -1
         self.filter_by_storage = -1
         self.items = []
+        self.preloaded_ids = []
 
     def set_view_mode(self, is_view: bool):
         self.view_mode = is_view
@@ -78,6 +90,9 @@ class ProductsMovementListState(rx.State):
 
     def set_show_serial(self, flag: bool):
         self.show_serial = flag
+
+    def set_show_excluded(self, flag: bool):
+        self.show_excluded = flag
 
     @rx.var
     def serial_visible(self) -> bool:
@@ -230,7 +245,7 @@ class ProductsMovementListState(rx.State):
                     len(units),
                     divisible,
                     uniq,
-                    str(remainder) if divisible else "—",
+                    format_amount(remainder) if divisible else "—",
                     units,
                 )
             )
@@ -272,17 +287,17 @@ class ProductsMovementListState(rx.State):
     def open_dialog(self):
         # Спершу показуємо скелетон, потім (після yield) довантажуємо ТМЦ —
         # щоб користувач бачив процес завантаження, а не порожній діалог.
-        self.products_selector_state.is_loading = True
+        self._products_selector_state.is_loading = True
         # Скидаємо не лише items, а й службові індекси — інакше обчислювані
         # get_(un)selected_items впадуть на застарілих індексах під час дельти.
-        self.products_selector_state.reset_items()
+        self._products_selector_state.reset_items()
         self.dialog_open = True
         yield
         filter_products = [item.id for item in self.items]
-        self.products_selector_state.set_filter(
+        self._products_selector_state.set_filter(
             self.filter_by_owner, self.filter_by_storage, filter_products
         )
-        self.products_selector_state.is_loading = False
+        self._products_selector_state.is_loading = False
 
     @rx.event
     def close_dialog(self):
@@ -290,9 +305,9 @@ class ProductsMovementListState(rx.State):
 
     @rx.event
     def on_save_selected(self):
-        selected = self.products_selector_state.get_selected_items_only()
+        selected = self._products_selector_state.get_selected_items_only()
         # Намір авто-розділення решти (набір подільного ТМЦ за мірою): id → обсяг.
-        split_intent = self.products_selector_state.get_split_intent()
+        split_intent = self._products_selector_state.get_split_intent()
         self.items += selected
         # За замовчуванням — передати цілком; режим розділення вмикає користувач
         # або масовий набір за мірою (split_intent).
@@ -304,6 +319,7 @@ class ProductsMovementListState(rx.State):
                 else:
                     self.split_mode[product.id] = False
                     self.split_amount[product.id] = ""
+            self.excluded.setdefault(product.id, False)
             # Ініціалізуємо ціну позиції (для продажу), якщо її ще немає.
             if (
                 product.product_catalog is not None
@@ -329,6 +345,7 @@ class ProductsMovementListState(rx.State):
             removed = self.items.pop(item)
             self.split_mode.pop(removed.id, None)
             self.split_amount.pop(removed.id, None)
+            self.excluded.pop(removed.id, None)
 
     @rx.event
     def set_split_mode_value(self, product_id: int, value: str):
@@ -338,29 +355,104 @@ class ProductsMovementListState(rx.State):
     def set_split_amount(self, product_id: int, value: str):
         self.split_amount[product_id] = value
 
+    @rx.event
+    def set_excluded(self, product_id: int, value: bool):
+        self.excluded[product_id] = value
+
     @staticmethod
     def _is_divisible(product: Product) -> bool:
         return product.product_catalog is not None and product.product_catalog.divisible
 
-    def resolve_movement_products(self) -> Tuple[bool, str, List[Product]]:
-        """Готує підсумковий перелік одиниць товару для руху: для позицій у режимі
-        «розділити» створює дочірні одиниці потрібного обсягу (батьківські зменшує).
-        Спершу повністю валідує всі обсяги, лише потім вносить зміни в БД."""
-        # Прохід 0 — серійні номери (обов'язкові лише там, де require_serial,
-        # напр. при видачі/продажу ТМЦ із серійним номером).
+    def prefill_for_edit(self, items: List[Product], prices: Optional[Dict[int, float]] = None) -> None:
+        """Ініціалізація віджета для РЕДАГУВАННЯ руху: крім самих `items`
+        обов'язково заповнює похідні словники (режим/обсяг поділу за id одиниці,
+        ціни та поля діапазону s/n за id каталогу).
+
+        У режимі перегляду ці контроли не рендеряться, тому ніхто їх не заповнює,
+        а в режимі редагування фронтенд читав би відсутні ключі Dict-Var.
+        """
+        self.items = items
+        self.preloaded_ids = [product.id for product in items]
+        for product in items:
+            if self._is_divisible(product):
+                self.split_mode.setdefault(product.id, False)
+                self.split_amount.setdefault(product.id, "")
+            self.excluded.setdefault(product.id, product.excluded_from_accounting)
+            if product.product_catalog is None:
+                continue
+            catalog_id = product.product_catalog.id
+            if catalog_id not in self.prices:
+                price = (prices or {}).get(catalog_id)
+                self.prices[catalog_id] = "" if price is None else str(price)
+            if product.product_catalog.uniq and catalog_id not in self.serial_range_from:
+                self.serial_mask[catalog_id] = ""
+                self.serial_range_from[catalog_id] = "1"
+                self.serial_range_to[catalog_id] = "1"
+                self.serial_range_hex[catalog_id] = False
+
+    def collect_serials(self) -> Dict[int, str]:
+        """id одиниці -> s/n для унікального ТМЦ підсумкового складу."""
+        return {
+            product.id: (product.serial_number or "")
+            for product in self.items
+            if product.product_catalog is not None and product.product_catalog.uniq
+        }
+
+    def collect_excluded(
+        self, final_products: Optional[List[Product]] = None
+    ) -> Dict[int, bool]:
+        """id одиниці -> позначка «поза обліком» для підсумкового складу.
+
+        Без аргументу — пряма мапа за `self.excluded` (шлях РЕДАГУВАННЯ: реальний
+        поділ і фінальні id одиниць невідомі до збереження в транзакції сервісу,
+        тож застосування виконує окремий DAO-крок, сам ураховуючи спадкування
+        позначки від батька для осколків поділу).
+
+        З `final_products` (шлях СТВОРЕННЯ, після `resolve_movement_products`) —
+        мапа за фінальними id: розділена одиниця успадковує позначку вихідної
+        (позиційна відповідність `self.items[i]` -> `final_products[i]`, та сама,
+        що будує `resolve_movement_products`). НЕ читаємо `id_parent` з елементів
+        `final_products` напряму — серед них є detached SQLAlchemy-об'єкти зі
+        `self.items`, і звернення до незавантаженого атрибута на detached
+        інстансі падає `DetachedInstanceError`.
+        """
+        if final_products is None:
+            return dict(self.excluded)
+        result: Dict[int, bool] = {}
+        for source, final in zip(self.items, final_products):
+            result[final.id] = self.excluded.get(source.id, False)
+        return result
+
+    def collect_unit_plan(self) -> Tuple[bool, str, List[Tuple[int, Optional[float]]]]:
+        """Те саме, що `resolve_movement_products`, але БЕЗ запису в БД: валідує
+        серійні номери й обсяги поділу і повертає ПЛАН — (id одиниці, обсяг
+        відділення або None = цілком).
+
+        Реальний поділ виконує `MovementEditService.save_full` у межах єдиної
+        транзакції: `resolve_movement_products` ділить одразу з власним commit,
+        і невдале збереження лишало б у БД осколки-сироти.
+        """
+        flag, text = self._validate_selection()
+        if not flag:
+            return False, text, []
+        plan: List[Tuple[int, Optional[float]]] = []
+        for product in self.items:
+            if self._is_divisible(product) and self.split_mode.get(product.id, False):
+                plan.append((product.id, float(int(self.split_amount.get(product.id, "0")))))
+            else:
+                plan.append((product.id, None))
+        return True, "", plan
+
+    def _validate_selection(self) -> Tuple[bool, str]:
+        """Спільна валідація складу: обов'язкові s/n і коректні обсяги поділу."""
         if self.require_serial:
             for product in self.items:
                 if product.product_catalog is None or not product.product_catalog.uniq:
                     continue
                 serial = product.serial_number
                 if serial is None or not serial.strip():
-                    return (
-                        False,
-                        f"Вкажіть серійний номер для «{product.product_catalog.title}»!",
-                        [],
-                    )
+                    return False, f"Вкажіть серійний номер для «{product.product_catalog.title}»!"
 
-        # Прохід 1 — валідація обсягів (без змін у БД).
         for product in self.items:
             if not (self._is_divisible(product) and self.split_mode.get(product.id, False)):
                 continue
@@ -369,16 +461,27 @@ class ProductsMovementListState(rx.State):
             try:
                 amount = int(raw)
             except (TypeError, ValueError):
-                return False, f"Невірний обсяг для розділення «{title}»!", []
+                return False, f"Невірний обсяг для розділення «{title}»!"
             if amount < 1 or amount >= product.count:
                 return (
                     False,
-                    f"Обсяг для «{title}» має бути від 1 до {product.count - 1} "
+                    f"Обсяг для «{title}» має бути від 1 до {format_amount(product.count - 1)} "
                     "(не можна передати всю ємність у нову одиницю)!",
-                    [],
                 )
+        return True, ""
 
-        # Прохід 2 — застосування розділень.
+    def resolve_movement_products(self) -> Tuple[bool, str, List[Product]]:
+        """Готує підсумковий перелік одиниць товару для руху: для позицій у режимі
+        «розділити» створює дочірні одиниці потрібного обсягу (батьківські зменшує).
+        Спершу повністю валідує всі обсяги, лише потім вносить зміни в БД.
+
+        Шлях СТВОРЕННЯ руху. При редагуванні використовується `collect_unit_plan`,
+        який поділ не виконує — його робить сервіс усередині своєї транзакції."""
+        flag, text = self._validate_selection()
+        if not flag:
+            return False, text, []
+
+        # Застосування розділень.
         resolved: List[Product] = []
         for product in self.items:
             if self._is_divisible(product) and self.split_mode.get(product.id, False):

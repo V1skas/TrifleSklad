@@ -1,203 +1,40 @@
 import reflex as rx
 
-from TrifleSklad.actions import Action as ActionEnum
-from TrifleSklad.state import AppState
+from TrifleSklad import routes
+from TrifleSklad.declared.submenu import find_group_by_url
+from TrifleSklad.views import auth as auth_views
+from TrifleSklad.views.auth import require_login
+from TrifleSklad.views.dashboard import main_dashboard_content, section_dashboard_content
 
-from components import decor
-from TrifleSklad import authorithation, administration, routes, catalog, movement, reports
-
-from TrifleSklad.authorithation.frontend import require_login
-
-def navbar_link(text: str, url: str) -> rx.Component:
-    return rx.link(
-        rx.button(
-            text,
-
-            variant="ghost",
-            color=rx.color("accent", 11),
-
-            border_radius="0",
-
-            _hover={
-                "color": rx.color("accent", 12),
-                "transform": "translateY(-1px)",
-                "transition": "all 0.1s ease-in-out",
-                "border_bottom": f"4px solid {rx.color('accent', 9)}",
-            },
-
-            height="100%",
-            size="4",
-        ),
-
-        href=url,
-
-        height="70%",
-    )
-
-def navbar() -> rx.Component:
-    return rx.box(
-        rx.hstack(
-            rx.link(
-                rx.hstack(
-                    decor.logo(),
-
-                    align_items="center",
-                    padding="1em",
-                    spacing="1",
-                ),
-                href=routes.WELCOME,
-            ),
-            rx.hstack(
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.WORKERS_LIST) | AppState.get_user_actions.contains(ActionEnum.ROLES_LIST) | AppState.get_user_actions.contains(ActionEnum.USERS_LIST),
-                    navbar_link("Адміністрування", routes.ADMIN),
-                ),
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.CATEGORIES_LIST) | AppState.get_user_actions.contains(ActionEnum.PRODUCTS_LIST) | AppState.get_user_actions.contains(ActionEnum.STORAGE_LIST) | AppState.get_user_actions.contains(ActionEnum.OWNERS_LIST) | AppState.get_user_actions.contains(ActionEnum.SUPPLIERS_LIST) | AppState.get_user_actions.contains(ActionEnum.PAYMENT_TYPE_LIST) | AppState.get_user_actions.contains(ActionEnum.NDS_RATES_LIST),
-                    navbar_link("Каталог", routes.CATALOG),
-                ),
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.ADMISSIONS_LIST) | AppState.get_user_actions.contains(ActionEnum.WRITE_OFFS_LIST) | AppState.get_user_actions.contains(ActionEnum.MOVEMENTS_LIST) | AppState.get_user_actions.contains(ActionEnum.ISSUES_LIST) | AppState.get_user_actions.contains(ActionEnum.SALES_LIST) | AppState.get_user_actions.contains(ActionEnum.RETURNS_LIST) | AppState.get_user_actions.contains(ActionEnum.SALE_RETURNS_LIST),
-                    navbar_link("Рух ТМЦ", routes.MOVEMENT),
-                ),
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.REQUESTS_LIST) | AppState.get_user_actions.contains(ActionEnum.REQUESTS_CREATE),
-                    navbar_link("Заявки", routes.CATALOG_REQUESTS),
-                ),
-                rx.cond(
-                    AppState.get_user_actions.contains(ActionEnum.REPORTS_STOCK) | AppState.get_user_actions.contains(ActionEnum.REPORTS_UNITS),
-                    navbar_link("Звіти", routes.REPORTS),
-                ),
-
-                align_items="center",
-                height="100%",
-                spacing="5",
-            ),
-            rx.menu.root(
-                rx.menu.trigger(
-                    rx.button(
-                        rx.icon("user"),
-                        rx.text(AppState.fio, size="3"),
-
-                        variant="ghost",
-                        color=rx.color("accent", 11),
-
-                        border_radius="0",
-
-                        _hover={
-                            "color": rx.color("accent", 12),
-                            "transform": "translateY(-1px)",
-                            "transition": "all 0.1s ease-in-out",
-                            "border_bottom": f"4px solid {rx.color('accent', 9)}",
-                        },
-
-                        size="4",
-                        height="75%",
-                    ),
-                ),
-                rx.menu.content(
-                    rx.menu.separator(),
-                    rx.menu.item("Вийти", on_click=AppState.logout),
-                ),
-
-                justify="end",
-                padding="1em",
-            ),
-
-            justify="between",
-            align_items="center",
-            height="100%",
-        ),
-
-        border_bottom=f"1px solid {rx.color('accent', 9)}",
-
-        padding_right="1em",
-
-        width="100%",
-        height="75px",
-    )
-
-def sidebar(*buttons):
-    return rx.box(
-        rx.vstack(
-            rx.heading("Меню", size="6", color=rx.color("accent", 3), bg=rx.color("accent", 9), height="40px", text_align="center", line_height="40px"),
-            *buttons,
-
-            spacing="0",
-            align_items="stretch",
-            width="100%",
-        ),
-
-        border_radius="1em 1em 5px 5px",
-        background_color=rx.color("gray", 4),
-        overflow="hidden",
-
-        padding="0",
-
-        size="4",
-
-        width="23em",
-    )
-
-def workspace(*tabs, **prop):
-    return rx.tabs.root(
-        *tabs,
-
-        width="100%",
-        height="100%",
-
-        **prop
-    )
-
-def page(*content) -> rx.Component:
-    # Спільна обгортка сторінки: шапка + контент із нижнім відступом, щоб останні
-    # елементи не «прилипали» до низу екрана.
-    return rx.vstack(
-        navbar(),
-        *content,
-
-        width="100%",
-        padding_bottom="2em",
-    )
 
 def auth_page() -> rx.Component:
-    return authorithation.frontend.index()
+    return auth_views.index()
+
+
+def index_page() -> rx.Component:
+    return rx.fragment(on_mount=rx.redirect(routes.WELCOME))
+
 
 @require_login
 def welcome_page() -> rx.Component:
-    return rx.vstack(
-        navbar(),
-        rx.vstack(
-            rx.heading("Ласкаво просимо до Trifle Склад!", size="9", color=rx.color("accent", 9)),
-            rx.text(
-                "Для початку роботи, оберіть потрібний розділ у шапці сторінки.",
+    # Шапка й сайдбар — персистентний каркас (views/templates/app_shell.py),
+    # тут лишається лише контент сторінки.
+    return main_dashboard_content()
 
-                size="5",
-            ),
 
-            spacing="5",
-            justify="center",
-            align="center",
+def _section_page(url: str):
+    # Заглушка кореневої сторінки розділу — щоб клік по пункту навбару не
+    # впирався у 404 (сама сторінка розділу відкривається з бічної панелі).
+    group = find_group_by_url(url)
 
-            min_height="75vh",
-            width="100%",
-        ),
+    @require_login
+    def page() -> rx.Component:
+        return section_dashboard_content(group)
 
-        width="100%",
-    )
+    return page
 
-@require_login
-def administration_page() -> rx.Component:
-    return page(administration.frontend.index())
 
-@require_login
-def catalog_page() -> rx.Component:
-    return page(catalog.frontend.index())
-
-@require_login
-def movement_page() -> rx.Component:
-    return page(movement.frontend.index())
-
-@require_login
-def reports_page() -> rx.Component:
-    return page(reports.frontend.index())
+admin_page = _section_page(routes.ADMIN)
+catalog_page = _section_page(routes.CATALOG)
+movement_page = _section_page(routes.MOVEMENT)
+reports_page = _section_page(routes.REPORTS)

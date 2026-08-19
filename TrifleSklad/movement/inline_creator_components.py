@@ -9,6 +9,7 @@
 import reflex as rx
 
 from TrifleSklad.state import AppState
+from TrifleSklad.views.templates import controls
 
 
 def create_lookup_button(action, label: str, on_click) -> rx.Component:
@@ -46,7 +47,7 @@ def supplier_create_dialog(State) -> rx.Component:
             rx.dialog.title("Створення постачальника"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
-                rx.input(value=State.sup_title, on_change=State.on_change_sup_title, width="100%"),
+                controls.input_field(value=State.sup_title, on_change=State.on_change_sup_title, width="100%"),
                 _field("Опис:", State.sup_description, State.on_change_sup_description, area=True),
                 _field("Адреса:", State.sup_address, State.on_change_sup_address),
                 _field("Email:", State.sup_email, State.on_change_sup_email),
@@ -76,7 +77,7 @@ def owner_create_dialog(State) -> rx.Component:
             rx.dialog.title("Створення власника"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
-                rx.input(value=State.owner_title, on_change=State.on_change_owner_title, width="100%"),
+                controls.input_field(value=State.owner_title, on_change=State.on_change_owner_title, width="100%"),
                 _field("Опис:", State.owner_description, State.on_change_owner_description, area=True),
                 rx.hstack(
                     rx.button("Скасувати", variant="outline", type="button", on_click=State.set_owner_create_open(False)),
@@ -101,7 +102,7 @@ def payment_type_create_dialog(State) -> rx.Component:
             rx.dialog.title("Створення типу оплати"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
-                rx.input(value=State.pt_title, on_change=State.on_change_pt_title, width="100%"),
+                controls.input_field(value=State.pt_title, on_change=State.on_change_pt_title, width="100%"),
                 _field("Опис:", State.pt_description, State.on_change_pt_description, area=True),
                 rx.hstack(
                     rx.button("Скасувати", variant="outline", type="button", on_click=State.set_payment_type_create_open(False)),
@@ -126,9 +127,9 @@ def nds_rate_create_dialog(State) -> rx.Component:
             rx.dialog.title("Створення ставки ПДВ"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
-                rx.input(value=State.nds_title, on_change=State.on_change_nds_title, width="100%"),
+                controls.input_field(value=State.nds_title, on_change=State.on_change_nds_title, width="100%"),
                 rx.text("Ставка (%):", size="2"),
-                rx.input(
+                controls.input_field(
                     type="number",
                     min="0",
                     step="0.01",
@@ -160,7 +161,7 @@ def worker_create_dialog(State) -> rx.Component:
             rx.dialog.title("Створення співробітника"),
             rx.vstack(
                 rx.text("*ПІБ:", size="2"),
-                rx.input(value=State.wrk_fio, on_change=State.on_change_wrk_fio, width="100%"),
+                controls.input_field(value=State.wrk_fio, on_change=State.on_change_wrk_fio, width="100%"),
                 _field("Телефон:", State.wrk_phone_number, State.on_change_wrk_phone_number),
                 _field("Email:", State.wrk_email, State.on_change_wrk_email),
                 _field("Посада:", State.wrk_position, State.on_change_wrk_position),
@@ -210,7 +211,7 @@ def storage_create_dialog(State) -> rx.Component:
                     ),
                 ),
                 rx.text("*Назва:", size="2"),
-                rx.input(value=State.st_title, on_change=State.on_change_st_title, width="100%"),
+                controls.input_field(value=State.st_title, on_change=State.on_change_st_title, width="100%"),
                 _field("Опис:", State.st_description, State.on_change_st_description, area=True),
                 _field("Адреса:", State.st_address, State.on_change_st_address),
                 rx.text("*Відповідальний:", size="2"),

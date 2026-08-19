@@ -5,6 +5,14 @@ import reflex as rx
 from components.infinite_scroll import infinite_scroll
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ALL, ProductsSelectorState
+from TrifleSklad.views.templates import controls
+
+
+def excluded_badge(item: Tuple[int, Product]) -> rx.Component:
+    return rx.cond(
+        item[1].excluded_from_accounting,
+        rx.badge("Поза обліком", color_scheme="orange", size="1", variant="soft"),
+    )
 
 
 def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
@@ -16,24 +24,46 @@ def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
         item[1].product_catalog.divisible,
         rx.vstack(
             rx.text(
-                f"Залишок: {item[1].count}/{item[1].product_catalog.capacity} "
-                f"{item[1].product_catalog.unit}",
+                # Без фіксованої ємності — максимум невідомий, показуємо ∞.
+                rx.cond(
+                    item[1].product_catalog.no_fixed_capacity,
+                    f"Залишок: {item[1].count}/∞ {item[1].product_catalog.unit}",
+                    f"Залишок: {item[1].count}/{item[1].product_catalog.capacity} "
+                    f"{item[1].product_catalog.unit}",
+                ),
                 size="1",
                 user_select="none",
             ),
             rx.progress(
-                value=item[1].count,
-                max=item[1].product_catalog.capacity,
+                # Без фіксованої ємності — полоса завжди повна (1/1); для звичайного
+                # подільного — залишок/ємність (count тут завжди ціле). Prop Progress
+                # приймає лише int, тож дробовий count зводимо до int.
+                value=rx.cond(
+                    item[1].product_catalog.no_fixed_capacity,
+                    1,
+                    item[1].count.to(int),
+                ),
+                max=rx.cond(
+                    item[1].product_catalog.no_fixed_capacity,
+                    1,
+                    item[1].product_catalog.capacity,
+                ),
                 color_scheme="green",
                 height="0.5em",
                 width="100%",
             ),
+            excluded_badge(item),
             spacing="1",
             width="100%",
         ),
-        rx.cond(
-            item[1].product_catalog.uniq,
-            rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+        rx.vstack(
+            rx.cond(
+                item[1].product_catalog.uniq,
+                rx.text(f"s/n: {item[1].serial_number}", size="1", user_select="none"),
+            ),
+            excluded_badge(item),
+            spacing="1",
+            width="100%",
         ),
     )
 
@@ -158,11 +188,10 @@ def mass_select_panel() -> rx.Component:
             rx.text("Масовий вибір", size="2", weight="bold"),
             rx.text("Кількість одиниць:", size="2"),
             rx.hstack(
-                rx.input(
+                controls.input_field(
                     type="number",
                     min=0,
                     placeholder="0",
-                    size="2",
                     flex="1",
                     value=ProductsSelectorState.mass_count,
                     on_change=ProductsSelectorState.set_mass_count,
@@ -184,11 +213,10 @@ def mass_select_panel() -> rx.Component:
                         f"Обсяг ({ProductsSelectorState.sel_unit}):", size="2"
                     ),
                     rx.hstack(
-                        rx.input(
+                        controls.input_field(
                             type="number",
                             min=0,
                             placeholder="0",
-                            size="2",
                             flex="1",
                             value=ProductsSelectorState.mass_measure,
                             on_change=ProductsSelectorState.set_mass_measure,
@@ -244,7 +272,6 @@ def filters_panel() -> rx.Component:
             ),
             value=ProductsSelectorState.filter_catalog,
             on_change=ProductsSelectorState.change_filter_catalog,
-            disabled=ProductsSelectorState.filter_category == ALL,
             width="100%",
             size="2",
         ),
@@ -257,18 +284,26 @@ def filters_panel() -> rx.Component:
                 color=rx.color("accent", 11),
             ),
         ),
-        rx.text("Пошук (s/n / ID):", size="2"),
-        rx.debounce_input(
-            rx.input(
-                rx.input.slot(rx.icon("search")),
-                placeholder="Введіть текст",
-                width="100%",
-                size="2",
-                disabled=~ProductsSelectorState.catalog_chosen,
-                value=ProductsSelectorState.filter_search,
-                on_change=ProductsSelectorState.change_filter_search,
+        rx.text("Бухгалтерський облік:", size="2"),
+        rx.select.root(
+            rx.select.trigger(width="100%"),
+            rx.select.content(
+                rx.select.item("Усі", value=ALL),
+                rx.select.item("Включені в облік", value="included"),
+                rx.select.item("Поза обліком", value="excluded"),
             ),
-            debounce_timeout=400,
+            value=ProductsSelectorState.filter_accounting,
+            on_change=ProductsSelectorState.change_filter_accounting,
+            width="100%",
+            size="2",
+        ),
+        rx.text("Пошук (назва / s/n / ID):", size="2"),
+        controls.search_field(
+            rx.input.slot(rx.icon("search")),
+            placeholder="Введіть текст",
+            width="100%",
+            value=ProductsSelectorState.filter_search,
+            on_change=ProductsSelectorState.change_filter_search,
         ),
         mass_select_panel(),
         rx.button(
@@ -317,34 +352,21 @@ def selector(*child, **prop) -> rx.Component:
             # Праворуч — список одиниць ТМЦ.
             rx.card(
                 rx.cond(
-                    ProductsSelectorState.catalog_chosen,
+                    ProductsSelectorState.is_loading,
+                    selector_skeleton(),
                     rx.cond(
-                        ProductsSelectorState.is_loading,
-                        selector_skeleton(),
-                        rx.cond(
-                            ProductsSelectorState.has_items,
-                            selector_list(),
-                            rx.center(
-                                rx.text(
-                                    "ТМЦ не знайдено",
-                                    color=rx.color("accent", 8),
-                                    user_select="none",
-                                    size="3",
-                                ),
-                                width="100%",
-                                height="100%",
+                        ProductsSelectorState.has_items,
+                        selector_list(),
+                        rx.center(
+                            rx.text(
+                                "ТМЦ не знайдено",
+                                color=rx.color("accent", 8),
+                                user_select="none",
+                                size="3",
                             ),
+                            width="100%",
+                            height="100%",
                         ),
-                    ),
-                    rx.center(
-                        rx.text(
-                            "Оберіть категорію та позицію каталогу",
-                            color=rx.color("accent", 8),
-                            user_select="none",
-                            size="3",
-                        ),
-                        width="100%",
-                        height="100%",
                     ),
                 ),
                 padding="1em",
