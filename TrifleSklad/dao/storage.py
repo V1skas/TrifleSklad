@@ -8,10 +8,17 @@ from TrifleSklad.models import Storage
 
 class StorageDao:
     @staticmethod
-    def get_all(session: Session, with_del: bool = False) -> Sequence[Storage]:
+    def get_all(
+        session: Session, with_del: bool = False, type_in: Optional[Sequence[int]] = None
+    ) -> Sequence[Storage]:
+        """`type_in` — звузити до переліку типів (напр. лише StorageType.CLIENT
+        для розділу «Клієнти», або всі типи, крім CLIENT, для «Об'єкти
+        підприємства», TS-56)."""
         statement = select(Storage).options(selectinload(Storage.responsible))
         if not with_del:
             statement = statement.where(Storage.is_deleted == False)
+        if type_in is not None:
+            statement = statement.where(Storage.type.in_(type_in))
         return session.exec(statement).all()
 
     @staticmethod

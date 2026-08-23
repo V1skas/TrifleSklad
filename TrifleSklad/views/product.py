@@ -35,7 +35,7 @@ def _table_row(item: ProductCatalog) -> rx.Component:
             rx.cond(
                 item.no_fixed_capacity,
                 rx.text("∞"),
-                rx.cond(item.divisible, rx.text(item.capacity), rx.text("-")),
+                rx.cond(item.divisible, rx.text(ListProductsState.capacity_labels[item.id]), rx.text("-")),
             )
         ),
         rx.table.cell(_bool_badge(item.uniq)),
@@ -223,7 +223,10 @@ def _form_fields(state, uniq_disabled: bool) -> rx.Component:
             "Параметри обліку",
             rx.text("Місткість", weight="medium"),
             controls.input_field(
-                value=state.capacity,
+                type="number",
+                min="0",
+                step="any",
+                value=state.capacity_input,
                 on_change=state.set_capacity,
                 width="100%",
                 disabled=state.uniq | state.no_fixed_capacity,

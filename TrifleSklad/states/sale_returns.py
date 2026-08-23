@@ -24,6 +24,7 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_cancel_mixin import CancelWithReasonMixin
 from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
@@ -66,7 +67,7 @@ class ListSaleReturnsState(MovementListFilterMixin, AppState):
         return rx.redirect(routes.MOVEMENT_SALE_RETURNS_ADD)
 
 
-class ViewSaleReturnsState(AuditHistoryMixin, AppState):
+class ViewSaleReturnsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     HISTORY_TABLE = "sale_returns"
     HISTORY_ACTION = Action.SALE_RETURNS_HISTORY
     HISTORY_DETAIL_ACTION = Action.SALE_RETURNS_HISTORY_DETAIL
@@ -201,13 +202,13 @@ class ViewSaleReturnsState(AuditHistoryMixin, AppState):
                 list_id_products.append(product.id)
 
         related_movements = MovementDAO.get_with_products_from_id(list_id_products, self.item.id)
-        if any(m.id != self.item.id for m in related_movements):
+        if related_movements:
             self.cancel_conflict_movements = related_movements
             self.is_cancel_conflict_dialog_open = True
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login, reason=self.cancel_reason)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -733,10 +734,6 @@ class EditSaleReturnsState(FullEditMixin, AppState):
             return
 
         if self.can_edit_full:
-            error = self._require_reason()
-            if error is not None:
-                yield rx.toast.error(error)
-                return
             if not StorageDAO.is_type(int(self.id_destination_storage), StorageType.WAREHOUSE):
                 yield rx.toast.error("Повертати ТМЦ можна лише на склад!")
                 return

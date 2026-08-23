@@ -37,6 +37,7 @@ from TrifleSklad.movement.inline_creators import LookupCreatorsMixin
 from TrifleSklad.movement.list_mixin import ALL, MovementListFilterMixin
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_cancel_mixin import CancelWithReasonMixin
 from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
@@ -123,7 +124,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
     is_product_uniq: bool = False
 
     selected_divisible: bool = False
-    selected_capacity: int = 0
+    selected_capacity: float = 0
     # Подільний ТМЦ без фіксованої ємності: ємність одиниці вводиться вручну для
     # кожної позиції постачання (одна на всі одиниці позиції).
     selected_no_fixed_capacity: bool = False
@@ -159,6 +160,10 @@ class MovementProductCatalogAddEditFormState(rx.State):
     @rx.var
     def category_chosen(self) -> bool:
         return self.filter_category != ""
+
+    @rx.var
+    def selected_capacity_label(self) -> str:
+        return format_amount(self.selected_capacity)
 
     @rx.var
     def products_catalog_list(self) -> List[Tuple[str, str]]:
@@ -617,6 +622,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
     new_divisible: bool = False
     new_uniq: bool = False
     new_capacity: str = "0"
+    new_no_fixed_capacity: bool = False
 
     is_duplicate_confirm_open: bool = False
     duplicate_product_id: int = -1
@@ -631,6 +637,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.new_divisible = False
         self.new_uniq = False
         self.new_capacity = "0"
+        self.new_no_fixed_capacity = False
         self.is_duplicate_confirm_open = False
         self.duplicate_product_id = -1
         self.duplicate_product_category_id = ""
@@ -667,8 +674,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
 
     @rx.event
     def on_change_new_capacity(self, value: str):
-        if self.new_uniq:
-            self.new_capacity = "1"
+        if self.new_uniq or self.new_no_fixed_capacity:
             return
         self.new_capacity = value
 
@@ -678,6 +684,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
         if value:
             self.new_divisible = False
             self.new_capacity = "1"
+            self.new_no_fixed_capacity = False
 
     @rx.event
     def on_change_new_divisible(self, value: bool):
@@ -685,6 +692,19 @@ class MovementProductCatalogAddEditFormState(rx.State):
             self.new_divisible = False
             return
         self.new_divisible = value
+        # «Без фіксованої ємності» має сенс лише для подільного ТМЦ.
+        if not value:
+            self.new_no_fixed_capacity = False
+
+    @rx.event
+    def on_change_new_no_fixed_capacity(self, value: bool):
+        # Тумблер доступний лише для подільного неунікального ТМЦ.
+        if self.new_uniq or not self.new_divisible:
+            self.new_no_fixed_capacity = False
+            return
+        self.new_no_fixed_capacity = value
+        if value:
+            self.new_capacity = "0"
 
     def _select_catalog_in_line(self, catalog_id: int, category_id: str):
         self._load_products_catalog_list()
@@ -722,7 +742,11 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return rx.toast.error("Оберіть категорію товару!")
         if self.new_uniq and self.new_divisible:
             return rx.toast.error("Товар із серійним номером не може бути подільним!")
-        if self.new_divisible and not (self.new_capacity.isdigit() and int(self.new_capacity) > 0):
+        if (
+            self.new_divisible
+            and not self.new_no_fixed_capacity
+            and _parse_positive_float(self.new_capacity) is None
+        ):
             return rx.toast.error("Для подільного ТМЦ потрібно вказати додатну місткість!")
 
         unit = self.new_unit.strip()
@@ -736,11 +760,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
             self.is_duplicate_confirm_open = True
             return
 
-        capacity = (
-            1
-            if self.new_uniq
-            else (int(self.new_capacity) if self.new_capacity.isdigit() else 0)
-        )
+        if self.new_uniq:
+            capacity = 1
+        elif self.new_no_fixed_capacity:
+            capacity = 0
+        else:
+            capacity = _parse_positive_float(self.new_capacity) or 0
         product = ProductCatalog(
             title=title,
             description=self.new_description.strip() or None,
@@ -749,6 +774,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             divisible=False if self.new_uniq else self.new_divisible,
             uniq=self.new_uniq,
             capacity=capacity,
+            no_fixed_capacity=self.new_no_fixed_capacity,
             count=0,
         )
         flag, text, new_id = ProductCatalogDAO.add_one(product)
@@ -1793,11 +1819,6 @@ class EditAdmissionState(FullEditMixin, AppState):
         if AdmissionDAO.is_invoice_number_exists(self.item.invoice_number, exclude_id=self.item.id):
             yield rx.toast.error("Постачання з таким номером накладної оплати вже існує!")
             return
-        if self.can_edit_full:
-            error = self._require_reason()
-            if error is not None:
-                yield rx.toast.error(error)
-                return
         self.item.movement.id_user = self.user.login
 
         for pc in self.item.movement.products_catalog:
@@ -1820,10 +1841,13 @@ class EditAdmissionState(FullEditMixin, AppState):
         yield rx.toast.error(text)
 
 
-class ViewAdmissionState(AuditHistoryMixin, AppState):
+class ViewAdmissionState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     HISTORY_TABLE = "admissions"
     HISTORY_ACTION = Action.ADMISSIONS_HISTORY
     HISTORY_DETAIL_ACTION = Action.ADMISSIONS_HISTORY_DETAIL
+    # Скасування постачання — це видалення непроведеного запису (він сам
+    # породив одиниці), а не зміна статусу на «Скасовано».
+    CANCEL_EVENT_NAME = "on_click_delete"
 
     item: Admission = Admission(
         id_payment_type=-1,
@@ -1977,13 +2001,13 @@ class ViewAdmissionState(AuditHistoryMixin, AppState):
         ]
 
         related_movements = MovementDAO.get_with_products_from_id(list_id_products, self.item.id)
-        if any(m.id != self.item.id for m in related_movements):
+        if related_movements:
             self.cancel_conflict_movements = related_movements
             self.is_cancel_conflict_dialog_open = True
             yield rx.toast.error("Видалення неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = AdmissionDAO.delete_one(self.item.id, self.user.login)
+        flag, text = AdmissionDAO.delete_one(self.item.id, self.user.login, reason=self.cancel_reason)
         if flag:
             yield rx.toast.success(text)
             yield rx.redirect(routes.MOVEMENT_ADMISSIONS)

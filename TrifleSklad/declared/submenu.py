@@ -31,6 +31,7 @@ MAIN: List[MenuItem] = [
         MenuItem("Каталог ТМЦ", "package", routes.CATALOG_PRODUCTS, required_action=Actions.PRODUCTS_LIST),
         MenuItem("Власники ТМЦ", "user-round", routes.CATALOG_OWNERS, required_action=Actions.OWNERS_LIST),
         MenuItem("Об'єкти підприємства", "warehouse", routes.CATALOG_STORAGES, required_action=Actions.STORAGE_LIST),
+        MenuItem("Клієнти", "users", routes.CATALOG_CLIENTS, required_action=Actions.CLIENT_LIST),
         MenuItem("Постачальники", "truck", routes.CATALOG_SUPPLIERS, required_action=Actions.SUPPLIERS_LIST),
         MenuItem("Типи оплат", "credit-card", routes.CATALOG_PAYMENT_TYPES, required_action=Actions.PAYMENT_TYPE_LIST),
         MenuItem("Ставки ПДВ", "percent", routes.CATALOG_NDS_RATES, required_action=Actions.NDS_RATES_LIST),

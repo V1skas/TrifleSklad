@@ -40,6 +40,13 @@ from TrifleSklad.states.storage import (
     ViewStorageState,
 )
 from TrifleSklad.views import storage as storage_views
+from TrifleSklad.states.client import (
+    AddClientState,
+    EditClientState,
+    ListClientState,
+    ViewClientState,
+)
+from TrifleSklad.views import client as client_views
 from TrifleSklad.states.category import (
     AddCategoriesState,
     EditCategoriesState,
@@ -218,6 +225,11 @@ app.add_page(storage_views.list_page, route=routes.CATALOG_STORAGES, on_load=Lis
 app.add_page(storage_views.add_page, route=routes.CATALOG_STORAGES_ADD, on_load=AddStorageState.on_load)
 app.add_page(storage_views.edit_page, route=routes.CATALOG_STORAGES_EDIT_ID + "[id]", on_load=EditStorageState.on_load)
 app.add_page(storage_views.view_page, route=routes.CATALOG_STORAGES_VIEW_ID + "[id]", on_load=ViewStorageState.on_load)
+
+app.add_page(client_views.list_page, route=routes.CATALOG_CLIENTS, on_load=ListClientState.on_load)
+app.add_page(client_views.add_page, route=routes.CATALOG_CLIENTS_ADD, on_load=AddClientState.on_load)
+app.add_page(client_views.edit_page, route=routes.CATALOG_CLIENTS_EDIT_ID + "[id]", on_load=EditClientState.on_load)
+app.add_page(client_views.view_page, route=routes.CATALOG_CLIENTS_VIEW_ID + "[id]", on_load=ViewClientState.on_load)
 
 app.add_page(category_views.list_page, route=routes.CATALOG_CATEGORIES, on_load=ListCategoriesState.on_load)
 app.add_page(category_views.add_page, route=routes.CATALOG_CATEGORIES_ADD, on_load=AddCategoriesState.on_load)

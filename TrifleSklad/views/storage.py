@@ -2,7 +2,7 @@ import reflex as rx
 
 from TrifleSklad import routes
 from TrifleSklad.actions import Action
-from TrifleSklad.declared import storage_type_list
+from TrifleSklad.declared import StorageType, storage_type_list
 from TrifleSklad.models import Storage
 from TrifleSklad.states.storage import (
     AddStorageState,
@@ -123,10 +123,16 @@ def list_page() -> rx.Component:
 
 
 def _type_select(value, on_change) -> rx.Component:
+    # «Клієнт» тут не пропонується — клієнти додаються/редагуються в
+    # окремому розділі «Клієнти» (views/client.py, TS-56).
     return rx.select.root(
         rx.select.trigger(placeholder="Оберіть тип"),
         rx.select.content(
-            *[rx.select.item(title, value=str(t)) for t, title in storage_type_list.items()],
+            *[
+                rx.select.item(title, value=str(t))
+                for t, title in storage_type_list.items()
+                if t != StorageType.CLIENT
+            ],
         ),
         value=value,
         on_change=on_change,

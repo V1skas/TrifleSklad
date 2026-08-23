@@ -160,8 +160,6 @@ class MovementEditService:
         створив поділ подільних одиниць.
         """
         reason = payload.reason.strip()
-        if not reason:
-            raise ServiceError("Вкажіть причину коригування!")
 
         try:
             with rx.session() as session:

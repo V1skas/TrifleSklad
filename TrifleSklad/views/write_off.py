@@ -188,6 +188,7 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditWriteOffState),
+        full_edit.save_reason_dialog(EditWriteOffState),
         titled_section(
             "Загальна інформація",
             rx.text("*Дата:", weight="medium"),
@@ -222,7 +223,6 @@ def _edit_form() -> rx.Component:
                 value=EditWriteOffState.id_incoming_owner,
                 on_change=EditWriteOffState.on_change_id_incoming_owner,
             ),
-            full_edit.reason_field(EditWriteOffState),
             rx.text("*Статус:", weight="medium"),
             rx.select(
                 EditWriteOffState.editable_statuses,
@@ -246,7 +246,7 @@ def edit_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Списання/Редагування",
-            controls.button_primary("Зберегти", on_click=EditWriteOffState.edit_one),
+            controls.button_primary("Зберегти", on_click=EditWriteOffState.open_save_dialog),
             left=controls.button_back(routes.MOVEMENT_WRITE_OFFS, label="Скасувати"),
             width="100%",
         ),
@@ -330,11 +330,16 @@ def view_page() -> rx.Component:
             rx.cond(
                 ViewWriteOffState.get_user_actions.contains(Action.WRITE_OFFS_DELETE)
                 & (ViewWriteOffState.current_is_canceled == False),
-                controls.delete_with_confirm(
+                controls.cancel_with_reason(
+                    open=ViewWriteOffState.is_cancel_reason_dialog_open,
+                    on_open_change=ViewWriteOffState.set_cancel_reason_dialog_open,
+                    value=ViewWriteOffState.cancel_reason,
+                    on_change=ViewWriteOffState.on_change_cancel_reason,
+                    on_open_trigger=ViewWriteOffState.open_cancel_reason_dialog,
+                    on_confirm=ViewWriteOffState.confirm_cancel,
                     title="Підтвердження скасування",
                     trigger_label="Скасувати",
                     description="Скасувати це списання? Товар буде повернено у залишки.",
-                    on_confirm=ViewWriteOffState.on_click_cancel,
                 ),
             ),
             rx.cond(

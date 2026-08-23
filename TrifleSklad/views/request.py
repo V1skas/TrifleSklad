@@ -160,7 +160,7 @@ def _position_dialog(state) -> rx.Component:
                             value=state.new_position_part,
                             on_change=state.set_new_position_part,
                         ),
-                        rx.text(f"Ємність однієї одиниці: {state.new_position_capacity} {state.new_position_unit}.", size="1", color="gray"),
+                        rx.text(f"Ємність однієї одиниці: {state.new_position_capacity_label} {state.new_position_unit}.", size="1", color="gray"),
                         spacing="1", width="100%", align="stretch",
                     ),
                 ),

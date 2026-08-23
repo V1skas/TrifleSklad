@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple
 import reflex as rx
 
 from TrifleSklad.dao_legacy import ProductCatalogDAO, ProductDAO
+from TrifleSklad.declared import format_amount
 from TrifleSklad.models import Product
 
 
@@ -31,7 +32,7 @@ class ProductsSelectorState(rx.State):
 
     # Метадані обраної позиції каталогу (для міри / прогресу / валідації).
     sel_divisible: bool = False
-    sel_capacity: int = 0
+    sel_capacity: float = 0
     sel_no_fixed_capacity: bool = False
     sel_unit: str = ""
 
@@ -115,6 +116,17 @@ class ProductsSelectorState(rx.State):
             and item.product_catalog.id == catalog_id
             for item in self.selected
         )
+
+    @rx.var
+    def capacity_labels(self) -> Dict[int, str]:
+        """Ємність каталогу без зайвого «.0» для дробових значень (TS-56),
+        ключ — id одиниці: у foreach `item` лишається сирою моделлю Product,
+        а format_amount працює лише в бекенді."""
+        return {
+            item.id: format_amount(item.product_catalog.capacity)
+            for item in list(self.selected) + list(self.available)
+            if item.product_catalog is not None
+        }
 
     @rx.var
     def get_selected_items(self) -> List[Tuple[int, Product]]:

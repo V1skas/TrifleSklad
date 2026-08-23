@@ -125,13 +125,20 @@ def _create_product_dialog() -> rx.Component:
                 controls.input_field(
                     type="number",
                     min="0",
+                    step="any",
                     value=State.new_capacity,
                     on_change=State.on_change_new_capacity,
-                    disabled=State.new_uniq,
+                    disabled=State.new_uniq | State.new_no_fixed_capacity,
                     width="100%",
                 ),
                 rx.checkbox("Має серійний номер", checked=State.new_uniq, on_change=State.on_change_new_uniq),
                 rx.checkbox("Подільний", checked=State.new_divisible, on_change=State.on_change_new_divisible, disabled=State.new_uniq),
+                rx.checkbox(
+                    "Без фіксованої ємності",
+                    checked=State.new_no_fixed_capacity,
+                    on_change=State.on_change_new_no_fixed_capacity,
+                    disabled=State.new_uniq | ~State.new_divisible,
+                ),
                 rx.hstack(
                     rx.button("Скасувати", variant="outline", type="button", on_click=State.set_create_open(False)),
                     rx.spacer(),
@@ -307,7 +314,7 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
                                             on_change=MovementProductCatalogAddEditFormState.on_change_unit_amount(row[0]),
                                             width="30%",
                                         ),
-                                        rx.text(f"/ {MovementProductCatalogAddEditFormState.selected_capacity}", size="2", color="gray"),
+                                        rx.text(f"/ {MovementProductCatalogAddEditFormState.selected_capacity_label}", size="2", color="gray"),
                                         controls.input_field(
                                             type="number",
                                             min="0",
@@ -848,7 +855,17 @@ def view_page() -> rx.Component:
             "Постачання/Перегляд",
             rx.cond(
                 ViewAdmissionState.get_user_actions.contains(Action.ADMISSIONS_DELETE),
-                controls.delete_with_confirm(on_confirm=ViewAdmissionState.on_click_delete),
+                controls.cancel_with_reason(
+                    open=ViewAdmissionState.is_cancel_reason_dialog_open,
+                    on_open_change=ViewAdmissionState.set_cancel_reason_dialog_open,
+                    value=ViewAdmissionState.cancel_reason,
+                    on_change=ViewAdmissionState.on_change_cancel_reason,
+                    on_open_trigger=ViewAdmissionState.open_cancel_reason_dialog,
+                    on_confirm=ViewAdmissionState.confirm_cancel,
+                    title="Підтвердження видалення",
+                    trigger_label="Видалити",
+                    description="Ви впевнені, що бажаєте видалити цей запис? Цю дію не можна буде скасувати.",
+                ),
             ),
             rx.cond(
                 ViewAdmissionState.get_user_actions.contains(Action.ADMISSIONS_EDIT),
@@ -1115,6 +1132,7 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditAdmissionState),
+        full_edit.save_reason_dialog(EditAdmissionState),
         titled_section(
             "Загальна інформація",
             rx.text("*Дата:", weight="medium"),
@@ -1176,7 +1194,6 @@ def _edit_form() -> rx.Component:
                     on_change=EditAdmissionState.on_change_status,
                 ),
             ),
-            full_edit.reason_field(EditAdmissionState),
             rx.text("Коментар:", weight="medium"),
             controls.text_area_field(value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment, width="100%"),
         ),
@@ -1257,7 +1274,7 @@ def edit_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Постачання/Редагування",
-            controls.button_primary("Зберегти", on_click=EditAdmissionState.edit_one),
+            controls.button_primary("Зберегти", on_click=EditAdmissionState.open_save_dialog),
             left=controls.button_back(routes.MOVEMENT_ADMISSIONS, label="Скасувати"),
             width="100%",
         ),

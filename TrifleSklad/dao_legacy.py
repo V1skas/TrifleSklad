@@ -1351,9 +1351,17 @@ class ProductDAO:
     ) -> List[tuple[int, str]]:
         """Перелік категорій (id, назва з відступом для дочірніх), у яких є
         доступні одиниці на вказаному місці/власнику — перший крок каскадного
-        вибору в діалозі."""
+        вибору в діалозі. Порядок — деревовидний (батько, одразу за ним —
+        його діти), як і в інших селектах категорій
+        (ProductCategoryDAO.get_hierarchy_options), а не плоский алфавітний —
+        інакше дочірня категорія могла опинитися далеко від батьківської.
+
+        Якщо одиниці є лише в дочірній категорії — батьківська однаково
+        показується: вибір батьківської категорії в цьому ж діалозі фільтрує
+        ТМЦ через `get_self_and_children_ids` (тобто фактично охоплює й дітей),
+        тож ховати батька було б нелогічно (TS-56)."""
         statement = (
-            select(ProductCategory.id, ProductCategory.title, ProductCategory.id_parent)
+            select(ProductCategory.id)
             .join(ProductCatalog, ProductCatalog.id_category == ProductCategory.id)
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
             .where(Product.id_storage == storage_id)
@@ -1361,13 +1369,24 @@ class ProductDAO:
         )
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
-        statement = statement.distinct().order_by(ProductCategory.title)
+        statement = statement.distinct()
 
         with rx.session() as session:
-            return [
-                (row[0], row[1] if row[2] is None else f"— {row[1]}")
-                for row in session.exec(statement).all()
-            ]
+            available_ids = set(session.exec(statement).all())
+
+        tree = ProductCategoryDAO.get_all_ordered_for_tree()
+        parent_by_id = {c.id: c.id_parent for c in tree}
+        visible_ids = set(available_ids)
+        for cid in available_ids:
+            parent_id = parent_by_id.get(cid)
+            if parent_id is not None:
+                visible_ids.add(parent_id)
+
+        return [
+            (c.id, c.title if c.id_parent is None else f"— {c.title}")
+            for c in tree
+            if c.id in visible_ids
+        ]
 
     @classmethod
     def get_catalog_options_by_owner_storage(
@@ -2300,7 +2319,7 @@ class MovementDAO:
             return False, f"Ошибка: {str(e)}", -1
 
     @classmethod
-    def cancel_movement(cls, id: int, actor_login: str) -> tuple[bool, str]:
+    def cancel_movement(cls, id: int, actor_login: str, reason: str = "") -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 movement = session.get(Movement, id)
@@ -2314,7 +2333,10 @@ class MovementDAO:
                 movement.status = MovementsStatus.CANCELED
 
                 record_action(
-                    session, actor_login, movement.id, Updated.from_diff(old_snapshot, movement, session)
+                    session,
+                    actor_login,
+                    movement.id,
+                    Updated.from_diff(old_snapshot, movement, session, reason=reason.strip()),
                 )
 
                 session.commit()
@@ -2331,8 +2353,14 @@ class MovementDAO:
     def get_with_products_from_id(
         cls, product_ids: List[int], from_movement_id: int
     ) -> List[Movement]:
-        """Движения, в которые входят указанные товары, начиная с from_movement_id
-        (включительно), отсортированные по возрастанию id (порядку создания)."""
+        """Пізніші рухи (з БІЛЬШИМ id, поточний рух виключено), у які входять
+        указані товари, відсортовані за зростанням id (порядку створення).
+
+        Скасовані рухи виключаються (TS-56, той самий принцип, що й
+        `dao/movement.py::MovementDao.get_movements_with_units`) — відкат тепер
+        бере джерело з шапки руху, а не реконструює його ланцюжком, тож
+        скасований пізніший рух більше не заважає скасуванню/видаленню
+        раннього."""
         if len(product_ids) == 0:
             return []
 
@@ -2347,7 +2375,8 @@ class MovementDAO:
                 MovementProducts.id_movement_product == MovementProductsCatalog.id,
             )
             .where(MovementProducts.id_product.in_(product_ids))
-            .where(Movement.id >= from_movement_id)
+            .where(Movement.id > from_movement_id)
+            .where(Movement.status != MovementsStatus.CANCELED)
             .distinct()
             .order_by(Movement.id)
         )
@@ -2979,7 +3008,7 @@ class AdmissionDAO:
         reason: str = "",
         removed_line_ids: Optional[List[int]] = None,
     ) -> tuple[bool, str, int]:
-        """Редагування постачання. `reason` — обов'язкова причина коригування при
+        """Редагування постачання. `reason` — необов'язкова причина коригування при
         повному редагуванні (йде в аудит). `removed_line_ids` — позиції, які
         користувач прибрав із переліку у формі: видаляються тут, у тій самій
         транзакції (раніше рядок зникав із БД одразу при кліку, ще до збереження).
@@ -3156,7 +3185,7 @@ class AdmissionDAO:
             return False, "Системна помилка!"
 
     @classmethod
-    def delete_one(cls, id: int, actor_login: str) -> tuple[bool, str]:
+    def delete_one(cls, id: int, actor_login: str, reason: str = "") -> tuple[bool, str]:
         try:
             with rx.session() as session:
                 admission: Admission = session.get(Admission, id)
@@ -3210,6 +3239,7 @@ class AdmissionDAO:
 
                 deleted_action = AdmissionDeleted.for_delete(
                     movement_view(admission), session,
+                    reason=reason.strip(),
                     lines=[
                         LineChange(
                             kind="removed",
