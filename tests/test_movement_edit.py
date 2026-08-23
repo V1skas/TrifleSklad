@@ -158,17 +158,53 @@ def test_editability_reports_later_movements_as_conflicts(session, rx_session, c
     assert MovementEditService().editability(later.id, later.type, "admin").allowed is True
 
 
+def test_editability_ignores_canceled_later_movement(session, rx_session, catalog, places):
+    """TS-56: скасований пізніший рух не блокує редагування раннього — відкат
+    бере джерело з шапки руху, а не реконструює його ланцюжком (TS-48-fix)."""
+    _, device = catalog
+    warehouse, warehouse2, _, owner, owner2 = places
+    unit = make_unit(session, device, warehouse, owner, serial="СН-002")
+    grant(session, "admin", TRANSFER_FULL)
+    first = make_movement(
+        session,
+        MovementsType.MOVEMENT,
+        [unit],
+        incoming_storage=warehouse,
+        incoming_owner=owner,
+        destination_storage=warehouse2,
+        destination_owner=owner2,
+        date="2026-07-25",
+    )
+    later = make_movement(
+        session,
+        MovementsType.MOVEMENT,
+        [unit],
+        incoming_storage=warehouse2,
+        incoming_owner=owner2,
+        destination_storage=warehouse,
+        destination_owner=owner,
+        date="2026-07-26",
+        status=MovementsStatus.CANCELED,
+    )
+
+    verdict = MovementEditService().editability(first.id, first.type, "admin")
+
+    assert verdict.allowed is True
+    assert later.id not in [m.id for m in verdict.conflicts]
+    assert verdict.conflicts == []
+
+
 # --- збереження ------------------------------------------------------------
 
 
-def test_save_requires_reason(session, rx_session, write_off):
+def test_save_allows_blank_reason(session, rx_session, write_off):
+    """TS-56: причина коригування необов'язкова — порожнє значення не блокує збереження."""
     movement, unit = write_off
     grant(session, "admin", WRITE_OFF_FULL)
 
-    with pytest.raises(ServiceError, match="причину"):
-        MovementEditService().save_full(
-            payload_for(movement, reason="   ", unit_plan=[(unit.id, None)]), "admin"
-        )
+    MovementEditService().save_full(
+        payload_for(movement, reason="   ", unit_plan=[(unit.id, None)]), "admin"
+    )
 
 
 def test_save_rejects_unit_from_another_source_and_keeps_stock_intact(

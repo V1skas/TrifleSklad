@@ -54,6 +54,11 @@ CATALOG_STORAGES_VIEW_ID = "/catalog/storages/view/"
 CATALOG_STORAGES_EDIT_ID = "/catalog/storages/edit/"
 CATALOG_STORAGES_ADD = "/catalog/storages/add/"
 
+CATALOG_CLIENTS = "/catalog/clients/"
+CATALOG_CLIENTS_VIEW_ID = "/catalog/clients/view/"
+CATALOG_CLIENTS_EDIT_ID = "/catalog/clients/edit/"
+CATALOG_CLIENTS_ADD = "/catalog/clients/add/"
+
 CATALOG_PAYMENT_TYPES = "/catalog/payment_types/"
 CATALOG_PAYMENT_TYPES_VIEW_ID = "/catalog/payment_types/view/"
 CATALOG_PAYMENT_TYPES_EDIT_ID = "/catalog/payment_types/edit/"

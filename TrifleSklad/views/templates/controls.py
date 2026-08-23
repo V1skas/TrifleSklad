@@ -297,6 +297,105 @@ def delete_with_confirm(
     )
 
 
+def confirm_with_reason_dialog(
+    *,
+    open,
+    on_open_change,
+    value,
+    on_change,
+    on_confirm,
+    title: str,
+    confirm_label: str = "Підтвердити",
+    confirm_color_scheme: str = "blue",
+    placeholder: str = "Необов'язково",
+    description: str = "",
+) -> rx.Component:
+    """Діалог підтвердження дії з необов'язковим текстовим полем причини —
+    використовується при збереженні повного редагування руху та при
+    скасуванні руху (TS-56). Причина йде в аудит-лог, порожнє значення
+    допустиме. Кнопки — стандартні стилі Radix (а не плоскі ghost-хелпери
+    проекту): нейтральна `soft gray` «Скасувати» + `solid` кнопка підтвердження
+    в обраному акцентному кольорі (`confirm_color_scheme`), обидві однакового
+    розміру й вирівняні праворуч — симетричний футер діалогу."""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title(title),
+            rx.vstack(
+                *([rx.text(description, size="2", color="gray")] if description else []),
+                rx.text("Причина (необов'язково)", size="2", weight="medium"),
+                text_area_field(
+                    placeholder=placeholder,
+                    value=value,
+                    on_change=on_change,
+                    width="100%",
+                ),
+                rx.flex(
+                    rx.button(
+                        "Скасувати",
+                        variant="soft",
+                        color_scheme="gray",
+                        size="2",
+                        type="button",
+                        on_click=on_open_change(False),
+                    ),
+                    rx.button(
+                        confirm_label,
+                        variant="solid",
+                        color_scheme=confirm_color_scheme,
+                        size="2",
+                        type="button",
+                        on_click=on_confirm,
+                    ),
+                    spacing="3",
+                    justify="end",
+                    width="100%",
+                    padding_top="0.5em",
+                ),
+                spacing="2",
+                width="100%",
+            ),
+            width="28em",
+        ),
+        open=open,
+        on_open_change=on_open_change,
+    )
+
+
+def cancel_with_reason(
+    *,
+    open,
+    on_open_change,
+    value,
+    on_change,
+    on_open_trigger,
+    on_confirm,
+    title: str = "Причина скасування",
+    trigger_label: str = "Скасувати",
+    confirm_label: str = "Застосувати",
+    description: str = "",
+) -> rx.Component:
+    """Кнопка скасування руху з необов'язковою причиною коригування (TS-56).
+    На відміну від `delete_with_confirm` (простий alert_dialog «так/ні»),
+    відкриває керований станом діалог із текстовим полем причини — тому
+    кнопка лише відкриває діалог (`on_open_trigger`), а не викликає дію
+    напряму. Кнопка підтвердження в діалозі («Застосувати») — червона, на
+    відміну від тригера («Скасувати»/«Видалити»), який лишається як є."""
+    return rx.fragment(
+        button_secondary(trigger_label, color_scheme="red", on_click=on_open_trigger),
+        confirm_with_reason_dialog(
+            open=open,
+            on_open_change=on_open_change,
+            value=value,
+            on_change=on_change,
+            on_confirm=on_confirm,
+            title=title,
+            confirm_label=confirm_label,
+            confirm_color_scheme="red",
+            description=description,
+        ),
+    )
+
+
 def button_primary(*args, **prop):
     # Старий дизайн не розрізняв «primary»/«secondary» — усі кнопки дій
     # (Створити/Зберегти/Редагувати тощо) були простими ghost-кнопками без

@@ -20,6 +20,7 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_cancel_mixin import CancelWithReasonMixin
 from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
@@ -66,7 +67,7 @@ class ListMovementsState(MovementListFilterMixin, AppState):
         return rx.redirect(routes.MOVEMENT_MOVEMENTS_ADD)
 
 
-class ViewMovementsState(AuditHistoryMixin, AppState):
+class ViewMovementsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     HISTORY_TABLE = "movements"
     HISTORY_ACTION = Action.MOVEMENTS_HISTORY
     HISTORY_DETAIL_ACTION = Action.MOVEMENTS_HISTORY_DETAIL
@@ -153,13 +154,13 @@ class ViewMovementsState(AuditHistoryMixin, AppState):
         list_id_products: List[int] = [p.id for p in self._products_movement_list_state.items]
 
         related_movements = MovementDAO.get_with_products_from_id(list_id_products, self.item.id)
-        if any(m.id != self.item.id for m in related_movements):
+        if related_movements:
             self.cancel_conflict_movements = related_movements
             self.is_cancel_conflict_dialog_open = True
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login, reason=self.cancel_reason)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -625,10 +626,6 @@ class EditMovementsState(FullEditMixin, AppState):
             return
 
         if self.can_edit_full:
-            error = self._require_reason()
-            if error is not None:
-                yield rx.toast.error(error)
-                return
             if not StorageDAO.is_type(int(self.id_incoming_storage), StorageType.WAREHOUSE):
                 yield rx.toast.error("Переміщення можливе лише між складами!")
                 return

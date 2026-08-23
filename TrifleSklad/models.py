@@ -181,7 +181,7 @@ class ProductCatalog(rx.Model, table=True):
     unit: str = Field(default="", nullable=False)
     divisible: bool = Field(default=False, nullable=False)
     uniq: bool = Field(default=False, nullable=False)
-    capacity: int = Field(default=0, nullable=False)
+    capacity: float = Field(default=0, nullable=False)
     # Подільний ТМЦ без фіксованої ємності: capacity не задається в каталозі, а
     # вводиться вручну при кожному постачанні; ємність одиниці живе в Product.count.
     no_fixed_capacity: bool = Field(default=False, nullable=False)

@@ -213,11 +213,16 @@ def view_page() -> rx.Component:
             rx.cond(
                 ViewSaleReturnsState.get_user_actions.contains(Action.SALE_RETURNS_DELETE)
                 & (ViewSaleReturnsState.current_is_canceled == False),
-                controls.delete_with_confirm(
+                controls.cancel_with_reason(
+                    open=ViewSaleReturnsState.is_cancel_reason_dialog_open,
+                    on_open_change=ViewSaleReturnsState.set_cancel_reason_dialog_open,
+                    value=ViewSaleReturnsState.cancel_reason,
+                    on_change=ViewSaleReturnsState.on_change_cancel_reason,
+                    on_open_trigger=ViewSaleReturnsState.open_cancel_reason_dialog,
+                    on_confirm=ViewSaleReturnsState.confirm_cancel,
                     title="Підтвердження скасування",
                     trigger_label="Скасувати",
                     description="Скасувати це повернення продажу?",
-                    on_confirm=ViewSaleReturnsState.on_click_cancel,
                 ),
             ),
             rx.cond(
@@ -522,6 +527,7 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditSaleReturnsState),
+        full_edit.save_reason_dialog(EditSaleReturnsState),
         titled_section(
             "Загальна інформація",
             rx.text("*Дата:", weight="medium"),
@@ -556,7 +562,6 @@ def _edit_form() -> rx.Component:
                 value=EditSaleReturnsState.id_destination_storage,
                 on_change=EditSaleReturnsState.on_change_id_destination_storage,
             ),
-            full_edit.reason_field(EditSaleReturnsState),
             rx.text("*Статус:", weight="medium"),
             rx.select(
                 EditSaleReturnsState.editable_statuses,
@@ -580,7 +585,7 @@ def edit_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Повернення продажу/Редагування",
-            controls.button_primary("Зберегти", on_click=EditSaleReturnsState.edit_one),
+            controls.button_primary("Зберегти", on_click=EditSaleReturnsState.open_save_dialog),
             left=controls.button_back(routes.MOVEMENT_SALE_RETURNS, label="Скасувати"),
             width="100%",
         ),

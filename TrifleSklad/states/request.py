@@ -20,6 +20,7 @@ from TrifleSklad.declared import (
     MovementsType,
     RequestStatus,
     StorageType,
+    format_amount,
     format_request_qty,
     movements_type_list,
     request_status_list,
@@ -162,7 +163,7 @@ class _RequestFormState(rx.State, mixin=True):
     list_destinations: List[Tuple[str, str]] = []
     list_catalog: List[Tuple[str, str]] = []
     # довідник характеристик каталогу: id -> (divisible, capacity, unit)
-    _catalog_info: Dict[int, Tuple[bool, int, str]] = {}
+    _catalog_info: Dict[int, Tuple[bool, float, str]] = {}
 
     new_position_catalog: str = ""
     new_position_count: str = "1"
@@ -203,11 +204,15 @@ class _RequestFormState(rx.State, mixin=True):
         return info[0] if info is not None else False
 
     @rx.var
-    def new_position_capacity(self) -> int:
+    def new_position_capacity(self) -> float:
         if self.new_position_catalog == "":
             return 0
         info = self._catalog_info.get(int(self.new_position_catalog))
         return info[1] if info is not None else 0
+
+    @rx.var
+    def new_position_capacity_label(self) -> str:
+        return format_amount(self.new_position_capacity)
 
     @rx.var
     def new_position_unit(self) -> str:

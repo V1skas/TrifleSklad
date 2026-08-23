@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from sqlmodel import Session, select
 
-from TrifleSklad.declared import MovementsType, sale_line_cost
+from TrifleSklad.declared import MovementsStatus, MovementsType, sale_line_cost
 from TrifleSklad.models import Movement, MovementProducts, MovementProductsCatalog, Product
 
 
@@ -38,10 +38,10 @@ class MovementDao:
         """Рухи, що містять будь-яку з указаних одиниць, за зростанням id.
         `after_id` — лише рухи з БІЛЬШИМ id (конфлікт-чек редагування).
 
-        Скасовані рухи навмисно НЕ фільтруються — так само, як у
-        `dao_legacy.MovementDAO.get_with_products_from_id`: місце одиниці
-        реконструюється ланцюжком id, і якщо поверх редагованого руху лежить
-        скасований пізніший, revert може повести залишок не туди.
+        Скасовані рухи виключаються (TS-56): відкат тепер бере джерело з
+        шапки руху (`_revert_to_source`/... у `services/movement_posting.py`,
+        TS-48-fix), а не реконструює його ланцюжком попередніх рухів, тож
+        скасований пізніший рух більше не заважає редагувати більш ранній.
         """
         if not unit_ids:
             return []
@@ -53,6 +53,7 @@ class MovementDao:
                 MovementProducts.id_movement_product == MovementProductsCatalog.id,
             )
             .where(MovementProducts.id_product.in_(unit_ids))
+            .where(Movement.status != MovementsStatus.CANCELED)
         )
         if after_id is not None:
             statement = statement.where(Movement.id > after_id)

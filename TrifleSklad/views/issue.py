@@ -284,6 +284,7 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditIssueState),
+        full_edit.save_reason_dialog(EditIssueState),
         titled_section(
             "Загальна інформація",
             rx.cond(
@@ -377,7 +378,6 @@ def _edit_form() -> rx.Component:
                 value=EditIssueState.id_recipient,
                 on_change=EditIssueState.on_change_id_recipient,
             ),
-            full_edit.reason_field(EditIssueState),
             rx.text("*Статус:", weight="medium"),
             rx.select(
                 EditIssueState.editable_statuses,
@@ -406,7 +406,7 @@ def edit_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Видачі/Редагування",
-            controls.button_primary("Зберегти", on_click=EditIssueState.edit_one),
+            controls.button_primary("Зберегти", on_click=EditIssueState.open_save_dialog),
             left=controls.button_back(routes.MOVEMENT_ISSUES, label="Скасувати"),
             width="100%",
         ),
@@ -492,11 +492,16 @@ def view_page() -> rx.Component:
             rx.cond(
                 ViewIssueState.get_user_actions.contains(Action.ISSUES_DELETE)
                 & (ViewIssueState.current_is_canceled == False),
-                controls.delete_with_confirm(
+                controls.cancel_with_reason(
+                    open=ViewIssueState.is_cancel_reason_dialog_open,
+                    on_open_change=ViewIssueState.set_cancel_reason_dialog_open,
+                    value=ViewIssueState.cancel_reason,
+                    on_change=ViewIssueState.on_change_cancel_reason,
+                    on_open_trigger=ViewIssueState.open_cancel_reason_dialog,
+                    on_confirm=ViewIssueState.confirm_cancel,
                     title="Підтвердження скасування",
                     trigger_label="Скасувати",
                     description="Скасувати цю видачу?",
-                    on_confirm=ViewIssueState.on_click_cancel,
                 ),
             ),
             rx.cond(

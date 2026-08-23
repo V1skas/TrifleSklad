@@ -5,8 +5,13 @@ import reflex as rx
 from TrifleSklad import routes
 from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import WorkerDAO
-from TrifleSklad.declared import storage_type_list
+from TrifleSklad.declared import StorageType, storage_type_list
 from TrifleSklad.models import Storage
+
+# «Об'єкти підприємства» — усі типи місць зберігання, крім клієнтів: клієнти
+# відображаються в окремому розділі «Клієнти» (states/client.py, TS-56), хоча
+# під капотом лишаються тим самим Storage з type == CLIENT.
+_NON_CLIENT_STORAGE_TYPES = [t for t in storage_type_list if t != StorageType.CLIENT]
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.storage import StorageService
 from TrifleSklad.states.app import AppState
@@ -45,7 +50,7 @@ class ListStorageState(SearchFilterMixin, AppState):
 
     @rx.var
     def storage_type_options(self) -> List[Tuple[str, str]]:
-        return [(title, str(t)) for t, title in storage_type_list.items()]
+        return [(storage_type_list[t], str(t)) for t in _NON_CLIENT_STORAGE_TYPES]
 
     @rx.var
     def has_active_filters(self) -> bool:
@@ -63,7 +68,7 @@ class ListStorageState(SearchFilterMixin, AppState):
             self.filter_address = ""
             self.filter_type = "all"
             self.is_filter_open = False
-            self.items = StorageService().get_list_items()
+            self.items = StorageService().get_list_items(type_in=_NON_CLIENT_STORAGE_TYPES)
             self.in_progress = False
         except Exception:
             yield rx.toast.error("Під час виконання запиту сталася помилка. Спробуйте знову.")
@@ -186,7 +191,7 @@ class EditStorageState(AppState):
         try:
             self.in_process = True
             item = StorageService().get_by_id(int(id))
-            if item is None:
+            if item is None or item.type == StorageType.CLIENT:
                 self.in_process = False
                 yield rx.redirect(routes.CATALOG_STORAGES)
                 yield rx.toast.error("Запис не було знайдено")
@@ -313,7 +318,7 @@ class ViewStorageState(AuditHistoryMixin, AppState):
             self.in_process = True
             self.item = StorageService().get_by_id(int(id))
             self.in_process = False
-            if self.item is None:
+            if self.item is None or self.item.type == StorageType.CLIENT:
                 yield rx.redirect(routes.CATALOG_STORAGES)
                 yield rx.toast.error("Запис не було знайдено")
                 return

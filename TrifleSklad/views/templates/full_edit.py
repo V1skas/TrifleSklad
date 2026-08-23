@@ -67,24 +67,21 @@ def full_edit_notice(state) -> rx.Component:
     )
 
 
-def reason_field(state) -> rx.Component:
-    """Обов'язкове поле «Причина коригування»: текст іде в аудит-лог і видимий у
-    блоці «Історія змін» усім, хто має право на історію."""
-    return rx.cond(
-        state.can_edit_full,
-        rx.vstack(
-            rx.text("*Причина коригування", size="2", weight="medium"),
-            controls.text_area_field(
-                placeholder="Чому змінюється вже проведений рух",
-                value=state.edit_reason,
-                on_change=state.on_change_edit_reason,
-            ),
-            rx.cond(
-                state.edit_reason_error,
-                rx.text("Вкажіть причину коригування!", size="1", color=rx.color("red", 11)),
-            ),
-            spacing="1",
-            align="start",
-            width="100%",
-        ),
+def save_reason_dialog(state) -> rx.Component:
+    """Діалог підтвердження збереження повного редагування — необов'язкова
+    причина коригування (TS-56). Текст іде в аудит-лог і видимий у блоці
+    «Історія змін» усім, хто має право на історію. Показується лише коли
+    доступне повне редагування — «Зберегти» відкриває цей діалог
+    (`FullEditMixin.open_save_dialog`), для урізаного редагування
+    зберігається одразу."""
+    return controls.confirm_with_reason_dialog(
+        open=state.is_save_dialog_open,
+        on_open_change=state.set_save_dialog_open,
+        value=state.edit_reason,
+        on_change=state.on_change_edit_reason,
+        on_confirm=state.confirm_save,
+        title="Причина коригування",
+        confirm_label="Зберегти",
+        confirm_color_scheme="blue",
+        placeholder="Чому змінюється вже проведений рух",
     )

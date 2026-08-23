@@ -1,9 +1,10 @@
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import reflex as rx
 
 from TrifleSklad import routes
 from TrifleSklad.actions import Action
+from TrifleSklad.declared import format_amount
 from TrifleSklad.models import ProductCatalog, ProductCategory
 from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.product_catalog import ProductCatalogService
@@ -13,6 +14,15 @@ from TrifleSklad.states.audit_mixin import AuditHistoryMixin
 from TrifleSklad.states.list_filter_mixin import SearchFilterMixin
 
 ALL = "all"
+
+
+def _parse_positive_capacity(value: str) -> float:
+    """Розбирає рядок у додатне дробове число (ємність); інакше 0."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed > 0 else 0
 
 
 class CategoryCreateMixin(rx.State, mixin=True):
@@ -111,6 +121,12 @@ class ListProductsState(SearchFilterMixin, AppState):
     def has_active_filters(self) -> bool:
         return bool(self.search_str) or self.filter_category_id != ALL
 
+    @rx.var
+    def capacity_labels(self) -> Dict[int, str]:
+        """Ємність без зайвого «.0» для дробових значень (TS-56) — ключ по id,
+        бо `item` у foreach лишається сирою моделлю ProductCatalog."""
+        return {i.id: format_amount(i.capacity) for i in (self.items or [])}
+
     @rx.event
     def on_load(self):
         if not self.has_permission(Action.PRODUCTS_LIST):
@@ -173,6 +189,10 @@ class AddProductsState(CategoryCreateMixin, AppState):
     in_process: bool = False
     list_categories: List[Tuple[str, str]] = []
     all_units_cache: List[str] = []
+    # Сира строка поля «Місткість» (як price_input в admission) — інакше дробове
+    # значення переформатується на кожен ввід через format_amount і губить крапку
+    # («0.» → «0» під час набору «0.75»).
+    capacity_input: str = "0"
 
     def _load_categories(self):
         self.list_categories = ProductCategoryService().get_hierarchy_options()
@@ -184,6 +204,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
             yield rx.redirect(routes.WELCOME)
             return
         self.item = ProductCatalog()
+        self.capacity_input = "0"
         self._load_categories()
         self.all_units_cache = ProductCatalogService().get_list_units()
 
@@ -210,10 +231,6 @@ class AddProductsState(CategoryCreateMixin, AppState):
     @rx.var
     def uniq(self) -> bool:
         return bool(self.item.uniq) if self.item is not None else False
-
-    @rx.var
-    def capacity(self) -> str:
-        return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
 
     @rx.var
     def no_fixed_capacity(self) -> bool:
@@ -248,6 +265,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
 
     @rx.event
     def set_capacity(self, value: str):
+        self.capacity_input = value
         # Товар із серійним номером завжди має місткість 1.
         if self.item.uniq:
             self.item.capacity = 1
@@ -256,7 +274,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
         if self.item.no_fixed_capacity:
             self.item.capacity = 0
             return
-        self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
+        self.item.capacity = _parse_positive_capacity(value)
 
     @rx.event
     def set_no_fixed_capacity(self, value: bool):
@@ -267,6 +285,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
         self.item.no_fixed_capacity = value
         if value:
             self.item.capacity = 0
+            self.capacity_input = "0"
 
     @rx.event
     def set_uniq(self, value: bool):
@@ -276,6 +295,7 @@ class AddProductsState(CategoryCreateMixin, AppState):
             self.item.divisible = False
             self.item.capacity = 1
             self.item.no_fixed_capacity = False
+            self.capacity_input = "1"
 
     @rx.event
     def on_save(self):
@@ -317,6 +337,8 @@ class EditProductsState(CategoryCreateMixin, AppState):
     in_process: bool = False
     list_categories: List[Tuple[str, str]] = []
     all_units_cache: List[str] = []
+    # Сира строка поля «Місткість» — див. пояснення в AddProductsState.
+    capacity_input: str = "0"
 
     def _load_categories(self):
         self.list_categories = ProductCategoryService().get_hierarchy_options()
@@ -337,6 +359,7 @@ class EditProductsState(CategoryCreateMixin, AppState):
                 yield rx.toast.error("Запис не знайдено!")
                 return
             self.item = item
+            self.capacity_input = format_amount(item.capacity) if item.capacity is not None else "0"
             self._load_categories()
             self.all_units_cache = ProductCatalogService().get_list_units()
             self.in_process = False
@@ -369,10 +392,6 @@ class EditProductsState(CategoryCreateMixin, AppState):
         return bool(self.item.uniq) if self.item is not None else False
 
     @rx.var
-    def capacity(self) -> str:
-        return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
-
-    @rx.var
     def no_fixed_capacity(self) -> bool:
         return bool(self.item.no_fixed_capacity) if self.item is not None else False
 
@@ -403,13 +422,14 @@ class EditProductsState(CategoryCreateMixin, AppState):
 
     @rx.event
     def set_capacity(self, value: str):
+        self.capacity_input = value
         if self.item.uniq:
             self.item.capacity = 1
             return
         if self.item.no_fixed_capacity:
             self.item.capacity = 0
             return
-        self.item.capacity = int(value) if value.isdigit() and int(value) > 0 else 0
+        self.item.capacity = _parse_positive_capacity(value)
 
     @rx.event
     def set_no_fixed_capacity(self, value: bool):
@@ -420,6 +440,7 @@ class EditProductsState(CategoryCreateMixin, AppState):
         self.item.no_fixed_capacity = value
         if value:
             self.item.capacity = 0
+            self.capacity_input = "0"
 
     @rx.event
     def set_uniq(self, value: bool):
@@ -428,6 +449,7 @@ class EditProductsState(CategoryCreateMixin, AppState):
             self.item.divisible = False
             self.item.capacity = 1
             self.item.no_fixed_capacity = False
+            self.capacity_input = "1"
 
     @rx.event
     def on_save(self):
@@ -498,7 +520,7 @@ class ViewProductsState(AuditHistoryMixin, AppState):
 
     @rx.var
     def capacity(self) -> str:
-        return str(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
+        return format_amount(self.item.capacity) if self.item is not None and self.item.capacity is not None else ""
 
     @rx.var
     def no_fixed_capacity(self) -> bool:

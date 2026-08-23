@@ -11,10 +11,10 @@ from TrifleSklad.services.errors import ServiceError
 
 
 class StorageService:
-    def get_list_items(self) -> Sequence[Storage]:
+    def get_list_items(self, type_in: Optional[Sequence[int]] = None) -> Sequence[Storage]:
         try:
             with rx.session() as session:
-                items = StorageDao.get_all(session)
+                items = StorageDao.get_all(session, type_in=type_in)
                 session.expunge_all()
                 return items
         except Exception as e:

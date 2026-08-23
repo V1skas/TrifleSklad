@@ -247,6 +247,7 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditMovementsState),
+        full_edit.save_reason_dialog(EditMovementsState),
         titled_section(
             "Загальна інформація",
             rx.text("*Дата:", weight="medium"),
@@ -311,7 +312,6 @@ def _edit_form() -> rx.Component:
                 value=EditMovementsState.id_destination_owner,
                 on_change=EditMovementsState.on_change_id_destination_owner,
             ),
-            full_edit.reason_field(EditMovementsState),
             rx.text("*Статус:", weight="medium"),
             rx.select(
                 EditMovementsState.editable_statuses,
@@ -335,7 +335,7 @@ def edit_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Переміщення/Редагування",
-            controls.button_primary("Зберегти", on_click=EditMovementsState.edit_one),
+            controls.button_primary("Зберегти", on_click=EditMovementsState.open_save_dialog),
             left=controls.button_back(routes.MOVEMENT_MOVEMENTS, label="Скасувати"),
             width="100%",
         ),
@@ -421,11 +421,16 @@ def view_page() -> rx.Component:
             rx.cond(
                 ViewMovementsState.get_user_actions.contains(Action.MOVEMENTS_DELETE)
                 & (ViewMovementsState.current_is_canceled == False),
-                controls.delete_with_confirm(
+                controls.cancel_with_reason(
+                    open=ViewMovementsState.is_cancel_reason_dialog_open,
+                    on_open_change=ViewMovementsState.set_cancel_reason_dialog_open,
+                    value=ViewMovementsState.cancel_reason,
+                    on_change=ViewMovementsState.on_change_cancel_reason,
+                    on_open_trigger=ViewMovementsState.open_cancel_reason_dialog,
+                    on_confirm=ViewMovementsState.confirm_cancel,
                     title="Підтвердження скасування",
                     trigger_label="Скасувати",
                     description="Скасувати це переміщення? Товар буде повернено на попереднє місце.",
-                    on_confirm=ViewMovementsState.on_click_cancel,
                 ),
             ),
             rx.cond(

@@ -201,7 +201,7 @@ class ViewUnitsReportState(AppState):
         count = format_amount(self.unit.count)
         if self.unit.product_catalog.no_fixed_capacity:
             return f"{count}/∞ {self.unit.product_catalog.unit}"
-        return f"{count}/{self.unit.product_catalog.capacity} {self.unit.product_catalog.unit}"
+        return f"{count}/{format_amount(self.unit.product_catalog.capacity)} {self.unit.product_catalog.unit}"
 
     @rx.var
     def unit_excluded(self) -> bool:

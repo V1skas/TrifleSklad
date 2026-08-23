@@ -181,6 +181,7 @@ def add_page() -> rx.Component:
 def _edit_form() -> rx.Component:
     return rx.vstack(
         full_edit.full_edit_notice(EditReturnsState),
+        full_edit.save_reason_dialog(EditReturnsState),
         titled_section(
             "Загальна інформація",
             rx.text("*Дата:", weight="medium"),
@@ -215,7 +216,6 @@ def _edit_form() -> rx.Component:
                 value=EditReturnsState.id_destination_storage,
                 on_change=EditReturnsState.on_change_id_destination_storage,
             ),
-            full_edit.reason_field(EditReturnsState),
             rx.text("*Статус:", weight="medium"),
             rx.select(
                 EditReturnsState.editable_statuses,
@@ -239,7 +239,7 @@ def edit_page() -> rx.Component:
     return page_wrapper(
         header_subpage(
             "Повернення/Редагування",
-            controls.button_primary("Зберегти", on_click=EditReturnsState.edit_one),
+            controls.button_primary("Зберегти", on_click=EditReturnsState.open_save_dialog),
             left=controls.button_back(routes.MOVEMENT_RETURNS, label="Скасувати"),
             width="100%",
         ),
@@ -323,11 +323,16 @@ def view_page() -> rx.Component:
             rx.cond(
                 ViewReturnsState.get_user_actions.contains(Action.RETURNS_DELETE)
                 & (ViewReturnsState.current_is_canceled == False),
-                controls.delete_with_confirm(
+                controls.cancel_with_reason(
+                    open=ViewReturnsState.is_cancel_reason_dialog_open,
+                    on_open_change=ViewReturnsState.set_cancel_reason_dialog_open,
+                    value=ViewReturnsState.cancel_reason,
+                    on_change=ViewReturnsState.on_change_cancel_reason,
+                    on_open_trigger=ViewReturnsState.open_cancel_reason_dialog,
+                    on_confirm=ViewReturnsState.confirm_cancel,
                     title="Підтвердження скасування",
                     trigger_label="Скасувати",
                     description="Скасувати це повернення? Товар буде повернено на попереднє місце.",
-                    on_confirm=ViewReturnsState.on_click_cancel,
                 ),
             ),
             rx.cond(

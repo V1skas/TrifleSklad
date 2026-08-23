@@ -20,6 +20,7 @@ from TrifleSklad.services.errors import ServiceError
 from TrifleSklad.services.movement_edit import FullEditPayload, MovementEditService
 from TrifleSklad.states.app import AppState
 from TrifleSklad.states.audit_mixin import AuditHistoryMixin
+from TrifleSklad.states.movement_cancel_mixin import CancelWithReasonMixin
 from TrifleSklad.states.movement_edit_mixin import FullEditMixin
 from TrifleSklad.utils.clock import now_local
 
@@ -64,7 +65,7 @@ class ListWriteOffState(MovementListFilterMixin, AppState):
         return rx.redirect(routes.MOVEMENT_WRITE_OFFS_ADD)
 
 
-class ViewWriteOffState(AuditHistoryMixin, AppState):
+class ViewWriteOffState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     HISTORY_TABLE = "write_offs"
     HISTORY_ACTION = Action.WRITE_OFFS_HISTORY
     HISTORY_DETAIL_ACTION = Action.WRITE_OFFS_HISTORY_DETAIL
@@ -151,13 +152,13 @@ class ViewWriteOffState(AuditHistoryMixin, AppState):
         list_id_products: List[int] = [p.id for p in self._products_movement_list_state.items]
 
         related_movements = MovementDAO.get_with_products_from_id(list_id_products, self.item.id)
-        if any(m.id != self.item.id for m in related_movements):
+        if related_movements:
             self.cancel_conflict_movements = related_movements
             self.is_cancel_conflict_dialog_open = True
             yield rx.toast.error("Скасування неможливе: товар бере участь у пізніших рухах!")
             return
 
-        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login)
+        flag, text = MovementDAO.cancel_movement(self.item.id, self.user.login, reason=self.cancel_reason)
         if not flag:
             yield rx.toast.error(text)
             return
@@ -524,10 +525,6 @@ class EditWriteOffState(FullEditMixin, AppState):
             return
 
         if self.can_edit_full:
-            error = self._require_reason()
-            if error is not None:
-                yield rx.toast.error(error)
-                return
             flag, text, plan = self._products_movement_list_state.collect_unit_plan()
             if not flag:
                 yield rx.toast.error(text)

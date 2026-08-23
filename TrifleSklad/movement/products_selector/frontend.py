@@ -28,7 +28,7 @@ def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
                 rx.cond(
                     item[1].product_catalog.no_fixed_capacity,
                     f"Залишок: {item[1].count}/∞ {item[1].product_catalog.unit}",
-                    f"Залишок: {item[1].count}/{item[1].product_catalog.capacity} "
+                    f"Залишок: {item[1].count}/{ProductsSelectorState.capacity_labels[item[1].id]} "
                     f"{item[1].product_catalog.unit}",
                 ),
                 size="1",
@@ -46,7 +46,7 @@ def product_detail_line(item: Tuple[int, Product]) -> rx.Component:
                 max=rx.cond(
                     item[1].product_catalog.no_fixed_capacity,
                     1,
-                    item[1].product_catalog.capacity,
+                    item[1].product_catalog.capacity.to(int),
                 ),
                 color_scheme="green",
                 height="0.5em",

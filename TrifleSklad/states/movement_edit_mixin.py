@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Optional, Tuple
+from typing import ClassVar, List, Tuple
 
 import reflex as rx
 
@@ -23,8 +23,10 @@ class FullEditMixin(rx.State, mixin=True):
     full_edit_block_message: str = ""
     # (id, тип, дата, статус, url) — той самий формат, що cancel_conflict_rows.
     full_edit_conflicts: List[Tuple[str, str, str, str, str]] = []
+    # Причина коригування — необов'язкова, вводиться у діалозі підтвердження
+    # збереження (лише коли доступне повне редагування).
     edit_reason: str = ""
-    edit_reason_error: bool = False
+    is_save_dialog_open: bool = False
 
     @rx.var
     def is_view_only_edit(self) -> bool:
@@ -38,12 +40,29 @@ class FullEditMixin(rx.State, mixin=True):
     @rx.event
     def on_change_edit_reason(self, value: str):
         self.edit_reason = value
-        if value.strip():
-            self.edit_reason_error = False
+
+    @rx.event
+    def open_save_dialog(self):
+        """«Зберегти» у шапці: для повного редагування — діалог з необов'язковою
+        причиною коригування; для урізаного — збереження одразу (причина
+        коригування там не застосовна)."""
+        if not self.can_edit_full:
+            return self.edit_one()
+        self.edit_reason = ""
+        self.is_save_dialog_open = True
+
+    @rx.event
+    def set_save_dialog_open(self, value: bool):
+        self.is_save_dialog_open = value
+
+    @rx.event
+    def confirm_save(self):
+        self.is_save_dialog_open = False
+        return self.edit_one()
 
     def _load_editability(self, movement_id: int) -> None:
         self.edit_reason = ""
-        self.edit_reason_error = False
+        self.is_save_dialog_open = False
         verdict = MovementEditService().editability(
             movement_id, self.MOVEMENT_TYPE, self.user.login if self.user is not None else ""
         )
@@ -59,10 +78,3 @@ class FullEditMixin(rx.State, mixin=True):
             )
             for m in verdict.conflicts
         ]
-
-    def _require_reason(self) -> Optional[str]:
-        """None, якщо причину коригування вказано; інакше — текст помилки."""
-        if self.edit_reason.strip():
-            return None
-        self.edit_reason_error = True
-        return "Вкажіть причину коригування!"
