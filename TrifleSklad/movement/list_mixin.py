@@ -18,7 +18,10 @@ ALL = "all"
 # Скидання прокрутки тіла сторінки на початок після зміни сторінки/фільтра:
 # короткий список інакше лишається за межами видимої області (scrollTop від
 # попередньої, довшої сторінки). id проставлено на скролері в page_wrapper.
-_SCROLL_TOP_SCRIPT = (
+# Публічна константа — переиспользується і звітами з пагінацією
+# (states/units_report.py, states/catalog_movements_report.py), щоб id скролера
+# лишався єдиним джерелом істини й не розсинхронився при зміні.
+SCROLL_TOP_SCRIPT = (
     "const el=document.getElementById('page-scroll-body');"
     "if(el){requestAnimationFrame(()=>{el.scrollTop=0;});}"
 )
@@ -216,7 +219,7 @@ class MovementListFilterMixin(rx.State, mixin=True):
         на 1-у сторінку, перезавантажити список, прокрутка вгору."""
         self._current_page = 1
         self._reload()
-        return rx.call_script(_SCROLL_TOP_SCRIPT)
+        return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def on_change_filter_date_enabled(self, value: bool):
@@ -289,26 +292,26 @@ class MovementListFilterMixin(rx.State, mixin=True):
         self._reset_filter_values()
         self._reset_section_filter_values()
         self._reload()
-        return rx.call_script(_SCROLL_TOP_SCRIPT)
+        return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def current_page_increment(self):
         if self._current_page + 1 <= self._all_pages:
             self._current_page += 1
             self._reload()
-            return rx.call_script(_SCROLL_TOP_SCRIPT)
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def current_page_decrement(self):
         if self._current_page > 1:
             self._current_page -= 1
             self._reload()
-            return rx.call_script(_SCROLL_TOP_SCRIPT)
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def on_change_current_page(self, value: str):
         if value != "" and value.isdigit() and 0 < int(value) <= self._all_pages:
             self._current_page = int(value)
             self._reload()
-            return rx.call_script(_SCROLL_TOP_SCRIPT)
+            return rx.call_script(SCROLL_TOP_SCRIPT)
     # ======================

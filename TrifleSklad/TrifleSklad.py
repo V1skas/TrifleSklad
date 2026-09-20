@@ -150,6 +150,8 @@ from TrifleSklad.states.stock_report import StockReportState
 from TrifleSklad.views import stock_report as stock_report_views
 from TrifleSklad.states.units_report import ListUnitsReportState, ViewUnitsReportState
 from TrifleSklad.views import units_report as units_report_views
+from TrifleSklad.states.catalog_movements_report import CatalogMovementsReportState
+from TrifleSklad.views import catalog_movements_report as catalog_movements_report_views
 
 app = rx.App(
     # Тема налаштовується через rx.plugins.RadixThemesPlugin у rxconfig.py
@@ -291,3 +293,4 @@ app.add_page(admission_views.view_page, route=routes.MOVEMENT_ADMISSIONS_VIEW_ID
 app.add_page(stock_report_views.page, route=routes.REPORTS_STOCK, on_load=StockReportState.on_load)
 app.add_page(units_report_views.list_page, route=routes.REPORTS_UNITS, on_load=ListUnitsReportState.on_load)
 app.add_page(units_report_views.view_page, route=routes.REPORTS_UNITS_VIEW_ID + "[id]", on_load=ViewUnitsReportState.on_load)
+app.add_page(catalog_movements_report_views.page, route=routes.REPORTS_CATALOG_MOVEMENTS, on_load=CatalogMovementsReportState.on_load)

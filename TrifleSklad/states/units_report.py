@@ -7,7 +7,7 @@ from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import MovementDAO, ProductCatalogDAO, ProductDAO
 from TrifleSklad.declared import format_amount, movements_status_list, movements_type_list
 from TrifleSklad.models import Product
-from TrifleSklad.movement.list_mixin import ALL
+from TrifleSklad.movement.list_mixin import ALL, SCROLL_TOP_SCRIPT
 from TrifleSklad.states.app import AppState
 
 
@@ -90,18 +90,21 @@ class ListUnitsReportState(AppState):
         if self._current_page + 1 <= self._all_pages:
             self._current_page += 1
             self._load_list()
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def current_page_decrement(self):
         if self._current_page > 1:
             self._current_page -= 1
             self._load_list()
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def on_change_current_page(self, value: str):
         if value != "" and 0 < int(value) <= self._all_pages:
             self._current_page = int(value)
             self._load_list()
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
 
 class ViewUnitsReportState(AppState):

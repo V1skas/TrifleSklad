@@ -61,6 +61,7 @@ MAIN: List[MenuItem] = [
     MenuItem("Звіти", "chart-bar", routes.REPORTS, children=[
         MenuItem("Наявність ТМЦ", "boxes", routes.REPORTS_STOCK, required_action=Actions.REPORTS_STOCK),
         MenuItem("Одиниці ТМЦ", "hash", routes.REPORTS_UNITS, required_action=Actions.REPORTS_UNITS),
+        MenuItem("Рух по каталогу ТМЦ", "route", routes.REPORTS_CATALOG_MOVEMENTS, required_action=Actions.REPORTS_CATALOG_MOVEMENTS),
     ]),
 ]
 

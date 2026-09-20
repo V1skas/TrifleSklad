@@ -173,6 +173,7 @@ class Action(StrEnum):
 
     REPORTS_STOCK = ("reports:stock", "Звіт «Наявність ТМЦ»", "Дозволяє переглядати звіт про наявність ТМЦ на місцях зберігання")
     REPORTS_UNITS = ("reports:units", "Звіт «Одиниці ТМЦ»", "Дозволяє переглядати перелік і деталі окремих одиниць ТМЦ")
+    REPORTS_CATALOG_MOVEMENTS = ("reports:catalog_movements", "Звіт «Рух по каталогу ТМЦ»", "Дозволяє переглядати звіт про рухи в розрізі позицій каталогу ТМЦ")
 
     def __new__(cls, code: str, title: str, description: str):
         obj = str.__new__(cls, code)
