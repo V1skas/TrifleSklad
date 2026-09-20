@@ -108,13 +108,16 @@ class ViewUnitsReportState(AppState):
     in_process: bool = True
 
     unit: Optional[Product] = None
+    acquisition_cost: Optional[float] = None
     history_rows: List[Tuple[str, str, str, str, str, str, str]] = []
 
     def _load_unit(self, id: int):
         self.unit = ProductDAO.get_by_id_with_relationships(id)
         if self.unit is None:
             self.history_rows = []
+            self.acquisition_cost = None
             return
+        self.acquisition_cost = ProductDAO.get_acquisition_cost(id)
         rows: List[Tuple[str, str, str, str, str, str, str]] = []
         for m in MovementDAO.get_history_by_product_id(id):
             type_title = movements_type_list.get(m.type, "—")
@@ -206,6 +209,12 @@ class ViewUnitsReportState(AppState):
     @rx.var
     def unit_excluded(self) -> bool:
         return self.unit is not None and self.unit.excluded_from_accounting
+
+    @rx.var
+    def acquisition_cost_display(self) -> str:
+        if self.acquisition_cost is None:
+            return "—"
+        return f"{self.acquisition_cost:.2f}"
 
     @rx.var
     def has_history(self) -> bool:

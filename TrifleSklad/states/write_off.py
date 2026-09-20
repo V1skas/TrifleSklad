@@ -39,6 +39,7 @@ class ListWriteOffState(MovementListFilterMixin, AppState):
             self.selected_statuses,
             incoming_storage=self.filter_incoming_storage,
             incoming_owner=self.filter_incoming_owner,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.var
@@ -56,7 +57,7 @@ class ListWriteOffState(MovementListFilterMixin, AppState):
             yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
             return
         self.in_progress = True
-        self._reset_list_state()
+        self._enter_list()
         self._reload()
         self.in_progress = False
 

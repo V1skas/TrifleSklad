@@ -44,7 +44,6 @@ def _filter_card() -> rx.Component:
                 ),
                 controls.filter_actions(
                     rx.button("Скинути", variant="soft", color_scheme="gray", on_click=ListRequestsState.reset_filters),
-                    rx.button("Застосувати", on_click=ListRequestsState.apply_filters),
                 ),
                 spacing="3",
                 width="100%",

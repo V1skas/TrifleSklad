@@ -41,6 +41,7 @@ class ListMovementsState(MovementListFilterMixin, AppState):
             destination_storage=self.filter_destination_storage,
             incoming_owner=self.filter_incoming_owner,
             destination_owner=self.filter_destination_owner,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.var
@@ -58,7 +59,7 @@ class ListMovementsState(MovementListFilterMixin, AppState):
             yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
             return
         self.in_progress = True
-        self._reset_list_state()
+        self._enter_list()
         self._reload()
         self.in_progress = False
 

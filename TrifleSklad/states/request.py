@@ -115,9 +115,7 @@ class ListRequestsState(AppState):
             self.selected_statuses = self.selected_statuses + [index]
         elif not checked and index in self.selected_statuses:
             self.selected_statuses = [s for s in self.selected_statuses if s != index]
-
-    @rx.event
-    def apply_filters(self):
+        # Застосовується одразу зі зміною (окремої кнопки «Застосувати» немає).
         self._current_page = 1
         self._reload()
 

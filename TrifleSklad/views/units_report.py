@@ -181,6 +181,7 @@ def view_page_content() -> rx.Component:
             rx.cond(ViewUnitsReportState.unit_divisible, _remain_row(ViewUnitsReportState)),
             field_row("Місце зберігання", ViewUnitsReportState.unit_storage),
             field_row("Власник", ViewUnitsReportState.unit_owner),
+            field_row("Вартість при постачанні", ViewUnitsReportState.acquisition_cost_display),
             field_row(
                 "Бухгалтерський облік",
                 rx.cond(ViewUnitsReportState.unit_excluded, "Виключено", "Враховується"),

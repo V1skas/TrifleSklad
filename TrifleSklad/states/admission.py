@@ -896,6 +896,12 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
     filter_supplier: str = ALL
     list_suppliers: List[Tuple[str, str]] = []
 
+    def _load_section_filter_options(self):
+        self.list_suppliers = [(s.title, str(s.id)) for s in SupplierDAO.get_all()]
+
+    def _reset_section_filter_values(self):
+        self.filter_supplier = ALL
+
     def _reload(self):
         self._all_pages, self.items = AdmissionDAO.get_paginated(
             self._current_page,
@@ -906,6 +912,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
             destination_storage=self.filter_destination_storage,
             destination_owner=self.filter_destination_owner,
             supplier=self.filter_supplier,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.var
@@ -913,6 +920,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
         return bool(
             self.filter_date_enabled
             or self.selected_statuses
+            or self.selected_catalog_ids
             or self.filter_destination_storage != ALL
             or self.filter_destination_owner != ALL
             or self.filter_supplier != ALL
@@ -940,9 +948,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
             yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
             return
         self.in_progress = True
-        self._reset_list_state()
-        self.filter_supplier = ALL
-        self.list_suppliers = [(s.title, str(s.id)) for s in SupplierDAO.get_all()]
+        self._enter_list()
         self._reload()
         self.in_progress = False
 
@@ -953,21 +959,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
     @rx.event
     def on_change_filter_supplier(self, value: str):
         self.filter_supplier = value
-
-    @rx.event
-    def reset_filters(self):
-        today = now_local().date().isoformat()
-        self.filter_date_enabled = False
-        self.filter_date_from = today
-        self.filter_date_to = today
-        self.selected_statuses = []
-        self.filter_incoming_storage = ALL
-        self.filter_destination_storage = ALL
-        self.filter_incoming_owner = ALL
-        self.filter_destination_owner = ALL
-        self.filter_supplier = ALL
-        self._current_page = 1
-        self._reload()
+        return self._apply_filters()
 
 
 class AddAdmissionState(LookupCreatorsMixin, AppState):

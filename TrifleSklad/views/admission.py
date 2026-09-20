@@ -818,17 +818,6 @@ def view_page_content() -> rx.Component:
             field_row("Коментар", ViewAdmissionState.item.movement.comment),
         ),
         titled_section(
-            "Фінанси",
-            field_row("Сума без ПДВ", ViewAdmissionState.subtotal_display),
-            field_row("Ставка ПДВ", ViewAdmissionState.nds_rate_title),
-            field_row("Сума ПДВ", ViewAdmissionState.nds_amount_display),
-            field_row("Разом з ПДВ", ViewAdmissionState.total_display),
-            field_row("ПДВ включений у ціну", rx.cond(ViewAdmissionState.item.flag_nds, "Так", "Ні")),
-            field_row("Спосіб оплати", ViewAdmissionState.item.payment_type.title),
-            field_row("Номер накладної оплати", ViewAdmissionState.invoice_number),
-            field_row("Курс долара", ViewAdmissionState.item.dollar_rate),
-        ),
-        titled_section(
             "Товари",
             _view_admission_products_catalog_table(),
             rx.dialog.root(
@@ -840,6 +829,17 @@ def view_page_content() -> rx.Component:
                 open=ViewAdmissionState.dialog_open,
                 on_open_change=ViewAdmissionState.close_dialog,
             ),
+        ),
+        titled_section(
+            "Фінанси",
+            field_row("Сума без ПДВ", ViewAdmissionState.subtotal_display),
+            field_row("Ставка ПДВ", ViewAdmissionState.nds_rate_title),
+            field_row("Сума ПДВ", ViewAdmissionState.nds_amount_display),
+            field_row("Разом з ПДВ", ViewAdmissionState.total_display),
+            field_row("ПДВ включений у ціну", rx.cond(ViewAdmissionState.item.flag_nds, "Так", "Ні")),
+            field_row("Спосіб оплати", ViewAdmissionState.item.payment_type.title),
+            field_row("Номер накладної оплати", ViewAdmissionState.invoice_number),
+            field_row("Курс долара", ViewAdmissionState.item.dollar_rate),
         ),
         history_block(ViewAdmissionState),
         spacing="3",
@@ -1034,6 +1034,17 @@ def _add_form() -> rx.Component:
             controls.text_area_field(value=AddAdmissionState.item.movement.comment, on_change=AddAdmissionState.on_change_comment, width="100%"),
         ),
         titled_section(
+            "Товари",
+            rx.text("*Товари з каталогу:", weight="medium"),
+            _add_admission_products_catalog_dialog(),
+            rx.cond(
+                AddAdmissionState.has_item_movement_products_catalog,
+                _add_admission_products_catalog_table(),
+                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+            ),
+            rx.button("Додати", on_click=AddAdmissionState.add_product_catalog_dialog_open),
+        ),
+        titled_section(
             "Фінанси",
             rx.text("*Спосіб оплати:", weight="medium"),
             rx.select.root(
@@ -1096,17 +1107,6 @@ def _add_form() -> rx.Component:
                 rx.text("Курс долара:"),
                 controls.input_field(required=True, value=AddAdmissionState.dollar_rate, on_change=AddAdmissionState.on_change_dollar_rate),
             ),
-        ),
-        titled_section(
-            "Товари",
-            rx.text("*Товари з каталогу:", weight="medium"),
-            _add_admission_products_catalog_dialog(),
-            rx.cond(
-                AddAdmissionState.has_item_movement_products_catalog,
-                _add_admission_products_catalog_table(),
-                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
-            ),
-            rx.button("Додати", on_click=AddAdmissionState.add_product_catalog_dialog_open),
         ),
         spacing="3",
         align="stretch",
@@ -1198,6 +1198,17 @@ def _edit_form() -> rx.Component:
             controls.text_area_field(value=EditAdmissionState.item.movement.comment, on_change=EditAdmissionState.on_change_comment, width="100%"),
         ),
         titled_section(
+            "Товари",
+            rx.text("*Товари з каталогу:", weight="medium"),
+            _edit_admission_products_catalog_dialog(),
+            _edit_admission_add_product_button(),
+            rx.cond(
+                EditAdmissionState.has_item_movement_products_catalog,
+                _edit_admission_products_catalog_table(),
+                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
+            ),
+        ),
+        titled_section(
             "Фінанси",
             rx.text("*Спосіб оплати:", weight="medium"),
             rx.select.root(
@@ -1250,17 +1261,6 @@ def _edit_form() -> rx.Component:
             rx.hstack(
                 rx.text("Курс долара:"),
                 controls.input_field(required=True, disabled=EditAdmissionState.is_view_only_edit, value=EditAdmissionState.dollar_rate, on_change=EditAdmissionState.on_change_dollar_rate),
-            ),
-        ),
-        titled_section(
-            "Товари",
-            rx.text("*Товари з каталогу:", weight="medium"),
-            _edit_admission_products_catalog_dialog(),
-            _edit_admission_add_product_button(),
-            rx.cond(
-                EditAdmissionState.has_item_movement_products_catalog,
-                _edit_admission_products_catalog_table(),
-                rx.center(rx.text("Нічого не обрано", color="gray"), width="100%", size="3"),
             ),
         ),
         spacing="3",

@@ -24,25 +24,119 @@ def filter_select(label: str, value, options, on_change) -> rx.Component:
     )
 
 
+def _catalog_row(State, option) -> rx.Component:
+    """Рядок мультивибору позиції каталогу: клік перемикає галочку.
+    `option` — (id-рядок, «назва (одиниця)», чи обраний)."""
+    return rx.hstack(
+        rx.cond(
+            option[2],
+            rx.icon("check", size=16, color=rx.color("accent", 9)),
+            rx.box(width="16px", height="16px", flex_shrink="0"),
+        ),
+        rx.text(option[1], size="2"),
+        spacing="2",
+        align="center",
+        width="100%",
+        padding="0.35em 0.5em",
+        border_radius="0.35em",
+        cursor="pointer",
+        on_click=lambda: State.toggle_catalog(option[0]),
+        _hover={"background_color": rx.color("accent", 3)},
+    )
+
+
+def catalog_filter(State) -> rx.Component:
+    """Фільтр за позиціями каталогу, що входять до руху: кнопка-поповер зі
+    списком і пошуком. Обрані позиції спливають наверх, повторний клік знімає
+    вибір. Спільний для всіх типів руху (стан у MovementListFilterMixin)."""
+    return controls.filter_group(
+        "Товари в русі",
+        rx.popover.root(
+            rx.popover.trigger(
+                rx.button(
+                    rx.icon("package", size=16),
+                    rx.cond(
+                        State.catalog_filter_count > 0,
+                        "Обрано: " + State.catalog_filter_count.to_string(),
+                        "Оберіть товари",
+                    ),
+                    variant="soft",
+                    color_scheme="gray",
+                    width="100%",
+                    justify="start",
+                ),
+            ),
+            rx.popover.content(
+                rx.vstack(
+                    rx.select.root(
+                        rx.select.trigger(placeholder="Усі категорії", width="100%"),
+                        rx.select.content(
+                            rx.select.item("Усі категорії", value=ALL),
+                            rx.foreach(
+                                State.list_categories,
+                                lambda c: rx.select.item(c[0], value=c[1]),
+                            ),
+                            width="100%",
+                        ),
+                        value=State.catalog_filter_category,
+                        on_change=State.set_catalog_category,
+                        width="100%",
+                    ),
+                    controls.search_field(
+                        rx.input.slot(rx.icon("search", size=16)),
+                        placeholder="Пошук товару",
+                        value=State.catalog_filter_search,
+                        on_change=State.set_catalog_search,
+                        width="100%",
+                    ),
+                    rx.scroll_area(
+                        rx.vstack(
+                            rx.foreach(
+                                State.catalog_options_for_filter,
+                                lambda option: _catalog_row(State, option),
+                            ),
+                            spacing="1",
+                            width="100%",
+                        ),
+                        type="hover",
+                        scrollbars="vertical",
+                        height="16em",
+                        width="100%",
+                    ),
+                    spacing="2",
+                    width="100%",
+                ),
+                width="24em",
+                max_width="90vw",
+            ),
+        ),
+    )
+
+
 def _date_input(value, on_change, enabled) -> rx.Component:
     """Поле дати фільтра на «сирому» HTML-input: на відміну від Radix-TextField,
     він надійно тримає контрольоване value (зокрема при скиданні) і віддає рядок
-    у on_change — інакше фільтр за датою не спрацьовував."""
-    return rx.el.input(
-        type="date",
-        value=value,
-        on_change=on_change,
-        disabled=~enabled,
-        border=f"1px solid {rx.color('gray', 7)}",
-        border_radius="0.4em",
-        padding="0.4em 0.6em",
-        background_color=rx.color("gray", 1),
-        color=rx.color("gray", 12),
-        width="100%",
-        # Нативний date-input має власну мінімальну ширину під «дд.мм.рррр» +
-        # іконку календаря; без цього flex стискає поле і дата обрізається.
-        min_width="7em",
-        flex="1",
+    у on_change — інакше фільтр за датою не спрацьовував.
+    Обгорнуте в debounce: фільтр застосовується одразу зі зміною, але з паузою —
+    щоб ручне введення дати не смикало перезавантаження на кожен сегмент."""
+    return rx.debounce_input(
+        rx.el.input(
+            type="date",
+            value=value,
+            on_change=on_change,
+            disabled=~enabled,
+            border=f"1px solid {rx.color('gray', 7)}",
+            border_radius="0.4em",
+            padding="0.4em 0.6em",
+            background_color=rx.color("gray", 1),
+            color=rx.color("gray", 12),
+            width="100%",
+            # Нативний date-input має власну мінімальну ширину під «дд.мм.рррр» +
+            # іконку календаря; без цього flex стискає поле і дата обрізається.
+            min_width="7em",
+            flex="1",
+        ),
+        debounce_timeout=controls.SEARCH_DEBOUNCE_MS,
     )
 
 
@@ -94,6 +188,8 @@ def filter_card(State, *extra) -> rx.Component:
                 wide=True,
             ),
             *extra,
+            # Універсальний фільтр за позиціями каталогу — на всіх типах руху.
+            catalog_filter(State),
         ),
         # Прапорці — окремою смугою на всю ширину: у ряд вони займають один
         # рядок, тоді як у вузькій колонці сітки розтягли б блок по висоті.
@@ -114,6 +210,8 @@ def filter_card(State, *extra) -> rx.Component:
             ),
             height="auto",
         ),
+        # Фільтри застосовуються одразу зі зміною полів — окремої кнопки
+        # «Застосувати» немає; лишається тільки скидання.
         controls.filter_actions(
             rx.button(
                 "Скинути",
@@ -121,7 +219,6 @@ def filter_card(State, *extra) -> rx.Component:
                 color_scheme="gray",
                 on_click=State.reset_filters,
             ),
-            rx.button("Застосувати", on_click=State.apply_filters),
         ),
     )
 

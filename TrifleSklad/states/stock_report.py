@@ -42,7 +42,13 @@ class StockReportState(AppState):
 
     is_units_open: bool = False
     selected_title: str = ""
+    selected_catalog_id: int = -1
     unit_rows: List[Tuple[str, str, str, str, str, bool]] = []
+
+    # Значення фільтрів і стан діалогу скидаються лише при першому вході в сесії;
+    # повернення з детального перегляду одиниці (повторний монтаж сторінки)
+    # зберігає відкритий діалог і фільтри.
+    _initialized: bool = False
 
     def _excluded_types(self) -> List[int]:
         excluded: List[int] = []
@@ -158,21 +164,32 @@ class StockReportState(AppState):
             return
 
         self.in_progress = True
-        self.filter_catalog = ""
-        self.filter_category = ""
-        self.filter_storage = ""
-        self.filter_owner = ""
-        self.exclude_warehouse = False
-        self.exclude_site = False
-        self.exclude_department = False
-        self.exclude_client = False
-        self.search_text = ""
-        self.is_units_open = False
-        self.unit_rows = []
-        self.selected_title = ""
-
         self._load_filter_options()
+
+        # Скид фільтрів і діалогу — лише при першому вході в розділ у межах сесії.
+        if not self._initialized:
+            self._initialized = True
+            self.filter_catalog = ""
+            self.filter_category = ""
+            self.filter_storage = ""
+            self.filter_owner = ""
+            self.exclude_warehouse = False
+            self.exclude_site = False
+            self.exclude_department = False
+            self.exclude_client = False
+            self.search_text = ""
+            self.is_units_open = False
+            self.unit_rows = []
+            self.selected_title = ""
+            self.selected_catalog_id = -1
+
         self._reload()
+
+        # Повернення з детального перегляду одиниці — відновлюємо відкритий діалог
+        # (перечитуємо одиниці за збереженою позицією каталогу).
+        if self.is_units_open and self.selected_catalog_id != -1:
+            self._load_units(self.selected_catalog_id, self.selected_title)
+
         self.in_progress = False
 
     @rx.event
@@ -246,9 +263,9 @@ class StockReportState(AppState):
         self.search_text = ""
         self._reload()
 
-    @rx.event
-    def open_units(self, catalog_id: int, title: str):
+    def _load_units(self, catalog_id: int, title: str) -> None:
         self.selected_title = title
+        self.selected_catalog_id = catalog_id
         units = ProductDAO.get_stock_units(
             catalog_id,
             int(self.filter_storage) if self.filter_storage else None,
@@ -269,6 +286,10 @@ class StockReportState(AppState):
             count = str(unit.count) if divisible else "—"
             rows.append((str(unit.id), serial, storage, owner, count, unit.excluded_from_accounting))
         self.unit_rows = rows
+
+    @rx.event
+    def open_units(self, catalog_id: int, title: str):
+        self._load_units(catalog_id, title)
         self.is_units_open = True
 
     @rx.event
@@ -277,3 +298,4 @@ class StockReportState(AppState):
         if not value:
             self.unit_rows = []
             self.selected_title = ""
+            self.selected_catalog_id = -1

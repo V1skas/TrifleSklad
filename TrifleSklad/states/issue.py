@@ -49,11 +49,15 @@ class ListIssueState(MovementListFilterMixin, AppState):
     list_recipients: List[Tuple[str, str]] = []
     list_sites: List[Tuple[str, str]] = []
 
-    def _load_issue_filter_options(self):
+    def _load_section_filter_options(self):
         self.list_recipients = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
         sites = StorageDAO.get_all_by_type(StorageType.TECHNICAL_SITE) + \
             StorageDAO.get_all_by_type(StorageType.DEPARTMENT)
         self.list_sites = [(s.title, str(s.id)) for s in sites]
+
+    def _reset_section_filter_values(self):
+        self.filter_recipient = ALL
+        self.filter_site = ALL
 
     def _reload(self):
         self._all_pages, self.items = IssueDAO.get_paginated(
@@ -66,6 +70,7 @@ class ListIssueState(MovementListFilterMixin, AppState):
             incoming_owner=self.filter_incoming_owner,
             site=self.filter_site,
             recipient=self.filter_recipient,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.event
@@ -75,10 +80,7 @@ class ListIssueState(MovementListFilterMixin, AppState):
             yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
             return
         self.in_progress = True
-        self._reset_list_state()
-        self.filter_recipient = ALL
-        self.filter_site = ALL
-        self._load_issue_filter_options()
+        self._enter_list()
         self._reload()
         self.in_progress = False
 
@@ -89,32 +91,19 @@ class ListIssueState(MovementListFilterMixin, AppState):
     @rx.event
     def on_change_filter_recipient(self, value: str):
         self.filter_recipient = value
+        return self._apply_filters()
 
     @rx.event
     def on_change_filter_site(self, value: str):
         self.filter_site = value
-
-    @rx.event
-    def reset_filters(self):
-        today = now_local().date().isoformat()
-        self.filter_date_enabled = False
-        self.filter_date_from = today
-        self.filter_date_to = today
-        self.selected_statuses = []
-        self.filter_incoming_storage = ALL
-        self.filter_destination_storage = ALL
-        self.filter_incoming_owner = ALL
-        self.filter_destination_owner = ALL
-        self.filter_recipient = ALL
-        self.filter_site = ALL
-        self._current_page = 1
-        self._reload()
+        return self._apply_filters()
 
     @rx.var
     def has_active_filters(self) -> bool:
         return bool(
             self.filter_date_enabled
             or self.selected_statuses
+            or self.selected_catalog_ids
             or self.filter_incoming_storage != ALL
             or self.filter_incoming_owner != ALL
             or self.filter_site != ALL
