@@ -24,9 +24,9 @@ class ListCategoriesState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.CATEGORIES_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.CATEGORIES_LIST)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_progress = True
@@ -48,9 +48,9 @@ class AddCategoriesState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.CATEGORIES_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.CATEGORIES_CREATE)
+        if guard is not None:
+            yield guard
             return
         self.item = ProductCategory()
         self.parent_id = NONE
@@ -105,9 +105,9 @@ class EditCategoriesState(AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.CATEGORIES_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.CATEGORIES_EDIT)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_process = True
@@ -186,9 +186,9 @@ class ViewCategoriesState(AuditHistoryMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.CATEGORIES_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.CATEGORIES_VIEW)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_process = True

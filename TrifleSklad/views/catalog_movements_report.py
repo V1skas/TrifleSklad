@@ -168,7 +168,7 @@ def _dialog_pagination() -> rx.Component:
 def _movements_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title(f"Рухи: {State.selected_title}"),
+            controls.dialog_heading(f"Рухи: {State.selected_title}"),
             rx.cond(
                 State.movement_rows.length() > 0,
                 rx.vstack(

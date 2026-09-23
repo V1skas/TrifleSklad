@@ -15,6 +15,7 @@ from TrifleSklad.declared import (
     MovementsStatus,
     MovementsType,
     StorageType,
+    format_transferred_qty,
     movements_status_list,
     movements_type_list,
 )
@@ -54,9 +55,9 @@ class ListSaleReturnsState(MovementListFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.SALE_RETURNS_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.SALE_RETURNS_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
         self._enter_list()
@@ -99,10 +100,10 @@ class ViewSaleReturnsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.var
     def positions_grouped(
         self,
-    ) -> List[Tuple[int, str, int, float, List[Tuple[int, str, str, bool]]]]:
+    ) -> List[Tuple[int, str, str, float, List[Tuple[int, str, str, bool]]]]:
         if self.item is None:
             return []
-        result: List[Tuple[int, str, int, float, List[Tuple[int, str, str, bool]]]] = []
+        result: List[Tuple[int, str, str, float, List[Tuple[int, str, str, bool]]]] = []
         for index, pc in enumerate(self.item.movement.products_catalog):
             units: List[Tuple[int, str, str, bool]] = []
             for unit in pc.products:
@@ -118,7 +119,23 @@ class ViewSaleReturnsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
                     else "—"
                 )
                 units.append((unit.id, serial, remain, unit.excluded_from_accounting))
-            result.append((index, pc.product.title, pc.count, pc.price, units))
+            product = pc.product
+            total_amount = sum(unit.count or 0 for unit in pc.products)
+            result.append(
+                (
+                    index,
+                    product.title,
+                    format_transferred_qty(
+                        total_amount,
+                        pc.count,
+                        product.divisible,
+                        product.capacity,
+                        product.no_fixed_capacity,
+                    ),
+                    pc.price,
+                    units,
+                )
+            )
         return result
 
     @rx.var
@@ -167,9 +184,9 @@ class ViewSaleReturnsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.SALE_RETURNS_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.SALE_RETURNS_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.item = SaleReturnDAO.get_by_id_with_all_relationship(int(id))
@@ -293,17 +310,26 @@ class AddSaleReturnsState(AppState):
     @rx.var
     def grouped_units(
         self,
-    ) -> List[Tuple[int, str, int, str, List[Tuple[int, str, str]]]]:
+    ) -> List[Tuple[int, str, str, str, List[Tuple[int, str, str]]]]:
         order: List[int] = []
-        groups: Dict[int, Tuple[str, bool, int, List[Tuple[int, str, str]]]] = {}
+        groups: Dict[
+            int, Tuple[str, bool, bool, float, float, List[Tuple[int, str, str]]]
+        ] = {}
         for product in self.units:
             catalog = product.product_catalog
             if catalog is None:
                 continue
             if catalog.id not in groups:
                 order.append(catalog.id)
-                groups[catalog.id] = (catalog.title, catalog.divisible, 0, [])
-            title, divisible, remainder, units = groups[catalog.id]
+                groups[catalog.id] = (
+                    catalog.title,
+                    catalog.divisible,
+                    bool(catalog.no_fixed_capacity),
+                    catalog.capacity or 0,
+                    0,
+                    [],
+                )
+            title, divisible, no_fixed, capacity, remainder, units = groups[catalog.id]
             serial = (
                 product.serial_number
                 if (catalog.uniq and product.serial_number)
@@ -314,17 +340,19 @@ class AddSaleReturnsState(AppState):
             groups[catalog.id] = (
                 title,
                 divisible,
+                no_fixed,
+                capacity,
                 remainder + (product.count or 0),
                 units,
             )
-        result: List[Tuple[int, str, int, str, List[Tuple[int, str, str]]]] = []
+        result: List[Tuple[int, str, str, str, List[Tuple[int, str, str]]]] = []
         for catalog_id in order:
-            title, divisible, remainder, units = groups[catalog_id]
+            title, divisible, no_fixed, capacity, remainder, units = groups[catalog_id]
             result.append(
                 (
                     catalog_id,
                     title,
-                    len(units),
+                    format_transferred_qty(remainder, len(units), divisible, capacity, no_fixed),
                     str(remainder) if divisible else "—",
                     units,
                 )
@@ -373,9 +401,9 @@ class AddSaleReturnsState(AppState):
 
     @rx.event
     def on_load(self, id: str = ""):
-        if not self.has_permission(Action.SALE_RETURNS_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.SALE_RETURNS_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.current_date = now_local().date().__str__()
@@ -570,25 +598,47 @@ class EditSaleReturnsState(FullEditMixin, AppState):
             return 0.0
 
     @rx.var
-    def grouped_units(self) -> List[Tuple[int, str, int, str, List[Tuple[int, str, str]]]]:
+    def grouped_units(self) -> List[Tuple[int, str, str, str, List[Tuple[int, str, str]]]]:
         order: List[int] = []
-        groups: Dict[int, Tuple[str, bool, int, List[Tuple[int, str, str]]]] = {}
+        groups: Dict[int, Tuple[str, bool, bool, float, float, List[Tuple[int, str, str]]]] = {}
         for product in self.units:
             catalog = product.product_catalog
             if catalog is None:
                 continue
             if catalog.id not in groups:
                 order.append(catalog.id)
-                groups[catalog.id] = (catalog.title, catalog.divisible, 0, [])
-            title, divisible, remainder, units = groups[catalog.id]
+                groups[catalog.id] = (
+                    catalog.title,
+                    catalog.divisible,
+                    bool(catalog.no_fixed_capacity),
+                    catalog.capacity or 0,
+                    0,
+                    [],
+                )
+            title, divisible, no_fixed, capacity, remainder, units = groups[catalog.id]
             serial = product.serial_number if (catalog.uniq and product.serial_number) else "—"
             remain = str(product.count) if catalog.divisible else "—"
             units.append((product.id, serial, remain))
-            groups[catalog.id] = (title, divisible, remainder + (product.count or 0), units)
-        result: List[Tuple[int, str, int, str, List[Tuple[int, str, str]]]] = []
+            groups[catalog.id] = (
+                title,
+                divisible,
+                no_fixed,
+                capacity,
+                remainder + (product.count or 0),
+                units,
+            )
+        result: List[Tuple[int, str, str, str, List[Tuple[int, str, str]]]] = []
         for catalog_id in order:
-            title, divisible, remainder, units = groups[catalog_id]
-            result.append((catalog_id, title, len(units), str(remainder) if divisible else "—", units))
+            title, divisible, no_fixed, capacity, remainder, units = groups[catalog_id]
+            result.append(
+                (
+                    catalog_id,
+                    title,
+                    format_transferred_qty(remainder, len(units), divisible, capacity, no_fixed),
+                    str(remainder) if divisible else "—",
+                    units,
+                )
+            )
         return result
 
     @rx.var
@@ -669,9 +719,9 @@ class EditSaleReturnsState(FullEditMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.SALE_RETURNS_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.SALE_RETURNS_EDIT)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.item = SaleReturnDAO.get_by_id_with_all_relationship(int(id))

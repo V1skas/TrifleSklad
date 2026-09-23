@@ -2,7 +2,6 @@ from typing import List, Tuple
 
 import reflex as rx
 
-from TrifleSklad import routes
 from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import (
     OwnerDAO,
@@ -11,7 +10,7 @@ from TrifleSklad.dao_legacy import (
     ProductDAO,
     StorageDAO,
 )
-from TrifleSklad.declared import StorageType
+from TrifleSklad.declared import StorageType, format_amount, format_transferred_qty
 from TrifleSklad.states.app import AppState
 
 ALL = "all"
@@ -20,7 +19,9 @@ ALL = "all"
 class StockReportState(AppState):
     in_progress: bool = True
 
-    rows: List[Tuple[int, str, str, int, int]] = []
+    # (catalog_id, title, unit, «Загальна кількість», «Одиниць»); останні дві —
+    # уже відформатовані рядки (Одиниць — дробове по ємності + фіз. к-сть).
+    rows: List[Tuple[int, str, str, str, str]] = []
 
     _catalog_cache: List[Tuple[str, str, str]] = []
     list_categories: List[Tuple[str, str]] = []
@@ -93,7 +94,7 @@ class StockReportState(AppState):
                 break
 
     def _reload(self):
-        self.rows = ProductDAO.get_stock_grouped(
+        grouped = ProductDAO.get_stock_grouped(
             int(self.filter_catalog) if self.filter_catalog else None,
             int(self.filter_storage) if self.filter_storage else None,
             int(self.filter_owner) if self.filter_owner else None,
@@ -101,6 +102,27 @@ class StockReportState(AppState):
             int(self.filter_category) if self.filter_category else None,
             self.search_text or None,
         )
+        self.rows = [
+            (
+                catalog_id,
+                title,
+                unit,
+                format_amount(total_count),
+                format_transferred_qty(
+                    total_count, units_count, divisible, capacity, no_fixed
+                ),
+            )
+            for (
+                catalog_id,
+                title,
+                unit,
+                total_count,
+                units_count,
+                divisible,
+                capacity,
+                no_fixed,
+            ) in grouped
+        ]
 
     @rx.var
     def has_rows(self) -> bool:
@@ -158,9 +180,9 @@ class StockReportState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.REPORTS_STOCK):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_STOCK)
+        if guard is not None:
+            yield guard
             return
 
         self.in_progress = True

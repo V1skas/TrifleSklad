@@ -59,9 +59,9 @@ class ListUnitsReportState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.REPORTS_UNITS):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_UNITS)
+        if guard is not None:
+            yield guard
             return
 
         self.in_progress = True
@@ -226,9 +226,9 @@ class ViewUnitsReportState(AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.REPORTS_UNITS):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_UNITS)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self._load_unit(int(id))

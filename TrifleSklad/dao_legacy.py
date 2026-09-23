@@ -1828,7 +1828,8 @@ class ProductDAO:
         за позицією каталогу, категорією, місцем зберігання, власником; exclude_types —
         типи сховищ (склад/площадка/відділ), які треба виключити; search — вільний
         пошук за назвою позиції каталогу або серійним номером одиниці.
-        Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
+        Повертає список кортежів (catalog_id, title, unit, total_count, units_count,
+        divisible, capacity, no_fixed_capacity)."""
         exclude_types = exclude_types or []
         statement = (
             select(
@@ -1837,12 +1838,22 @@ class ProductDAO:
                 ProductCatalog.unit,
                 func.coalesce(func.sum(Product.count), 0),
                 func.count(Product.id),
+                ProductCatalog.divisible,
+                ProductCatalog.capacity,
+                ProductCatalog.no_fixed_capacity,
             )
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
             .join(Storage, Storage.id == Product.id_storage)
             .where(Product.is_deleted == False)
             .where(Storage.is_deleted == False)
-            .group_by(ProductCatalog.id, ProductCatalog.title, ProductCatalog.unit)
+            .group_by(
+                ProductCatalog.id,
+                ProductCatalog.title,
+                ProductCatalog.unit,
+                ProductCatalog.divisible,
+                ProductCatalog.capacity,
+                ProductCatalog.no_fixed_capacity,
+            )
             .order_by(ProductCatalog.title)
         )
         if catalog_id is not None:
@@ -1872,7 +1883,16 @@ class ProductDAO:
         with rx.session() as session:
             rows = session.exec(statement).all()
             return [
-                (row[0], row[1], row[2], int(row[3] or 0), int(row[4] or 0))
+                (
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3] or 0,
+                    int(row[4] or 0),
+                    bool(row[5]),
+                    row[6] or 0,
+                    bool(row[7]),
+                )
                 for row in rows
             ]
 

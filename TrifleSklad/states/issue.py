@@ -75,9 +75,9 @@ class ListIssueState(MovementListFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.ISSUES_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.ISSUES_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
         self._enter_list()
@@ -151,9 +151,9 @@ class ViewIssueState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.ISSUES_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.ISSUES_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         item = IssueDAO.get_by_id_with_movement_product_storage_owner_recipient(int(id))
@@ -308,9 +308,9 @@ class AddIssueState(LookupCreatorsMixin, AppState):
 
     @rx.event
     async def on_load(self):
-        if not self.has_permission(Action.ISSUES_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.ISSUES_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.item = Issue(
@@ -685,9 +685,9 @@ class EditIssueState(FullEditMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.ISSUES_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.ISSUES_EDIT)
+        if guard is not None:
+            yield guard
             return
 
         self.in_process = True

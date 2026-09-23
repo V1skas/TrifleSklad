@@ -104,7 +104,7 @@ def _filter_card() -> rx.Component:
 def _units_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title(f"Одиниці: {StockReportState.selected_title}"),
+            controls.dialog_heading(f"Одиниці: {StockReportState.selected_title}"),
             rx.table.root(
                 rx.table.header(
                     rx.table.row(

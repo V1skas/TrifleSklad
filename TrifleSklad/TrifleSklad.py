@@ -152,6 +152,7 @@ from TrifleSklad.states.units_report import ListUnitsReportState, ViewUnitsRepor
 from TrifleSklad.views import units_report as units_report_views
 from TrifleSklad.states.catalog_movements_report import CatalogMovementsReportState
 from TrifleSklad.views import catalog_movements_report as catalog_movements_report_views
+from TrifleSklad.states.auth import AuthState
 
 app = rx.App(
     # Тема налаштовується через rx.plugins.RadixThemesPlugin у rxconfig.py
@@ -177,7 +178,11 @@ app.app_wraps[5, "Overlay"] = overlay_wrap
 
 app.add_page(frontend.index_page, route=routes.INDEX)
 app.add_page(frontend.welcome_page, route=routes.WELCOME)
-app.add_page(frontend.auth_page, route=routes.LOGIN, on_load=state.AppState.check_params)
+app.add_page(
+    frontend.auth_page,
+    route=routes.LOGIN,
+    on_load=[state.AppState.check_params, AuthState.load_remembered],
+)
 
 # Заглушки коренів розділів — щоб клік по пункту навбару не впирався у 404.
 app.add_page(frontend.admin_page, route=routes.ADMIN)

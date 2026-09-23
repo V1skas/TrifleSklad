@@ -182,9 +182,9 @@ class CatalogMovementsReportState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.REPORTS_CATALOG_MOVEMENTS):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_CATALOG_MOVEMENTS)
+        if guard is not None:
+            yield guard
             return
 
         self.in_progress = True

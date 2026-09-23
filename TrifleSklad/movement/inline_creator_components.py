@@ -44,7 +44,7 @@ def _field(label: str, value, on_change, area: bool = False) -> rx.Component:
 def supplier_create_dialog(State) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення постачальника"),
+            controls.dialog_heading("Створення постачальника"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=State.sup_title, on_change=State.on_change_sup_title, width="100%"),
@@ -54,12 +54,9 @@ def supplier_create_dialog(State) -> rx.Component:
                 _field("Контактна особа:", State.sup_contact_person, State.on_change_sup_contact_person),
                 _field("Контактний телефон:", State.sup_contact_phone, State.on_change_sup_contact_phone),
                 _field("ЄДРПОУ:", State.sup_edrpou, State.on_change_sup_edrpou),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_supplier_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_supplier),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=State.set_supplier_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_supplier),
                 ),
                 spacing="2",
                 width="100%",
@@ -74,17 +71,14 @@ def supplier_create_dialog(State) -> rx.Component:
 def owner_create_dialog(State) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення власника"),
+            controls.dialog_heading("Створення власника"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=State.owner_title, on_change=State.on_change_owner_title, width="100%"),
                 _field("Опис:", State.owner_description, State.on_change_owner_description, area=True),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_owner_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_owner),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=State.set_owner_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_owner),
                 ),
                 spacing="2",
                 width="100%",
@@ -99,17 +93,14 @@ def owner_create_dialog(State) -> rx.Component:
 def payment_type_create_dialog(State) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення типу оплати"),
+            controls.dialog_heading("Створення типу оплати"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=State.pt_title, on_change=State.on_change_pt_title, width="100%"),
                 _field("Опис:", State.pt_description, State.on_change_pt_description, area=True),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_payment_type_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_payment_type),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=State.set_payment_type_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_payment_type),
                 ),
                 spacing="2",
                 width="100%",
@@ -124,7 +115,7 @@ def payment_type_create_dialog(State) -> rx.Component:
 def nds_rate_create_dialog(State) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення ставки ПДВ"),
+            controls.dialog_heading("Створення ставки ПДВ"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=State.nds_title, on_change=State.on_change_nds_title, width="100%"),
@@ -138,12 +129,9 @@ def nds_rate_create_dialog(State) -> rx.Component:
                     width="100%",
                 ),
                 _field("Опис:", State.nds_description, State.on_change_nds_description, area=True),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_nds_rate_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_nds_rate),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=State.set_nds_rate_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_nds_rate),
                 ),
                 spacing="2",
                 width="100%",
@@ -158,19 +146,16 @@ def nds_rate_create_dialog(State) -> rx.Component:
 def worker_create_dialog(State) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення співробітника"),
+            controls.dialog_heading("Створення співробітника"),
             rx.vstack(
                 rx.text("*ПІБ:", size="2"),
                 controls.input_field(value=State.wrk_fio, on_change=State.on_change_wrk_fio, width="100%"),
                 _field("Телефон:", State.wrk_phone_number, State.on_change_wrk_phone_number),
                 _field("Email:", State.wrk_email, State.on_change_wrk_email),
                 _field("Посада:", State.wrk_position, State.on_change_wrk_position),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_worker_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_worker),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=State.set_worker_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_worker),
                 ),
                 spacing="2",
                 width="100%",
@@ -185,7 +170,7 @@ def worker_create_dialog(State) -> rx.Component:
 def storage_create_dialog(State) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення місця зберігання"),
+            controls.dialog_heading("Створення місця зберігання"),
             rx.vstack(
                 rx.cond(
                     State.st_allow_type_choice,
@@ -228,12 +213,9 @@ def storage_create_dialog(State) -> rx.Component:
                     on_change=State.on_change_st_id_responsible,
                     width="100%",
                 ),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_storage_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_storage),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=State.set_storage_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_storage),
                 ),
                 spacing="2",
                 width="100%",

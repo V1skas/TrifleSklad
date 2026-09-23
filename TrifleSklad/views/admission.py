@@ -34,18 +34,15 @@ def _create_category_dialog() -> rx.Component:
     State = MovementProductCatalogAddEditFormState
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення категорії"),
+            controls.dialog_heading("Створення категорії"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=State.new_category_title, on_change=State.on_change_new_category_title, width="100%"),
                 rx.text("Опис:", size="2"),
                 controls.text_area_field(value=State.new_category_description, on_change=State.on_change_new_category_description, width="100%"),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_create_category_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_category),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button("Скасувати", on_click=State.set_create_category_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_category),
                 ),
                 spacing="2",
                 width="100%",
@@ -61,15 +58,12 @@ def _duplicate_product_confirm_dialog() -> rx.Component:
     State = MovementProductCatalogAddEditFormState
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Такий товар вже є в каталозі"),
+            controls.dialog_heading("Такий товар вже є в каталозі"),
             rx.text(f"ТМЦ «{State.duplicate_product_title}» вже є в каталозі. Додати наявний товар до поставки?"),
-            rx.hstack(
-                rx.button("Ні", variant="outline", type="button", on_click=State.cancel_duplicate_product),
-                rx.spacer(),
-                rx.button("Так, додати", type="button", on_click=State.confirm_use_duplicate_product),
-                width="100%",
-                padding_top="0.5em",
-            ),
+            controls.dialog_footer(
+                    controls.dialog_cancel_button("Ні", on_click=State.cancel_duplicate_product),
+                    controls.dialog_confirm_button("Так, додати", on_click=State.confirm_use_duplicate_product),
+                ),
             width="28em",
         ),
         open=State.is_duplicate_confirm_open,
@@ -81,7 +75,7 @@ def _create_product_dialog() -> rx.Component:
     State = MovementProductCatalogAddEditFormState
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення товару каталогу"),
+            controls.dialog_heading("Створення товару каталогу"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=State.new_title, on_change=State.on_change_new_title, width="100%"),
@@ -139,12 +133,9 @@ def _create_product_dialog() -> rx.Component:
                     on_change=State.on_change_new_no_fixed_capacity,
                     disabled=State.new_uniq | ~State.new_divisible,
                 ),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=State.set_create_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=State.create_product),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button("Скасувати", on_click=State.set_create_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=State.create_product),
                 ),
                 spacing="2",
                 width="100%",
@@ -163,7 +154,7 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
             rx.select.trigger(placeholder="Оберіть категорію", width="100%"),
             rx.select.content(
                 rx.foreach(
-                    MovementProductCatalogAddEditFormState.category_options,
+                    MovementProductCatalogAddEditFormState.filter_category_options,
                     lambda c: rx.select.item(c[0], value=c[1]),
                 ),
                 width="100%",
@@ -230,6 +221,11 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
                 on_change=MovementProductCatalogAddEditFormState.on_change_count,
             ),
             width="100%",
+        ),
+        rx.checkbox(
+            "Поза бухгалтерським обліком (усі одиниці)",
+            checked=MovementProductCatalogAddEditFormState.position_excluded,
+            on_change=MovementProductCatalogAddEditFormState.on_change_position_excluded,
         ),
         rx.cond(
             MovementProductCatalogAddEditFormState.selected_divisible
@@ -331,6 +327,13 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
                                             on_change=MovementProductCatalogAddEditFormState.on_change_unit_price(row[0]),
                                             width="40%",
                                         ),
+                                        rx.tooltip(
+                                            rx.checkbox(
+                                                checked=row[5],
+                                                on_change=MovementProductCatalogAddEditFormState.on_change_unit_excluded(row[0]),
+                                            ),
+                                            content="Поза обліком",
+                                        ),
                                         width="100%",
                                         align="center",
                                     ),
@@ -424,7 +427,15 @@ def _movement_product_catalog_add_edit_form() -> rx.Component:
                                         on_change=MovementProductCatalogAddEditFormState.on_change_serial_numbers(item[0]),
                                         width="100%",
                                     ),
+                                    rx.tooltip(
+                                        rx.checkbox(
+                                            checked=MovementProductCatalogAddEditFormState.unit_excluded[item[0]],
+                                            on_change=MovementProductCatalogAddEditFormState.on_change_unit_excluded(item[0]),
+                                        ),
+                                        content="Поза обліком",
+                                    ),
                                     width="100%",
+                                    align="center",
                                 ),
                             ),
                             width="100%",
@@ -491,7 +502,7 @@ def _movement_product_catalog_detailed_view_form() -> rx.Component:
         ),
         rx.hstack(
             rx.text("Кількість:"),
-            rx.text(MovementProductCatalogDetailedViewState.item.count, weight="bold", decoration="underline", width="100%"),
+            rx.text(MovementProductCatalogDetailedViewState.quantity_label, weight="bold", decoration="underline", width="100%"),
         ),
         rx.hstack(
             rx.text("Вартість за одиницю:"),
@@ -522,7 +533,7 @@ def _movement_product_catalog_detailed_view_form() -> rx.Component:
 def _add_admission_products_catalog_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Інформація про товар"),
+            controls.dialog_heading("Інформація про товар"),
             rx.tabs.root(
                 rx.tabs.content(
                     _movement_product_catalog_add_edit_form(),
@@ -539,19 +550,13 @@ def _add_admission_products_catalog_dialog() -> rx.Component:
             ),
             rx.cond(
                 AddAdmissionState.is_product_dialog_view_mode,
-                rx.hstack(
-                    rx.button("Видалити", variant="outline", color_scheme="red", on_click=AddAdmissionState.on_close_product_catalog_dialog),
-                    rx.spacer(),
-                    rx.button("Редагувати", type="button", on_click=AddAdmissionState.edit_product_catalog_dialog),
-                    padding_top="1em",
-                    width="100%",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button("Видалити", color_scheme="red", on_click=AddAdmissionState.on_close_product_catalog_dialog),
+                    controls.dialog_confirm_button("Редагувати", on_click=AddAdmissionState.edit_product_catalog_dialog),
                 ),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", on_click=AddAdmissionState.on_close_product_catalog_dialog),
-                    rx.spacer(),
-                    rx.button("Зберегти", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=AddAdmissionState.on_save_product_catalog_dialog),
-                    padding_top="1em",
-                    width="100%",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=AddAdmissionState.on_close_product_catalog_dialog),
+                    controls.dialog_confirm_button("Зберегти", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=AddAdmissionState.on_save_product_catalog_dialog),
                 ),
             ),
             width="30em",
@@ -564,7 +569,7 @@ def _add_admission_products_catalog_dialog() -> rx.Component:
 def _edit_admission_products_catalog_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Інформація про товар"),
+            controls.dialog_heading("Інформація про товар"),
             rx.tabs.root(
                 rx.tabs.content(
                     _movement_product_catalog_add_edit_form(),
@@ -581,19 +586,13 @@ def _edit_admission_products_catalog_dialog() -> rx.Component:
             ),
             rx.cond(
                 EditAdmissionState.is_product_dialog_view_mode,
-                rx.hstack(
-                    rx.button("Видалити", variant="outline", color_scheme="red", on_click=EditAdmissionState.on_close_product_catalog_dialog),
-                    rx.spacer(),
-                    rx.button("Редагувати", type="button", on_click=EditAdmissionState.edit_product_catalog_dialog),
-                    padding_top="1em",
-                    width="100%",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button("Видалити", color_scheme="red", on_click=EditAdmissionState.on_close_product_catalog_dialog),
+                    controls.dialog_confirm_button("Редагувати", on_click=EditAdmissionState.edit_product_catalog_dialog),
                 ),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", on_click=EditAdmissionState.on_close_product_catalog_dialog),
-                    rx.spacer(),
-                    rx.button("Зберегти", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=EditAdmissionState.on_save_product_catalog_dialog),
-                    padding_top="1em",
-                    width="100%",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button(on_click=EditAdmissionState.on_close_product_catalog_dialog),
+                    controls.dialog_confirm_button("Зберегти", disabled=MovementProductCatalogAddEditFormState.has_errors, on_click=EditAdmissionState.on_save_product_catalog_dialog),
                 ),
             ),
             width="30em",
@@ -636,7 +635,7 @@ def _edit_admission_products_catalog_table() -> rx.Component:
                     EditAdmissionState.item_movement_products_catalog_list,
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
-                        rx.table.cell(item[1].count),
+                        rx.table.cell(item[5]),
                         rx.table.cell(item[4]),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
@@ -698,7 +697,7 @@ def _add_admission_products_catalog_table() -> rx.Component:
                     AddAdmissionState.item_movement_products_catalog_list,
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
-                        rx.table.cell(item[1].count),
+                        rx.table.cell(item[5]),
                         rx.table.cell(item[4]),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
@@ -736,7 +735,7 @@ def _view_admission_products_catalog_table() -> rx.Component:
                     ViewAdmissionState.item_movement_products_catalog_list,
                     lambda item: rx.table.row(
                         rx.table.cell(item[1].product.title),
-                        rx.table.cell(item[1].count),
+                        rx.table.cell(item[5]),
                         rx.table.cell(item[4]),
                         rx.table.cell(item[2]),
                         rx.table.cell(item[3]),
@@ -759,7 +758,7 @@ def _view_admission_products_catalog_table() -> rx.Component:
 def _cancel_conflict_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Видалення неможливе"),
+            controls.dialog_heading("Видалення неможливе"),
             rx.dialog.description(
                 "Товар із цього постачання бере участь у наведених нижче рухах. "
                 "Спочатку скасуйте пізніші рухи."
@@ -822,7 +821,7 @@ def view_page_content() -> rx.Component:
             _view_admission_products_catalog_table(),
             rx.dialog.root(
                 rx.dialog.content(
-                    rx.dialog.title("Інформація про товар"),
+                    controls.dialog_heading("Інформація про товар"),
                     _movement_product_catalog_detailed_view_form(),
                     width="30em",
                 ),

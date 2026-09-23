@@ -129,9 +129,9 @@ class ListProductsState(SearchFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.PRODUCTS_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.PRODUCTS_LIST)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_progress = True
@@ -199,9 +199,9 @@ class AddProductsState(CategoryCreateMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.PRODUCTS_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.PRODUCTS_CREATE)
+        if guard is not None:
+            yield guard
             return
         self.item = ProductCatalog()
         self.capacity_input = "0"
@@ -346,9 +346,9 @@ class EditProductsState(CategoryCreateMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.PRODUCTS_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.PRODUCTS_EDIT)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_process = True
@@ -533,9 +533,9 @@ class ViewProductsState(AuditHistoryMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.PRODUCTS_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.PRODUCTS_VIEW)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_process = True

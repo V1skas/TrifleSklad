@@ -396,6 +396,49 @@ def cancel_with_reason(
     )
 
 
+def dialog_heading(title: str, **prop) -> rx.Component:
+    """Єдиний заголовок діалогу — у стилі сторінок (titled_section/header_subpage):
+    акцентний колір + тонка лінія знизу. Лишається справжнім `rx.dialog.title`
+    (потрібен Radix для доступності діалогу)."""
+    prop.setdefault("size", "5")
+    return rx.dialog.title(
+        title,
+        color=rx.color("accent", 9),
+        padding_bottom="0.4em",
+        margin_bottom="0.6em",
+        width="100%",
+        style={"border_bottom": f"1px solid {rx.color('accent', 6)}"},
+        **prop,
+    )
+
+
+def dialog_cancel_button(label: str = "Скасувати", **prop) -> rx.Component:
+    """Кнопка скасування діалогу — нейтральна soft gray, size=2 (той самий вигляд,
+    що у `confirm_with_reason_dialog`, — єдиний стандарт футера діалогів)."""
+    prop.setdefault("variant", "soft")
+    prop.setdefault("color_scheme", "gray")
+    prop.setdefault("size", "2")
+    prop.setdefault("type", "button")
+    return rx.button(label, **prop)
+
+
+def dialog_confirm_button(label: str, **prop) -> rx.Component:
+    """Кнопка підтвердження діалогу (Створити/Зберегти/Так…) — solid, size=2."""
+    prop.setdefault("variant", "solid")
+    prop.setdefault("size", "2")
+    prop.setdefault("type", "button")
+    return rx.button(label, **prop)
+
+
+def dialog_footer(*buttons, **prop) -> rx.Component:
+    """Праворуч-вирівняний рядок кнопок діалогу — єдиний вигляд футера
+    (симетрично до дій у шапці сторінок)."""
+    prop.setdefault("width", "100%")
+    prop.setdefault("spacing", "3")
+    prop.setdefault("padding_top", "1em")
+    return rx.hstack(rx.spacer(), *buttons, align="center", **prop)
+
+
 def button_primary(*args, **prop):
     # Старий дизайн не розрізняв «primary»/«secondary» — усі кнопки дій
     # (Створити/Зберегти/Редагувати тощо) були простими ghost-кнопками без

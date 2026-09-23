@@ -3,7 +3,12 @@ from typing import Dict, List, Optional, Tuple
 import reflex as rx
 
 from TrifleSklad.dao_legacy import ProductDAO
-from TrifleSklad.declared import format_amount, generate_serial_range, sale_line_cost
+from TrifleSklad.declared import (
+    format_amount,
+    format_transferred_qty,
+    generate_serial_range,
+    sale_line_cost,
+)
 from TrifleSklad.models import Product
 from TrifleSklad.movement.products_selector.backend import ProductsSelectorState
 
@@ -210,14 +215,19 @@ class ProductsMovementListState(rx.State):
     @rx.var
     def grouped(
         self,
-    ) -> List[Tuple[int, str, int, bool, bool, str, List[Tuple[int, Product]]]]:
+    ) -> List[Tuple[int, str, str, bool, bool, str, List[Tuple[int, Product]]]]:
         # Групує одиниці за позицією каталогу для таблиці:
-        # (id каталогу, назва, к-сть одиниць, подільне?, унікальне?, залишок,
+        # (id каталогу, назва, к-сть, подільне?, унікальне?, залишок,
         #  перелік (глобальний індекс у self.items, Product)).
-        # Залишок — сума count подільних одиниць групи (для контролю обсягу),
-        # інакше «—». Глобальний індекс потрібен для on_remove_selected/split_*.
+        # «К-сть» (group[2]) — для подільного з фіксованою ємністю дробове по
+        # ємності + фіз. к-сть у дужках (format_transferred_qty), інакше число
+        # фіз. одиниць. Залишок — сума count подільних одиниць групи (для
+        # контролю обсягу), інакше «—». Глобальний індекс потрібен для
+        # on_remove_selected/split_*.
         order: List[int] = []
-        groups: Dict[int, Tuple[str, bool, bool, int, List[Tuple[int, Product]]]] = {}
+        groups: Dict[
+            int, Tuple[str, bool, bool, bool, float, float, List[Tuple[int, Product]]]
+        ] = {}
         for index, product in enumerate(self.items):
             catalog = product.product_catalog
             if catalog is None:
@@ -225,24 +235,34 @@ class ProductsMovementListState(rx.State):
             catalog_id = catalog.id
             if catalog_id not in groups:
                 order.append(catalog_id)
-                groups[catalog_id] = (catalog.title, catalog.divisible, catalog.uniq, 0, [])
-            title, divisible, uniq, remainder, units = groups[catalog_id]
+                groups[catalog_id] = (
+                    catalog.title,
+                    catalog.divisible,
+                    catalog.uniq,
+                    bool(catalog.no_fixed_capacity),
+                    catalog.capacity or 0,
+                    0,
+                    [],
+                )
+            title, divisible, uniq, no_fixed, capacity, remainder, units = groups[catalog_id]
             units.append((index, product))
             groups[catalog_id] = (
                 title,
                 divisible,
                 uniq,
+                no_fixed,
+                capacity,
                 remainder + (product.count or 0),
                 units,
             )
-        result: List[Tuple[int, str, int, bool, bool, str, List[Tuple[int, Product]]]] = []
+        result: List[Tuple[int, str, str, bool, bool, str, List[Tuple[int, Product]]]] = []
         for catalog_id in order:
-            title, divisible, uniq, remainder, units = groups[catalog_id]
+            title, divisible, uniq, no_fixed, capacity, remainder, units = groups[catalog_id]
             result.append(
                 (
                     catalog_id,
                     title,
-                    len(units),
+                    format_transferred_qty(remainder, len(units), divisible, capacity, no_fixed),
                     divisible,
                     uniq,
                     format_amount(remainder) if divisible else "—",

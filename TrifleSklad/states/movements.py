@@ -54,9 +54,9 @@ class ListMovementsState(MovementListFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.MOVEMENTS_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.MOVEMENTS_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
         self._enter_list()
@@ -109,9 +109,9 @@ class ViewMovementsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.MOVEMENTS_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.MOVEMENTS_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.item = MovementDAO.get_by_id_with_product_storage_owner(int(id))
@@ -235,9 +235,9 @@ class AddMovementsState(LookupCreatorsMixin, AppState):
 
     @rx.event
     async def on_load(self):
-        if not self.has_permission(Action.MOVEMENTS_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.MOVEMENTS_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.current_date = now_local().date().__str__()
@@ -503,9 +503,9 @@ class EditMovementsState(FullEditMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.MOVEMENTS_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.MOVEMENTS_EDIT)
+        if guard is not None:
+            yield guard
             return
 
         self.in_process = True

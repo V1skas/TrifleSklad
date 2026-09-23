@@ -22,10 +22,10 @@ _TH_TIGHT = {**NESTED_DETAIL_TH, "width": "1%", "white_space": "nowrap"}
 def dialog():
     return rx.dialog.root(
         rx.dialog.content(
+            controls.dialog_heading("Вибір ТМЦ"),
             products_selector(
-                rx.hstack(
-                    rx.spacer(),
-                    rx.button("Обрати", type="button", on_click=ProductsMovementListState.on_save_selected)
+                controls.dialog_footer(
+                    controls.dialog_confirm_button("Обрати", on_click=ProductsMovementListState.on_save_selected),
                 ),
                 width="100%",
                 height="100%"

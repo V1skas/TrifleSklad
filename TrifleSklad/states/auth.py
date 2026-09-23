@@ -11,6 +11,11 @@ class AuthState(rx.State):
     flag_err: bool = False
     text_err: str = ""
 
+    # Логін останнього успішного входу — зберігається в браузері (localStorage),
+    # переживає reset_all()/logout(); підставляється в поле логіну на сторінці
+    # входу (див. load_remembered).
+    remembered_login: str = rx.LocalStorage("")
+
     @rx.var
     def login_error(self) -> bool:
         return self.flag_err
@@ -41,7 +46,16 @@ class AuthState(rx.State):
         self.reset_error()
 
     @rx.event
-    async def auth_handler(self):
+    def load_remembered(self):
+        """Підставити логін останнього входу в поле (виклик на завантаженні
+        сторінки входу). Порожнє значення — нічого не робимо."""
+        if self.remembered_login and not self.login:
+            self.login = self.remembered_login
+
+    @rx.event
+    async def auth_handler(self, form_data: dict | None = None):
+        # form_data приходить лише коли обробник викликано сабмітом форми (Enter
+        # у полі) — не використовується: логін/пароль уже в self.login/password.
         try:
             result = AuthService().auth(self.login, self.password)
             if result is None:
@@ -59,6 +73,8 @@ class AuthState(rx.State):
             app_state.user_actions = AuthService().get_list_user_actions(user.login)
             app_state.fio = AuthService().get_fio(user.login)
             app_state.permissions_version_seen = user.permissions_version or 0
+
+            self.remembered_login = user.login
 
             return [rx.redirect(WELCOME), AuthState.reset_all()]
         except Exception as e:

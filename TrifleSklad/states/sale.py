@@ -18,6 +18,7 @@ from TrifleSklad.declared import (
     MovementsType,
     StorageType,
     format_request_qty,
+    format_transferred_qty,
     movements_status_list,
     movements_type_list,
     sale_line_cost,
@@ -86,9 +87,9 @@ class ListSaleState(MovementListFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.SALES_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.SALES_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
         self._enter_list()
@@ -146,13 +147,14 @@ class ViewSaleState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.var
     def positions_grouped(
         self,
-    ) -> List[Tuple[int, str, int, float, float, List[Tuple[int, str, str, bool]]]]:
+    ) -> List[Tuple[int, str, str, float, float, List[Tuple[int, str, str, bool]]]]:
         if self.item is None:
             return []
-        result: List[Tuple[int, str, int, float, float, List[Tuple[int, str, str, bool]]]] = []
+        result: List[Tuple[int, str, str, float, float, List[Tuple[int, str, str, bool]]]] = []
         for index, pc in enumerate(self.item.movement.products_catalog):
             units: List[Tuple[int, str, str, bool]] = []
             line_units: List[Tuple[int, bool, int]] = []
+            total_amount = 0.0
             for unit in pc.products:
                 catalog = unit.product_catalog
                 serial = (
@@ -166,6 +168,7 @@ class ViewSaleState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
                     else "—"
                 )
                 units.append((unit.id, serial, remain, unit.excluded_from_accounting))
+                total_amount += unit.count or 0
                 line_units.append(
                     (
                         unit.count or 0,
@@ -173,11 +176,18 @@ class ViewSaleState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
                         catalog.capacity if catalog is not None else 0,
                     )
                 )
+            product = pc.product
             result.append(
                 (
                     index,
-                    pc.product.title,
-                    pc.count,
+                    product.title,
+                    format_transferred_qty(
+                        total_amount,
+                        pc.count,
+                        product.divisible,
+                        product.capacity,
+                        product.no_fixed_capacity,
+                    ),
                     pc.price,
                     sale_line_cost(pc.price, line_units),
                     units,
@@ -223,9 +233,9 @@ class ViewSaleState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.SALES_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.SALES_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.expanded_positions = {}
@@ -417,9 +427,9 @@ class AddSaleState(LookupCreatorsMixin, AppState):
 
     @rx.event
     async def on_load(self):
-        if not self.has_permission(Action.SALES_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.SALES_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.current_date = now_local().date().__str__()
@@ -651,9 +661,9 @@ class EditSaleState(FullEditMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.SALES_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.SALES_EDIT)
+        if guard is not None:
+            yield guard
             return
 
         self.in_process = True

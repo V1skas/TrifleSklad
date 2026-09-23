@@ -117,6 +117,70 @@ class AppState(rx.State):
     def has_section_access(self, section: str) -> bool:
         return any(action.startswith(f"{section}:") for action in self.user_actions)
 
+    def _ensure_session(self) -> bool:
+        """Гарантує, що auth_token/user/user_actions встановлені з ДІЙСНОЇ
+        cookie-сесії, і повертає True — сесія дійсна; False — сесії немає або
+        токен протермінований.
+
+        Викликається з гвардів on_load (`access_guard`), тому працює і на
+        підстанах (List/Add/Edit/View): auth_token/user/... — успадковані від
+        AppState var'и, і присвоєння `self.x = ...` на підстані делегується у
+        вузол AppState (Reflex `__setattr__` → `setattr(self.parent_state, ...)`),
+        тож шапка (AppState.is_authenticated) бачить зміну.
+
+        Свіже перезавантаження сторінки скидає стан у пам'яті (auth_token=None),
+        але cookie лишається — тут ми відновлюємо сесію з неї, щоб залогінений
+        користувач не «випадав» на /login. Якщо сесія вже відновлена в цьому
+        стані — короткочасно виходимо без зайвого запиту до БД (перевірка
+        протермінування/бампу версії — на require_auth при повторному вході)."""
+        if self.auth_token is not None and self.user is not None:
+            return True
+        if not self.auth_token_value:
+            return False
+        token = self._auth_service.get_auth_token(self.auth_token_value)
+        if token is None or token.user is None:
+            self.auth_token = None
+            return False
+        self.auth_token = token
+        self.user = token.user
+        self.user_actions = self._auth_service.get_list_user_actions(self.user.login)
+        self.fio = self._auth_service.get_fio(self.user.login)
+        self.permissions_version_seen = self.user.permissions_version or 0
+        return True
+
+    def access_guard(self, action: SystemAction):
+        """Єдиний гвард сторінкових on_load. Повертає подію редіректу або None:
+          * немає дійсної сесії (не залогінені / протермінований токен) → /login
+            (а НЕ /welcome — раніше гвард сліпо кидав на /welcome, і при
+            автовиході/першому заході без логіну користувач опинявся не там або
+            «застрягав»; ще й гоничись із require_auth, що кидав на /login);
+          * сесія є, але немає права на цю сторінку → /welcome + тост;
+          * доступ дозволено → None.
+
+        Робить перевірку самодостатньою (сам відновлює сесію з cookie), тому не
+        залежить від того, чи встиг спрацювати require_auth зі спінера — це й
+        усуває гонитву редіректів."""
+        if not self._ensure_session():
+            return rx.redirect(routes.LOGIN)
+        if not self.has_permission(action):
+            return [
+                rx.redirect(routes.WELCOME),
+                rx.toast.error("У Вас немає доступу до цієї сторінки!"),
+            ]
+        return None
+
+    def access_guard_any(self, *actions: SystemAction):
+        """Як `access_guard`, але сторінка доступна за наявності БУДЬ-ЯКОГО з
+        перелічених прав (напр. «Заявки» — REQUESTS_LIST або REQUESTS_CREATE)."""
+        if not self._ensure_session():
+            return rx.redirect(routes.LOGIN)
+        if not any(self.has_permission(a) for a in actions):
+            return [
+                rx.redirect(routes.WELCOME),
+                rx.toast.error("У Вас немає доступу до цієї сторінки!"),
+            ]
+        return None
+
     @rx.var
     def active_group_url(self) -> str:
         """URL найдовшого (найбільш специфічного) пункту верхнього меню, чий

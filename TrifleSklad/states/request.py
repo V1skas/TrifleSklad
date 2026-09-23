@@ -95,9 +95,9 @@ class ListRequestsState(AppState):
 
     @rx.event
     def on_load(self):
-        if not (self.has_permission(ActionEnum.REQUESTS_LIST) or self.has_permission(ActionEnum.REQUESTS_CREATE)):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard_any(ActionEnum.REQUESTS_LIST, ActionEnum.REQUESTS_CREATE)
+        if guard is not None:
+            yield guard
             return
         self.can_see_all = self.has_permission(ActionEnum.REQUESTS_LIST)
         self._current_page = 1
@@ -339,9 +339,9 @@ class _RequestFormState(rx.State, mixin=True):
 class AddRequestsState(_RequestFormState, AppState):
     @rx.event
     def on_load(self):
-        if not self.has_permission(ActionEnum.REQUESTS_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(ActionEnum.REQUESTS_CREATE)
+        if guard is not None:
+            yield guard
             return
         self.request_type = str(MovementsType.ISSUE)
         self.id_responsible = ""
@@ -389,9 +389,9 @@ class EditRequestsState(_RequestFormState, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(ActionEnum.REQUESTS_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(ActionEnum.REQUESTS_EDIT)
+        if guard is not None:
+            yield guard
             return
         self.item = RequestDAO.get_by_id_with_relationships(int(id))
         if self.item is None:
@@ -519,9 +519,9 @@ class ViewRequestsState(AuditHistoryMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(ActionEnum.REQUESTS_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(ActionEnum.REQUESTS_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.item = RequestDAO.get_by_id_with_relationships(int(id))
@@ -610,9 +610,9 @@ class ProcessRequestsState(AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(ActionEnum.REQUESTS_PROCESS):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(ActionEnum.REQUESTS_PROCESS)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.item = RequestDAO.get_by_id_with_relationships(int(id))
