@@ -13,6 +13,20 @@ COPY pyproject.toml uv.lock* .python-version ./
 RUN pip install uv
 RUN uv sync
 
+# Same-origin WebSocket: фронтенд Reflex по умолчанию подменяет ХОСТ адреса
+# бэкенда на window.location.hostname, но ПОРТ оставляет запечённым (backend_port,
+# здесь 80). За NAT-пробросом (внешний порт → :80) страница грузится с внешнего
+# порта, а WebSocket всё равно бьётся на :80 → сокет не поднимается. Патчим шаблон
+# state.js в установленном reflex, чтобы порт тоже брался из window.location
+# (тот же origin, что и страница) — тогда WS работает через любой проброшенный порт.
+# Правится ШАБЛОН (а не .web/), т.к. reflex перегенерирует .web из шаблона при
+# каждой компиляции. Guard роняет сборку, если строка-якорь изменилась в новой
+# версии Reflex (чтобы баг не вернулся молча).
+RUN STATE_JS="$(uv run python -c 'import reflex_base, os; print(os.path.join(os.path.dirname(reflex_base.__file__), ".templates", "web", "utils", "state.js"))')" \
+    && grep -q '    endpoint.hostname = frontend_hostname;' "$STATE_JS" \
+    && sed -i 's/    endpoint.hostname = frontend_hostname;/    endpoint.hostname = frontend_hostname;\n    endpoint.port = window.location.port;/' "$STATE_JS" \
+    && grep -q '    endpoint.port = window.location.port;' "$STATE_JS"
+
 # Копируем весь оставшийся код проекта. Каталог utils/ переехал в
 # TrifleSklad/utils/ (рефакторинг архитектуры), поэтому отдельно не копируется.
 COPY alembic.ini rxconfig.py update.py .update_marker deploy.py entrypoint.sh ./
