@@ -58,9 +58,9 @@ class ListStorageState(SearchFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.STORAGE_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.STORAGE_LIST)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_progress = True
@@ -97,9 +97,9 @@ class AddStorageState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.STORAGE_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.STORAGE_CREATE)
+        if guard is not None:
+            yield guard
             return
         self.item = Storage()
         self.list_workers = [(str(w.id), w.fio) for w in WorkerDAO.get_all()]
@@ -184,9 +184,9 @@ class EditStorageState(AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.STORAGE_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.STORAGE_EDIT)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_process = True
@@ -310,9 +310,9 @@ class ViewStorageState(AuditHistoryMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.STORAGE_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.STORAGE_VIEW)
+        if guard is not None:
+            yield guard
             return
         try:
             self.in_process = True

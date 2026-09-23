@@ -39,6 +39,7 @@ class ListReturnsState(MovementListFilterMixin, AppState):
             self.selected_statuses,
             incoming_storage=self.filter_incoming_storage,
             destination_storage=self.filter_destination_storage,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.var
@@ -51,12 +52,12 @@ class ListReturnsState(MovementListFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.RETURNS_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.RETURNS_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
-        self._reset_list_state()
+        self._enter_list()
         self._reload()
         self.in_progress = False
 
@@ -106,9 +107,9 @@ class ViewReturnsState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.RETURNS_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.RETURNS_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self.item = MovementDAO.get_by_id_with_product_storage_owner(int(id))
@@ -214,9 +215,9 @@ class AddReturnsState(LookupCreatorsMixin, AppState):
 
     @rx.event
     async def on_load(self):
-        if not self.has_permission(Action.RETURNS_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.RETURNS_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.current_date = now_local().date().__str__()
@@ -405,9 +406,9 @@ class EditReturnsState(FullEditMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.RETURNS_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.RETURNS_EDIT)
+        if guard is not None:
+            yield guard
             return
 
         self.in_process = True

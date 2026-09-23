@@ -257,7 +257,7 @@ def edit_page() -> rx.Component:
 def _cancel_conflict_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Скасування неможливе"),
+            controls.dialog_heading("Скасування неможливе"),
             rx.dialog.description(
                 "Товар із цього списання бере участь у наведених нижче рухах. "
                 "Спочатку скасуйте пізніші рухи."

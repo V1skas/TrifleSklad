@@ -150,6 +150,9 @@ from TrifleSklad.states.stock_report import StockReportState
 from TrifleSklad.views import stock_report as stock_report_views
 from TrifleSklad.states.units_report import ListUnitsReportState, ViewUnitsReportState
 from TrifleSklad.views import units_report as units_report_views
+from TrifleSklad.states.catalog_movements_report import CatalogMovementsReportState
+from TrifleSklad.views import catalog_movements_report as catalog_movements_report_views
+from TrifleSklad.states.auth import AuthState
 
 app = rx.App(
     # Тема налаштовується через rx.plugins.RadixThemesPlugin у rxconfig.py
@@ -175,7 +178,11 @@ app.app_wraps[5, "Overlay"] = overlay_wrap
 
 app.add_page(frontend.index_page, route=routes.INDEX)
 app.add_page(frontend.welcome_page, route=routes.WELCOME)
-app.add_page(frontend.auth_page, route=routes.LOGIN, on_load=state.AppState.check_params)
+app.add_page(
+    frontend.auth_page,
+    route=routes.LOGIN,
+    on_load=[state.AppState.check_params, AuthState.load_remembered],
+)
 
 # Заглушки коренів розділів — щоб клік по пункту навбару не впирався у 404.
 app.add_page(frontend.admin_page, route=routes.ADMIN)
@@ -291,3 +298,4 @@ app.add_page(admission_views.view_page, route=routes.MOVEMENT_ADMISSIONS_VIEW_ID
 app.add_page(stock_report_views.page, route=routes.REPORTS_STOCK, on_load=StockReportState.on_load)
 app.add_page(units_report_views.list_page, route=routes.REPORTS_UNITS, on_load=ListUnitsReportState.on_load)
 app.add_page(units_report_views.view_page, route=routes.REPORTS_UNITS_VIEW_ID + "[id]", on_load=ViewUnitsReportState.on_load)
+app.add_page(catalog_movements_report_views.page, route=routes.REPORTS_CATALOG_MOVEMENTS, on_load=CatalogMovementsReportState.on_load)

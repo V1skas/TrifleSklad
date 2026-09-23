@@ -2,7 +2,6 @@ from typing import List, Tuple
 
 import reflex as rx
 
-from TrifleSklad import routes
 from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import (
     OwnerDAO,
@@ -11,7 +10,7 @@ from TrifleSklad.dao_legacy import (
     ProductDAO,
     StorageDAO,
 )
-from TrifleSklad.declared import StorageType
+from TrifleSklad.declared import StorageType, format_amount, format_transferred_qty
 from TrifleSklad.states.app import AppState
 
 ALL = "all"
@@ -20,7 +19,9 @@ ALL = "all"
 class StockReportState(AppState):
     in_progress: bool = True
 
-    rows: List[Tuple[int, str, str, int, int]] = []
+    # (catalog_id, title, unit, «Загальна кількість», «Одиниць»); останні дві —
+    # уже відформатовані рядки (Одиниць — дробове по ємності + фіз. к-сть).
+    rows: List[Tuple[int, str, str, str, str]] = []
 
     _catalog_cache: List[Tuple[str, str, str]] = []
     list_categories: List[Tuple[str, str]] = []
@@ -42,7 +43,13 @@ class StockReportState(AppState):
 
     is_units_open: bool = False
     selected_title: str = ""
+    selected_catalog_id: int = -1
     unit_rows: List[Tuple[str, str, str, str, str, bool]] = []
+
+    # Значення фільтрів і стан діалогу скидаються лише при першому вході в сесії;
+    # повернення з детального перегляду одиниці (повторний монтаж сторінки)
+    # зберігає відкритий діалог і фільтри.
+    _initialized: bool = False
 
     def _excluded_types(self) -> List[int]:
         excluded: List[int] = []
@@ -87,7 +94,7 @@ class StockReportState(AppState):
                 break
 
     def _reload(self):
-        self.rows = ProductDAO.get_stock_grouped(
+        grouped = ProductDAO.get_stock_grouped(
             int(self.filter_catalog) if self.filter_catalog else None,
             int(self.filter_storage) if self.filter_storage else None,
             int(self.filter_owner) if self.filter_owner else None,
@@ -95,6 +102,27 @@ class StockReportState(AppState):
             int(self.filter_category) if self.filter_category else None,
             self.search_text or None,
         )
+        self.rows = [
+            (
+                catalog_id,
+                title,
+                unit,
+                format_amount(total_count),
+                format_transferred_qty(
+                    total_count, units_count, divisible, capacity, no_fixed
+                ),
+            )
+            for (
+                catalog_id,
+                title,
+                unit,
+                total_count,
+                units_count,
+                divisible,
+                capacity,
+                no_fixed,
+            ) in grouped
+        ]
 
     @rx.var
     def has_rows(self) -> bool:
@@ -152,27 +180,38 @@ class StockReportState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.REPORTS_STOCK):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_STOCK)
+        if guard is not None:
+            yield guard
             return
 
         self.in_progress = True
-        self.filter_catalog = ""
-        self.filter_category = ""
-        self.filter_storage = ""
-        self.filter_owner = ""
-        self.exclude_warehouse = False
-        self.exclude_site = False
-        self.exclude_department = False
-        self.exclude_client = False
-        self.search_text = ""
-        self.is_units_open = False
-        self.unit_rows = []
-        self.selected_title = ""
-
         self._load_filter_options()
+
+        # Скид фільтрів і діалогу — лише при першому вході в розділ у межах сесії.
+        if not self._initialized:
+            self._initialized = True
+            self.filter_catalog = ""
+            self.filter_category = ""
+            self.filter_storage = ""
+            self.filter_owner = ""
+            self.exclude_warehouse = False
+            self.exclude_site = False
+            self.exclude_department = False
+            self.exclude_client = False
+            self.search_text = ""
+            self.is_units_open = False
+            self.unit_rows = []
+            self.selected_title = ""
+            self.selected_catalog_id = -1
+
         self._reload()
+
+        # Повернення з детального перегляду одиниці — відновлюємо відкритий діалог
+        # (перечитуємо одиниці за збереженою позицією каталогу).
+        if self.is_units_open and self.selected_catalog_id != -1:
+            self._load_units(self.selected_catalog_id, self.selected_title)
+
         self.in_progress = False
 
     @rx.event
@@ -246,9 +285,9 @@ class StockReportState(AppState):
         self.search_text = ""
         self._reload()
 
-    @rx.event
-    def open_units(self, catalog_id: int, title: str):
+    def _load_units(self, catalog_id: int, title: str) -> None:
         self.selected_title = title
+        self.selected_catalog_id = catalog_id
         units = ProductDAO.get_stock_units(
             catalog_id,
             int(self.filter_storage) if self.filter_storage else None,
@@ -269,6 +308,10 @@ class StockReportState(AppState):
             count = str(unit.count) if divisible else "—"
             rows.append((str(unit.id), serial, storage, owner, count, unit.excluded_from_accounting))
         self.unit_rows = rows
+
+    @rx.event
+    def open_units(self, catalog_id: int, title: str):
+        self._load_units(catalog_id, title)
         self.is_units_open = True
 
     @rx.event
@@ -277,3 +320,4 @@ class StockReportState(AppState):
         if not value:
             self.unit_rows = []
             self.selected_title = ""
+            self.selected_catalog_id = -1

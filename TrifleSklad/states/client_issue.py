@@ -47,10 +47,14 @@ class ListClientIssueState(MovementListFilterMixin, AppState):
     list_recipients: List[Tuple[str, str]] = []
     list_clients: List[Tuple[str, str]] = []
 
-    def _load_client_issue_filter_options(self):
+    def _load_section_filter_options(self):
         self.list_recipients = [(w.fio, str(w.id)) for w in WorkerDAO.get_all()]
         clients = StorageDAO.get_all_by_type(StorageType.CLIENT)
         self.list_clients = [(s.title, str(s.id)) for s in clients]
+
+    def _reset_section_filter_values(self):
+        self.filter_recipient = ALL
+        self.filter_client = ALL
 
     def _reload(self):
         self._all_pages, self.items = ClientIssueDAO.get_paginated(
@@ -62,19 +66,17 @@ class ListClientIssueState(MovementListFilterMixin, AppState):
             incoming_storage=self.filter_incoming_storage,
             incoming_owner=self.filter_incoming_owner,
             recipient=self.filter_recipient,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.CLIENT_ISSUES_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.CLIENT_ISSUES_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
-        self._reset_list_state()
-        self.filter_recipient = ALL
-        self.filter_client = ALL
-        self._load_client_issue_filter_options()
+        self._enter_list()
         self._reload()
         self.in_progress = False
 
@@ -85,32 +87,19 @@ class ListClientIssueState(MovementListFilterMixin, AppState):
     @rx.event
     def on_change_filter_recipient(self, value: str):
         self.filter_recipient = value
+        return self._apply_filters()
 
     @rx.event
     def on_change_filter_client(self, value: str):
         self.filter_client = value
-
-    @rx.event
-    def reset_filters(self):
-        today = now_local().date().isoformat()
-        self.filter_date_enabled = False
-        self.filter_date_from = today
-        self.filter_date_to = today
-        self.selected_statuses = []
-        self.filter_incoming_storage = ALL
-        self.filter_destination_storage = ALL
-        self.filter_incoming_owner = ALL
-        self.filter_destination_owner = ALL
-        self.filter_recipient = ALL
-        self.filter_client = ALL
-        self._current_page = 1
-        self._reload()
+        return self._apply_filters()
 
     @rx.var
     def has_active_filters(self) -> bool:
         return bool(
             self.filter_date_enabled
             or self.selected_statuses
+            or self.selected_catalog_ids
             or self.filter_incoming_storage != ALL
             or self.filter_incoming_owner != ALL
             or self.filter_client != ALL
@@ -160,9 +149,9 @@ class ViewClientIssueState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.CLIENT_ISSUES_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.CLIENT_ISSUES_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         item = ClientIssueDAO.get_by_id_with_movement_product_storage_owner_recipient(int(id))
@@ -302,9 +291,9 @@ class AddClientIssueState(LookupCreatorsMixin, AppState):
 
     @rx.event
     async def on_load(self):
-        if not self.has_permission(Action.CLIENT_ISSUES_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.CLIENT_ISSUES_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.item = ClientIssue(
@@ -659,9 +648,9 @@ class EditClientIssueState(FullEditMixin, AppState):
     @rx.event
     async def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.CLIENT_ISSUES_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.CLIENT_ISSUES_EDIT)
+        if guard is not None:
+            yield guard
             return
 
         self.in_process = True

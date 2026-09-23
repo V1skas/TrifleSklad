@@ -44,7 +44,6 @@ def _filter_card() -> rx.Component:
                 ),
                 controls.filter_actions(
                     rx.button("Скинути", variant="soft", color_scheme="gray", on_click=ListRequestsState.reset_filters),
-                    rx.button("Застосувати", on_click=ListRequestsState.apply_filters),
                 ),
                 spacing="3",
                 width="100%",
@@ -132,7 +131,7 @@ def list_page() -> rx.Component:
 def _position_dialog(state) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Додавання позиції"),
+            controls.dialog_heading("Додавання позиції"),
             rx.vstack(
                 rx.text("*Найменування з каталогу:", size="2"),
                 rx.select.root(
@@ -171,12 +170,9 @@ def _position_dialog(state) -> rx.Component:
                         size="1", color="gray",
                     ),
                 ),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=state.set_position_dialog_open(False)),
-                    rx.spacer(),
-                    rx.button("Додати", type="button", on_click=state.add_position),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button("Скасувати", on_click=state.set_position_dialog_open(False)),
+                    controls.dialog_confirm_button("Додати", on_click=state.add_position),
                 ),
                 spacing="2",
                 width="100%",

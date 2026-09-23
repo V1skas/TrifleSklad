@@ -21,6 +21,7 @@ from TrifleSklad.declared import (
     StorageType,
     admission_nds_split,
     format_amount,
+    format_transferred_qty,
     generate_serial_range,
     movements_status_list,
     movements_type_list,
@@ -111,6 +112,20 @@ def _line_cost(pc: MovementProductsCatalog) -> float:
     return sum(qty * price for qty, price in _admission_unit_lines(pc))
 
 
+def _qty_label(pc: MovementProductsCatalog) -> str:
+    """Колонка «К-сть одиниць»: для подільного з фіксованою ємністю — дробове по
+    ємності + фіз. к-сть у дужках (напр. «1.2 (2)»), інакше число фіз. одиниць."""
+    product = pc.product
+    total_amount = sum((p.count or 0) for p in pc.products)
+    return format_transferred_qty(
+        total_amount,
+        pc.count,
+        product.divisible if product is not None else False,
+        product.capacity if product is not None else 0,
+        product.no_fixed_capacity if product is not None else False,
+    )
+
+
 class MovementProductCatalogAddEditFormState(rx.State):
     item: MovementProductsCatalog = MovementProductsCatalog(
         count=0, price=0.0, id_product_catalog=-1, products=[]
@@ -142,6 +157,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
     # `unit_prices` одразу (з подальшою можливістю пооднічного доуточнення).
     bulk_capacity: str = ""
     bulk_price: str = ""
+    # Позначка «поза бухгалтерським обліком» (TS-59 п.4): масова `position_excluded`
+    # (на всю позицію) + поединична `unit_excluded` (паралельна `item.products`,
+    # як `unit_amounts`). Одиниці постачання створюються самим діалогом, тож флаг
+    # достатньо проставити на об'єктах Product у `_apply_units`.
+    position_excluded: bool = False
+    unit_excluded: List[bool] = []
 
     search_catalog: str = ""
 
@@ -153,9 +174,16 @@ class MovementProductCatalogAddEditFormState(rx.State):
     error_price: bool = False
     error_capacity: bool = False
 
-    @rx.var
-    def category_options(self) -> List[Tuple[str, str]]:
-        return [(label, id) for id, label in ProductCategoryDAO.get_hierarchy_options()]
+    # Список категорій для фільтра діалогу (формат (назва, id)). Раніше був
+    # @rx.var без реактивних залежностей → Reflex кешував його одноразово, і
+    # створена «на льоту» категорія не з'являлась у фільтрі (TS-59 п.5). Тепер —
+    # звичайне поле, яке перечитуємо при відкритті діалогу і після створення категорії.
+    filter_category_options: List[Tuple[str, str]] = []
+
+    def _load_filter_category_options(self):
+        self.filter_category_options = [
+            (label, cid) for cid, label in ProductCategoryDAO.get_hierarchy_options()
+        ]
 
     @rx.var
     def category_chosen(self) -> bool:
@@ -176,26 +204,30 @@ class MovementProductCatalogAddEditFormState(rx.State):
             str(i) for i in ProductCategoryDAO.get_self_and_children_ids(int(self.filter_category))
         )
         term = self.search_catalog.strip().lower()
-        return [
-            (catalog.title, str(catalog.id))
-            for catalog in self.cache_products_catalog_list
-            if str(catalog.id_category) in allowed_category_ids
-            and (term == "" or term in catalog.title.lower())
-        ]
+        return sorted(
+            (
+                (catalog.title, str(catalog.id))
+                for catalog in self.cache_products_catalog_list
+                if str(catalog.id_category) in allowed_category_ids
+                and (term == "" or term in catalog.title.lower())
+            ),
+            key=lambda option: option[0].lower(),
+        )
 
     @rx.var
     def item_products_list(self) -> List[Tuple[int, Product]]:
         return [(index, product) for index, product in enumerate(self.item.products)]
 
     @rx.var
-    def unit_rows(self) -> List[Tuple[int, str, bool, str, bool]]:
-        """(індекс, ємність, помилка ємності, ціна, помилка ціни) — для
-        акордеону «Одиниці» (лише подільний ТМЦ із фіксованою ємністю,
-        TS-53). `unit_amounts`/`unit_prices` завжди однакової довжини —
-        підтримується `_sync_unit_rows`."""
+    def unit_rows(self) -> List[Tuple[int, str, bool, str, bool, bool]]:
+        """(індекс, ємність, помилка ємності, ціна, помилка ціни, поза обліком) —
+        для акордеону «Одиниці» (лише подільний ТМЦ із фіксованою ємністю,
+        TS-53). `unit_amounts`/`unit_prices`/`unit_excluded` завжди однакової
+        довжини — підтримується `_sync_unit_rows`."""
         if not self._units_editable():
             return []
         prices = self.unit_prices
+        excluded = self.unit_excluded
         return [
             (
                 i,
@@ -205,6 +237,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
                 (prices[i].strip() != "" and self._parse_unit_price(prices[i]) is None)
                 if i < len(prices)
                 else False,
+                excluded[i] if i < len(excluded) else False,
             )
             for i, amount in enumerate(self.unit_amounts)
         ]
@@ -308,8 +341,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
         return _parse_nonneg_float(value)
 
     def _sync_unit_rows(self):
-        """Приводить довжину `unit_amounts`/`unit_prices` до к-сті одиниць
-        позиції — нові одиниці за замовчуванням повні, без ручної ціни."""
+        """Приводить довжину `unit_amounts`/`unit_prices`/`unit_excluded` до к-сті
+        одиниць позиції — нові одиниці за замовчуванням повні, без ручної ціни,
+        а позначку обліку успадковують від масової (`position_excluded`)."""
         full_label = format_amount(self._full_unit_count())
         target_len = len(self.item.products)
         amounts = list(self.unit_amounts[:target_len])
@@ -318,6 +352,9 @@ class MovementProductCatalogAddEditFormState(rx.State):
         prices = list(self.unit_prices[:target_len])
         prices += [""] * (target_len - len(prices))
         self.unit_prices = prices
+        excluded = list(self.unit_excluded[:target_len])
+        excluded += [self.position_excluded] * (target_len - len(excluded))
+        self.unit_excluded = excluded
 
     def _apply_units(self):
         """Єдина точка запису Product.count/Product.price по всіх одиницях
@@ -327,6 +364,15 @@ class MovementProductCatalogAddEditFormState(rx.State):
         `unit_prices[i]` (порожнє/невірне — повна ємність / без override);
         неподільний — count=1, без override ціни."""
         units = self.item.products
+        # Позначка «поза обліком» — незалежна від count/price, тож виставляємо її
+        # одним проходом для всіх гілок нижче (поединична `unit_excluded`, а де її
+        # ще немає — масова `position_excluded`).
+        for i, unit in enumerate(units):
+            unit.excluded_from_accounting = (
+                self.unit_excluded[i]
+                if i < len(self.unit_excluded)
+                else self.position_excluded
+            )
         if self.selected_divisible and self.selected_no_fixed_capacity:
             full = self._full_unit_count()
             for unit in units:
@@ -387,6 +433,26 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self._apply_units()
 
     @rx.event
+    def on_change_position_excluded(self, value: bool):
+        """Масова позначка «поза обліком» — пише однакове значення в усі одиниці
+        позиції (поединичне доуточнення лишається доступним)."""
+        self.position_excluded = value
+        self.unit_excluded = [value] * len(self.item.products)
+        self._apply_units()
+
+    @rx.event
+    def on_change_unit_excluded(self, index: int, value: bool):
+        if index < 0 or index >= len(self.item.products):
+            return
+        excluded = list(self.unit_excluded)
+        # Вирівнюємо довжину до к-сті одиниць (нові — за масовою позначкою).
+        while len(excluded) < len(self.item.products):
+            excluded.append(self.position_excluded)
+        excluded[index] = value
+        self.unit_excluded = excluded
+        self._apply_units()
+
+    @rx.event
     def on_change_search_catalog(self, value: str):
         self.search_catalog = value
 
@@ -407,6 +473,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.unit_prices = []
         self.bulk_capacity = ""
         self.bulk_price = ""
+        self.unit_excluded = []
+        self.position_excluded = False
 
     @rx.event
     def on_change_filter_category(self, value: str):
@@ -435,6 +503,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.unit_prices = []
         self.bulk_capacity = ""
         self.bulk_price = ""
+        self.unit_excluded = []
+        self.position_excluded = False
         if self.is_product_uniq and not self.item.product.uniq:
             for i in range(self.item.count):
                 self.item.products[i].serial_number = ""
@@ -574,6 +644,12 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
         self.bulk_capacity = ""
         self.bulk_price = ""
+        # Відновлюємо позначку «поза обліком» кожної одиниці; масова — «увімкнена»,
+        # коли всі одиниці позначені.
+        self.unit_excluded = [bool(p.excluded_from_accounting) for p in item.products]
+        self.position_excluded = bool(
+            item.products and all(p.excluded_from_accounting for p in item.products)
+        )
         self.id_product_catalog_entered = True
         self.id_product_catalog_in_cache = (
             str(item.product.id) if item.product is not None else ""
@@ -585,6 +661,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
         )
         self.search_catalog = ""
         self.price_input = str(item.price)
+        self._load_filter_category_options()
 
     @rx.event
     def clear(self):
@@ -602,6 +679,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.unit_prices = []
         self.bulk_capacity = ""
         self.bulk_price = ""
+        self.unit_excluded = []
+        self.position_excluded = False
         self.id_product_catalog_entered = False
         self.id_product_catalog_in_cache = ""
         self.search_catalog = ""
@@ -609,6 +688,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
         self.price_input = "0"
         self.error_count = False
         self.error_price = False
+        self._load_filter_category_options()
         self._reset_new_product()
         self.is_create_open = False
 
@@ -725,6 +805,8 @@ class MovementProductCatalogAddEditFormState(rx.State):
                 self.unit_prices = []
                 self.bulk_capacity = ""
                 self.bulk_price = ""
+                self.unit_excluded = []
+                self.position_excluded = False
                 for unit in self.item.products:
                     unit.id_product_catalog = catalog.id
                 self._sync_unit_rows()
@@ -859,6 +941,7 @@ class MovementProductCatalogAddEditFormState(rx.State):
             return rx.toast.error(text)
 
         self.list_categories = ProductCategoryDAO.get_hierarchy_options()
+        self._load_filter_category_options()
         self.new_id_category = str(new_id)
         self.is_create_category_open = False
         self._reset_new_category()
@@ -878,6 +961,10 @@ class MovementProductCatalogDetailedViewState(rx.State):
     def price_display(self) -> str:
         return _format_money(self.item.price)
 
+    @rx.var
+    def quantity_label(self) -> str:
+        return _qty_label(self.item)
+
     @rx.event
     def set_item(self, item: MovementProductsCatalog):
         self.item = item
@@ -896,6 +983,12 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
     filter_supplier: str = ALL
     list_suppliers: List[Tuple[str, str]] = []
 
+    def _load_section_filter_options(self):
+        self.list_suppliers = [(s.title, str(s.id)) for s in SupplierDAO.get_all()]
+
+    def _reset_section_filter_values(self):
+        self.filter_supplier = ALL
+
     def _reload(self):
         self._all_pages, self.items = AdmissionDAO.get_paginated(
             self._current_page,
@@ -906,6 +999,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
             destination_storage=self.filter_destination_storage,
             destination_owner=self.filter_destination_owner,
             supplier=self.filter_supplier,
+            catalog_ids=self.selected_catalog_ids,
         )
 
     @rx.var
@@ -913,6 +1007,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
         return bool(
             self.filter_date_enabled
             or self.selected_statuses
+            or self.selected_catalog_ids
             or self.filter_destination_storage != ALL
             or self.filter_destination_owner != ALL
             or self.filter_supplier != ALL
@@ -935,14 +1030,12 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.ADMISSIONS_LIST):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.ADMISSIONS_LIST)
+        if guard is not None:
+            yield guard
             return
         self.in_progress = True
-        self._reset_list_state()
-        self.filter_supplier = ALL
-        self.list_suppliers = [(s.title, str(s.id)) for s in SupplierDAO.get_all()]
+        self._enter_list()
         self._reload()
         self.in_progress = False
 
@@ -953,21 +1046,7 @@ class ListAdmissionState(MovementListFilterMixin, AppState):
     @rx.event
     def on_change_filter_supplier(self, value: str):
         self.filter_supplier = value
-
-    @rx.event
-    def reset_filters(self):
-        today = now_local().date().isoformat()
-        self.filter_date_enabled = False
-        self.filter_date_from = today
-        self.filter_date_to = today
-        self.selected_statuses = []
-        self.filter_incoming_storage = ALL
-        self.filter_destination_storage = ALL
-        self.filter_incoming_owner = ALL
-        self.filter_destination_owner = ALL
-        self.filter_supplier = ALL
-        self._current_page = 1
-        self._reload()
+        return self._apply_filters()
 
 
 class AddAdmissionState(LookupCreatorsMixin, AppState):
@@ -1061,9 +1140,9 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.ADMISSIONS_CREATE):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.ADMISSIONS_CREATE)
+        if guard is not None:
+            yield guard
             return
 
         self.item = Admission(
@@ -1255,9 +1334,16 @@ class AddAdmissionState(LookupCreatorsMixin, AppState):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str, str]]:
         return [
-            (index, pc, _format_money(pc.price), _format_money(_line_cost(pc)), _residual_label(pc))
+            (
+                index,
+                pc,
+                _format_money(pc.price),
+                _format_money(_line_cost(pc)),
+                _residual_label(pc),
+                _qty_label(pc),
+            )
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
@@ -1512,9 +1598,9 @@ class EditAdmissionState(FullEditMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.ADMISSIONS_EDIT):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.ADMISSIONS_EDIT)
+        if guard is not None:
+            yield guard
             return
 
         self.in_process = True
@@ -1609,11 +1695,18 @@ class EditAdmissionState(FullEditMixin, AppState):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog, str, str]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str, str]]:
         if self.item is None:
             return []
         return [
-            (index, pc, _format_money(pc.price), _format_money(_line_cost(pc)))
+            (
+                index,
+                pc,
+                _format_money(pc.price),
+                _format_money(_line_cost(pc)),
+                _residual_label(pc),
+                _qty_label(pc),
+            )
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 
@@ -1878,9 +1971,9 @@ class ViewAdmissionState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.ADMISSIONS_VIEW):
-            yield rx.toast.error("У Вас немає доступу до цієї сторінки!")
-            yield rx.redirect(routes.WELCOME)
+        guard = self.access_guard(Action.ADMISSIONS_VIEW)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         item = AdmissionDAO.get_by_id_with_all_relationship(int(id))
@@ -1925,9 +2018,16 @@ class ViewAdmissionState(CancelWithReasonMixin, AuditHistoryMixin, AppState):
     @rx.var
     def item_movement_products_catalog_list(
         self,
-    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str]]:
+    ) -> List[Tuple[int, MovementProductsCatalog, str, str, str, str]]:
         return [
-            (index, pc, _format_money(pc.price), _format_money(_line_cost(pc)), _residual_label(pc))
+            (
+                index,
+                pc,
+                _format_money(pc.price),
+                _format_money(_line_cost(pc)),
+                _residual_label(pc),
+                _qty_label(pc),
+            )
             for index, pc in enumerate(self.item.movement.products_catalog)
         ]
 

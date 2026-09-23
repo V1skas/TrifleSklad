@@ -289,13 +289,32 @@ class ProductsSelectorState(rx.State):
         self._offset += len(items)
         self.has_more = has_more
 
+    def _reload_category_options(self) -> None:
+        # Виключаємо вже додані до руху / обрані одиниці — категорія без доступних
+        # одиниць у список не потрапляє (TS-59).
+        self.category_options = [
+            (title, str(cid))
+            for cid, title in ProductDAO.get_categories_by_owner_storage(
+                self.filter_by_owner, self.filter_by_storage, self._excluded_ids()
+            )
+        ]
+
     def _reload_catalog_options(self) -> None:
         self.catalog_options = [
             (title, str(cid))
             for cid, title in ProductDAO.get_catalog_options_by_owner_storage(
-                self.filter_by_owner, self.filter_by_storage, self._category_id_value()
+                self.filter_by_owner,
+                self.filter_by_storage,
+                self._category_id_value(),
+                self._excluded_ids(),
             )
         ]
+
+    def _filter_in_options(self, value: str, options: List[Tuple[str, str]]) -> bool:
+        """Чи доступне збережене значення фільтра серед опцій (ALL/"" — завжди)."""
+        if value == ALL or value == "":
+            return True
+        return any(opt[1] == value for opt in options)
 
     def set_filter(
         self,
@@ -303,28 +322,32 @@ class ProductsSelectorState(rx.State):
         storage: int = -1,
         products: List[int] = [],
     ) -> None:
-        """Ініціалізація діалогу: задає місце/власника, перелік виключень,
-        завантажує опції категорій/каталогу та повний список одиниць. Усі
-        фільтри доступні одразу, каскад не блокує."""
+        """Ініціалізація діалогу: місце/власник, перелік виключень, опції та
+        список одиниць. Категорію й позицію каталогу ЗБЕРІГАЄМО між відкриттями
+        (TS-59) — скидаємо лише пошук/облік/масовий вибір. Опції рахуємо з
+        урахуванням уже доданих у рух одиниць: вичерпані категорії/позиції не
+        показуємо, а якщо збережене значення стало недоступним — скидаємо на
+        «Усі …»."""
         self.filter_by_owner = owner
         self.filter_by_storage = storage
         self.exclude_products = products
         self.filter_search = ""
-        self.filter_category = ALL
-        self.filter_catalog = ALL
         self.filter_accounting = ALL
-        self.sel_divisible = False
-        self.sel_capacity = 0
-        self.sel_unit = ""
-        self.total_units = 0
-        self.total_measure = 0
         self.mass_count = ""
         self.mass_measure = ""
-        self.category_options = [
-            (title, str(cid))
-            for cid, title in ProductDAO.get_categories_by_owner_storage(owner, storage)
-        ]
+
+        self._reload_category_options()
+        if not self._filter_in_options(self.filter_category, self.category_options):
+            self.filter_category = ALL
+            self.filter_catalog = ALL
         self._reload_catalog_options()
+        if not self._filter_in_options(self.filter_catalog, self.catalog_options):
+            self.filter_catalog = ALL
+
+        # Метадані/підсумки збереженої позиції (або очищення, якщо позиції нема).
+        self._load_catalog_meta()
+        self._load_catalog_totals()
+
         self._offset = 0
         self.has_more = False
         self._load_page(reset=True)

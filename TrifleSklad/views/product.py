@@ -141,18 +141,15 @@ def list_page() -> rx.Component:
 def _create_category_dialog(state) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            rx.dialog.title("Створення категорії"),
+            controls.dialog_heading("Створення категорії"),
             rx.vstack(
                 rx.text("*Назва:", size="2"),
                 controls.input_field(value=state.new_category_title, on_change=state.set_new_category_title, width="100%"),
                 rx.text("Опис:", size="2"),
                 controls.text_area_field(value=state.new_category_description, on_change=state.set_new_category_description, width="100%"),
-                rx.hstack(
-                    rx.button("Скасувати", variant="outline", type="button", on_click=state.set_create_category_open(False)),
-                    rx.spacer(),
-                    rx.button("Створити", type="button", on_click=state.create_category),
-                    width="100%",
-                    padding_top="0.5em",
+                controls.dialog_footer(
+                    controls.dialog_cancel_button("Скасувати", on_click=state.set_create_category_open(False)),
+                    controls.dialog_confirm_button("Створити", on_click=state.create_category),
                 ),
                 spacing="2",
                 width="100%",

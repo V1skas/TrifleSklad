@@ -7,7 +7,7 @@ from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import MovementDAO, ProductCatalogDAO, ProductDAO
 from TrifleSklad.declared import format_amount, movements_status_list, movements_type_list
 from TrifleSklad.models import Product
-from TrifleSklad.movement.list_mixin import ALL
+from TrifleSklad.movement.list_mixin import ALL, SCROLL_TOP_SCRIPT
 from TrifleSklad.states.app import AppState
 
 
@@ -59,9 +59,9 @@ class ListUnitsReportState(AppState):
 
     @rx.event
     def on_load(self):
-        if not self.has_permission(Action.REPORTS_UNITS):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_UNITS)
+        if guard is not None:
+            yield guard
             return
 
         self.in_progress = True
@@ -90,31 +90,37 @@ class ListUnitsReportState(AppState):
         if self._current_page + 1 <= self._all_pages:
             self._current_page += 1
             self._load_list()
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def current_page_decrement(self):
         if self._current_page > 1:
             self._current_page -= 1
             self._load_list()
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
     @rx.event
     def on_change_current_page(self, value: str):
         if value != "" and 0 < int(value) <= self._all_pages:
             self._current_page = int(value)
             self._load_list()
+            return rx.call_script(SCROLL_TOP_SCRIPT)
 
 
 class ViewUnitsReportState(AppState):
     in_process: bool = True
 
     unit: Optional[Product] = None
+    acquisition_cost: Optional[float] = None
     history_rows: List[Tuple[str, str, str, str, str, str, str]] = []
 
     def _load_unit(self, id: int):
         self.unit = ProductDAO.get_by_id_with_relationships(id)
         if self.unit is None:
             self.history_rows = []
+            self.acquisition_cost = None
             return
+        self.acquisition_cost = ProductDAO.get_acquisition_cost(id)
         rows: List[Tuple[str, str, str, str, str, str, str]] = []
         for m in MovementDAO.get_history_by_product_id(id):
             type_title = movements_type_list.get(m.type, "—")
@@ -208,15 +214,21 @@ class ViewUnitsReportState(AppState):
         return self.unit is not None and self.unit.excluded_from_accounting
 
     @rx.var
+    def acquisition_cost_display(self) -> str:
+        if self.acquisition_cost is None:
+            return "—"
+        return f"{self.acquisition_cost:.2f}"
+
+    @rx.var
     def has_history(self) -> bool:
         return len(self.history_rows) > 0
 
     @rx.event
     def on_load(self, id: str = ""):
         id = id or self._route_param("id", "")
-        if not self.has_permission(Action.REPORTS_UNITS):
-            yield rx.redirect(routes.WELCOME)
-            yield rx.toast.error("У Вас немає дозволу на перегляд цієї сторінки!")
+        guard = self.access_guard(Action.REPORTS_UNITS)
+        if guard is not None:
+            yield guard
             return
         self.in_process = True
         self._load_unit(int(id))

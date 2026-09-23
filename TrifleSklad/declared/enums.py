@@ -68,6 +68,18 @@ def format_amount(value) -> str:
     return str(int(number)) if number == int(number) else str(number)
 
 
+def format_transferred_qty(
+    total_amount, physical_units, divisible, capacity, no_fixed_capacity: bool = False
+) -> str:
+    """Кількість переданого/наявного ТМЦ для табличних колонок. Для подільного
+    ТМЦ із фіксованою ємністю — дробове по ємності + фіз. к-сть одиниць у дужках
+    (напр. ємність 1000, передано 1200 у 2 одиницях → «1.2 (2)»). Для
+    неподільного та без фіксованої ємності — просто число фізичних одиниць."""
+    if divisible and not no_fixed_capacity and capacity and capacity > 0:
+        return f"{format_amount(total_amount / capacity)} ({physical_units})"
+    return str(physical_units)
+
+
 def format_request_qty(count: int, part: Optional[int], unit: str = "") -> str:
     """Людиночитний опис кількості позиції заявки: цілі одиниці та/або частина
     (для подільного ТМЦ). Напр. «2 ціл. + 30 м», «1 ціл.», «30 м»."""

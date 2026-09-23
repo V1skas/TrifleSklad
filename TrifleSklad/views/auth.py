@@ -26,29 +26,40 @@ def login_card() -> rx.Component:
                 spacing="5",
                 width="100%",
             ),
-            rx.vstack(
-                controls.input_field(
-                    rx.input.slot(rx.icon("user")),
+            rx.form.root(
+                rx.vstack(
+                    controls.input_field(
+                        rx.input.slot(rx.icon("user")),
 
-                    value=AuthState.login,
-                    on_change=AuthState.set_login,
+                        value=AuthState.login,
+                        on_change=AuthState.set_login,
 
-                    placeholder="Логін",
+                        placeholder="Логін",
+                        size="3",
+                        width="100%",
+                    ),
+                    controls.input_field(
+                        rx.input.slot(rx.icon("lock")),
+
+                        value=AuthState.password,
+                        on_change=AuthState.set_password,
+
+                        placeholder="Пароль",
+                        type="password",
+                        size="3",
+                        width="100%",
+                    ),
+                    # type="submit" без on_click — сабміт форми спрацьовує і по
+                    # кліку, і по Enter у будь-якому полі (один виклик).
+                    rx.button("Увійти", type="submit", size="3", width="100%"),
+
+                    spacing="3",
                     width="100%",
                 ),
-                controls.input_field(
-                    rx.input.slot(rx.icon("lock")),
-
-                    value=AuthState.password,
-                    on_change=AuthState.set_password,
-
-                    placeholder="Пароль",
-                    type="password",
-                    width="100%",
-                ),
-                rx.button("Увійти", type="submit", size="3", width="100%", on_click=AuthState.auth_handler),
-
-                spacing="3",
+                # on_submit викликає той самий метод, що й кнопка; дані форми не
+                # обробляються — логін/пароль уже в стані (self.login/password).
+                on_submit=AuthState.auth_handler,
+                reset_on_submit=False,
                 width="100%",
             ),
             rx.cond(

@@ -84,9 +84,9 @@ def _actions_dialog(state) -> rx.Component:
         rx.dialog.content(
             actions_picker(
                 rx.hstack(
-                    rx.dialog.close(rx.button("Скасувати", variant="surface", size="3", type="button")),
+                    rx.dialog.close(controls.dialog_cancel_button("Скасувати")),
                     rx.spacer(),
-                    rx.dialog.close(rx.button("Готово", size="3", type="button", on_click=state.apply_actions)),
+                    rx.dialog.close(controls.dialog_confirm_button("Готово", on_click=state.apply_actions)),
                     width="100%",
                 ),
                 height="90vh",

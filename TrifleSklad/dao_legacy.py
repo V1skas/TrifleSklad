@@ -1347,7 +1347,7 @@ class ProductDAO:
 
     @classmethod
     def get_categories_by_owner_storage(
-        cls, owner_id: int, storage_id: int
+        cls, owner_id: int, storage_id: int, exclude_ids: Optional[List[int]] = None
     ) -> List[tuple[int, str]]:
         """Перелік категорій (id, назва з відступом для дочірніх), у яких є
         доступні одиниці на вказаному місці/власнику — перший крок каскадного
@@ -1369,6 +1369,8 @@ class ProductDAO:
         )
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
         statement = statement.distinct()
 
         with rx.session() as session:
@@ -1390,11 +1392,17 @@ class ProductDAO:
 
     @classmethod
     def get_catalog_options_by_owner_storage(
-        cls, owner_id: int, storage_id: int, category_id: int = -1
+        cls,
+        owner_id: int,
+        storage_id: int,
+        category_id: int = -1,
+        exclude_ids: Optional[List[int]] = None,
     ) -> List[tuple[int, str]]:
         """Перелік позицій каталогу (id, назва), у яких є доступні одиниці на
         вказаному місці/власнику — для випадаючого фільтра в діалозі вибору.
-        category_id != -1 — звузити до конкретної категорії."""
+        category_id != -1 — звузити до конкретної категорії.
+        exclude_ids — не рахувати вже додані до руху / обрані одиниці (позиція,
+        усі одиниці якої вичерпані, зникає зі списку)."""
         statement = (
             select(ProductCatalog.id, ProductCatalog.title)
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
@@ -1403,6 +1411,8 @@ class ProductDAO:
         )
         if owner_id != -1:
             statement = statement.where(Product.id_owner == owner_id)
+        if exclude_ids:
+            statement = statement.where(Product.id.not_in(exclude_ids))
         if category_id != -1:
             statement = statement.where(
                 ProductCatalog.id_category.in_(ProductCategoryDAO.get_self_and_children_ids(category_id))
@@ -1818,7 +1828,8 @@ class ProductDAO:
         за позицією каталогу, категорією, місцем зберігання, власником; exclude_types —
         типи сховищ (склад/площадка/відділ), які треба виключити; search — вільний
         пошук за назвою позиції каталогу або серійним номером одиниці.
-        Повертає список кортежів (catalog_id, title, unit, total_count, units_count)."""
+        Повертає список кортежів (catalog_id, title, unit, total_count, units_count,
+        divisible, capacity, no_fixed_capacity)."""
         exclude_types = exclude_types or []
         statement = (
             select(
@@ -1827,12 +1838,22 @@ class ProductDAO:
                 ProductCatalog.unit,
                 func.coalesce(func.sum(Product.count), 0),
                 func.count(Product.id),
+                ProductCatalog.divisible,
+                ProductCatalog.capacity,
+                ProductCatalog.no_fixed_capacity,
             )
             .join(Product, Product.id_product_catalog == ProductCatalog.id)
             .join(Storage, Storage.id == Product.id_storage)
             .where(Product.is_deleted == False)
             .where(Storage.is_deleted == False)
-            .group_by(ProductCatalog.id, ProductCatalog.title, ProductCatalog.unit)
+            .group_by(
+                ProductCatalog.id,
+                ProductCatalog.title,
+                ProductCatalog.unit,
+                ProductCatalog.divisible,
+                ProductCatalog.capacity,
+                ProductCatalog.no_fixed_capacity,
+            )
             .order_by(ProductCatalog.title)
         )
         if catalog_id is not None:
@@ -1862,7 +1883,16 @@ class ProductDAO:
         with rx.session() as session:
             rows = session.exec(statement).all()
             return [
-                (row[0], row[1], row[2], int(row[3] or 0), int(row[4] or 0))
+                (
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3] or 0,
+                    int(row[4] or 0),
+                    bool(row[5]),
+                    row[6] or 0,
+                    bool(row[7]),
+                )
                 for row in rows
             ]
 
@@ -1935,6 +1965,52 @@ class ProductDAO:
             if product:
                 session.expunge(product)
             return product
+
+    @classmethod
+    def get_acquisition_cost(cls, product_id: int) -> Optional[float]:
+        """ПОВНА вартість одиниці на момент постачання — з кореневої (надісланої)
+        одиниці. Для подільного це важливо: якщо одиницю згодом поділили й
+        лишилась лише частина, вартість усе одно береться повна, з кореня
+        постачання (не пропорційно поточному залишку).
+        - піднімаємось по id_parent до кореневої одиниці (осколок поділу сам не
+          пов'язаний із постачанням);
+        - ручний override Product.price кореня → його абсолютна ціна;
+        - інакше базова ціна позиції постачання (MovementProductsCatalog.price за
+          повну одиницю).
+        None — якщо постачання не знайдено."""
+        with rx.session() as session:
+            product = session.get(Product, product_id)
+            if product is None:
+                return None
+
+            # Піднімаємось до кореневої одиниці (створеної при постачанні).
+            root = product
+            seen: set[int] = set()
+            while root.id_parent is not None and root.id not in seen:
+                seen.add(root.id)
+                parent = session.get(Product, root.id_parent)
+                if parent is None:
+                    break
+                root = parent
+
+            if root.price is not None:
+                return round(root.price, 2)
+
+            base = session.exec(
+                select(MovementProductsCatalog.price)
+                .join(
+                    MovementProducts,
+                    MovementProducts.id_movement_product == MovementProductsCatalog.id,
+                )
+                .join(Movement, Movement.id == MovementProductsCatalog.id_movement)
+                .where(MovementProducts.id_product == root.id)
+                .where(Movement.type == MovementsType.ADMISSION)
+                .order_by(MovementProductsCatalog.id)
+                .limit(1)
+            ).first()
+            if base is None:
+                return None
+            return round(base, 2)
 
     @classmethod
     def get_units_count(
@@ -2038,11 +2114,15 @@ def movement_filter_conditions(
     destination_storage: Optional[str] = None,
     incoming_owner: Optional[str] = None,
     destination_owner: Optional[str] = None,
+    catalog_ids: Optional[List[int]] = None,
 ) -> list:
-    """Список SQLAlchemy-умов фільтрації рухів за датою (рядок ISO), статусами та
-    (контекстно) складом/власником відправлення/призначення.
+    """Список SQLAlchemy-умов фільтрації рухів за датою (рядок ISO), статусами,
+    (контекстно) складом/власником відправлення/призначення та позиціями каталогу,
+    що входять до руху.
     Спільний для всіх типів руху (поступлення/списання/переміщення/видача/продаж).
-    Значення складу/власника — рядок id; "" / "all" / None означають «без фільтра»."""
+    Значення складу/власника — рядок id; "" / "all" / None означають «без фільтра».
+    `catalog_ids` — рух проходить фільтр, якщо містить хоча б одну з цих позицій
+    каталогу (корельований EXISTS по movements_products_catalog)."""
     conditions = []
     if date_from:
         conditions.append(Movement.date >= date_from)
@@ -2062,6 +2142,14 @@ def movement_filter_conditions(
     _add(Movement.id_destination_storage, destination_storage)
     _add(Movement.id_incoming_owner, incoming_owner)
     _add(Movement.id_destination_owner, destination_owner)
+
+    if catalog_ids:
+        conditions.append(
+            select(MovementProductsCatalog.id)
+            .where(MovementProductsCatalog.id_movement == Movement.id)
+            .where(MovementProductsCatalog.id_product_catalog.in_(catalog_ids))
+            .exists()
+        )
     return conditions
 
 
@@ -2163,12 +2251,14 @@ class MovementDAO:
         destination_storage: Optional[str] = None,
         incoming_owner: Optional[str] = None,
         destination_owner: Optional[str] = None,
+        catalog_ids: Optional[List[int]] = None,
     ) -> tuple[int, List[Movement]]:
-        """Сторінкований перелік рухів одного типу з фільтром за датою/статусами
-        та складом/власником. Дата — рядок ISO 'YYYY-MM-DD'."""
+        """Сторінкований перелік рухів одного типу з фільтром за датою/статусами,
+        складом/власником та позиціями каталогу. Дата — рядок ISO 'YYYY-MM-DD'."""
         conditions = movement_filter_conditions(
             date_from, date_to, statuses,
             incoming_storage, destination_storage, incoming_owner, destination_owner,
+            catalog_ids,
         )
 
         count_stmt = select(func.count(Movement.id)).where(Movement.type == type)
@@ -2420,6 +2510,254 @@ class MovementDAO:
             if len(movements) > 0:
                 session.expunge_all()
             return list(movements)
+
+    @classmethod
+    def _catalog_summary_conditions(
+        cls,
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        exclude_canceled: bool = False,
+        category_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> list:
+        """Спільні умови фільтрації для звіту «Рух по каталогу ТМЦ»: рухові
+        критерії (дата/склад/власник відправлення й призначення) через
+        movement_filter_conditions + виключення скасованих + категорія позиції
+        каталогу (з підкатегоріями) + пошук за назвою позиції."""
+        conditions = movement_filter_conditions(
+            date_from,
+            date_to,
+            None,
+            incoming_storage,
+            destination_storage,
+            incoming_owner,
+            destination_owner,
+        )
+        if exclude_canceled:
+            conditions.append(Movement.status != MovementsStatus.CANCELED)
+        if category_id is not None:
+            conditions.append(
+                ProductCatalog.id_category.in_(
+                    ProductCategoryDAO.get_self_and_children_ids(category_id)
+                )
+            )
+        if search:
+            term = search.strip()
+            if term:
+                conditions.append(func.lower(ProductCatalog.title).like(f"%{term.lower()}%"))
+        return conditions
+
+    @classmethod
+    def get_catalog_movement_summary_count(
+        cls,
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        exclude_canceled: bool = False,
+        category_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> int:
+        """Кількість РІЗНИХ позицій каталогу, що мають ≥1 рух під фільтром —
+        для пагінації звіту «Рух по каталогу ТМЦ»."""
+        conditions = cls._catalog_summary_conditions(
+            date_from, date_to, incoming_storage, destination_storage,
+            incoming_owner, destination_owner, exclude_canceled, category_id, search,
+        )
+        statement = (
+            select(func.count(func.distinct(ProductCatalog.id)))
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_product_catalog == ProductCatalog.id,
+            )
+            .join(Movement, Movement.id == MovementProductsCatalog.id_movement)
+        )
+        for cond in conditions:
+            statement = statement.where(cond)
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+
+    @classmethod
+    def get_catalog_movement_summary_paginated(
+        cls,
+        page: int = 1,
+        limit: int = 20,
+        count_items: int = 0,
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        exclude_canceled: bool = False,
+        category_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> tuple[int, List[tuple]]:
+        """Сторінка позицій каталогу з кількістю рухів під фільтром. Повертає
+        (total_pages, [(catalog_id, title, unit, category_title, movement_count), ...]),
+        сортування за назвою позиції."""
+        total_pages = max(1, math.ceil(count_items / limit))
+        skip = (max(1, page) - 1) * limit
+
+        conditions = cls._catalog_summary_conditions(
+            date_from, date_to, incoming_storage, destination_storage,
+            incoming_owner, destination_owner, exclude_canceled, category_id, search,
+        )
+        statement = (
+            select(
+                ProductCatalog.id,
+                ProductCatalog.title,
+                ProductCatalog.unit,
+                ProductCategory.title,
+                func.count(func.distinct(Movement.id)),
+            )
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_product_catalog == ProductCatalog.id,
+            )
+            .join(Movement, Movement.id == MovementProductsCatalog.id_movement)
+            .outerjoin(ProductCategory, ProductCategory.id == ProductCatalog.id_category)
+        )
+        for cond in conditions:
+            statement = statement.where(cond)
+        statement = (
+            statement.group_by(
+                ProductCatalog.id,
+                ProductCatalog.title,
+                ProductCatalog.unit,
+                ProductCategory.title,
+            )
+            .order_by(ProductCatalog.title)
+            .offset(skip)
+            .limit(limit)
+        )
+
+        with rx.session() as session:
+            rows = session.exec(statement).all()
+            return total_pages, [
+                (row[0], row[1], row[2], row[3] or "—", int(row[4] or 0))
+                for row in rows
+            ]
+
+    @classmethod
+    def _movements_by_catalog_conditions(
+        cls,
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        exclude_canceled: bool = False,
+    ) -> list:
+        """Умови фільтрації рухів однієї позиції каталогу (діалог звіту «Рух по
+        каталогу ТМЦ»): рухові критерії + виключення скасованих."""
+        conditions = movement_filter_conditions(
+            date_from,
+            date_to,
+            None,
+            incoming_storage,
+            destination_storage,
+            incoming_owner,
+            destination_owner,
+        )
+        if exclude_canceled:
+            conditions.append(Movement.status != MovementsStatus.CANCELED)
+        return conditions
+
+    @classmethod
+    def get_movements_by_catalog_count(
+        cls,
+        catalog_id: int,
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        exclude_canceled: bool = False,
+    ) -> int:
+        """Кількість рухів однієї позиції каталогу під фільтром — для пагінації
+        діалогу звіту «Рух по каталогу ТМЦ»."""
+        conditions = cls._movements_by_catalog_conditions(
+            date_from, date_to, incoming_storage, destination_storage,
+            incoming_owner, destination_owner, exclude_canceled,
+        )
+        statement = (
+            select(func.count(func.distinct(Movement.id)))
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .where(MovementProductsCatalog.id_product_catalog == catalog_id)
+        )
+        for cond in conditions:
+            statement = statement.where(cond)
+
+        with rx.session() as session:
+            return session.exec(statement).one()
+
+    @classmethod
+    def get_movements_by_catalog(
+        cls,
+        catalog_id: int,
+        page: int = 1,
+        limit: int = 20,
+        count_items: int = 0,
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+        exclude_canceled: bool = False,
+    ) -> tuple[int, List[tuple]]:
+        """Сторінка рухів однієї позиції каталогу під фільтром, найсвіжіші зверху.
+        Один рядок = один рух (одна позиція каталогу дає один
+        MovementProductsCatalog на рух). Повертає (total_pages,
+        [(Movement, count_позиції, supplier_title|None), ...]) із підвантаженими
+        складами/власниками; supplier_title заповнено лише для постачання
+        (джерело = постачальник)."""
+        total_pages = max(1, math.ceil(count_items / limit))
+        skip = (max(1, page) - 1) * limit
+
+        conditions = cls._movements_by_catalog_conditions(
+            date_from, date_to, incoming_storage, destination_storage,
+            incoming_owner, destination_owner, exclude_canceled,
+        )
+        statement = (
+            select(Movement, MovementProductsCatalog.count, Supplier.title)
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id_movement == Movement.id,
+            )
+            .outerjoin(Admission, Admission.id == Movement.id)
+            .outerjoin(Supplier, Supplier.id == Admission.id_supplier)
+            .options(
+                joinedload(Movement.incoming_storage),
+                joinedload(Movement.destination_storage),
+                joinedload(Movement.incoming_owner),
+                joinedload(Movement.destination_owner),
+            )
+            .where(MovementProductsCatalog.id_product_catalog == catalog_id)
+        )
+        for cond in conditions:
+            statement = statement.where(cond)
+        statement = statement.order_by(Movement.id.desc()).offset(skip).limit(limit)
+
+        with rx.session() as session:
+            rows = session.exec(statement).all()
+            result = [(row[0], int(row[1] or 0), row[2]) for row in rows]
+            if rows:
+                session.expunge_all()
+            return total_pages, result
 
     @classmethod
     def restore_products_to_previous_location(
@@ -2842,10 +3180,12 @@ class AdmissionDAO:
         incoming_owner: Optional[str] = None,
         destination_owner: Optional[str] = None,
         supplier: Optional[str] = None,
+        catalog_ids: Optional[List[int]] = None,
     ) -> tuple[int, List[Admission]]:
         conditions = movement_filter_conditions(
             date_from, date_to, statuses,
             incoming_storage, destination_storage, incoming_owner, destination_owner,
+            catalog_ids,
         )
         movement_ids = select(Movement.id)
         for cond in conditions:
@@ -3320,6 +3660,7 @@ class IssueDAO:
         incoming_owner: Optional[str] = None,
         site: Optional[str] = None,
         recipient: Optional[str] = None,
+        catalog_ids: Optional[List[int]] = None,
     ) -> tuple[int, List[Issue]]:
         # Місце призначення видачі (площадка/відділ) — це destination_storage руху.
         conditions = movement_filter_conditions(
@@ -3327,6 +3668,7 @@ class IssueDAO:
             incoming_storage=incoming_storage,
             destination_storage=site,
             incoming_owner=incoming_owner,
+            catalog_ids=catalog_ids,
         )
         movement_ids = select(Movement.id)
         for cond in conditions:
@@ -3541,11 +3883,13 @@ class ClientIssueDAO:
         incoming_owner: Optional[str] = None,
         recipient: Optional[str] = None,
         contract_number: Optional[str] = None,
+        catalog_ids: Optional[List[int]] = None,
     ) -> tuple[int, List[ClientIssue]]:
         conditions = movement_filter_conditions(
             date_from, date_to, statuses,
             incoming_storage=incoming_storage,
             incoming_owner=incoming_owner,
+            catalog_ids=catalog_ids,
         )
         movement_ids = select(Movement.id)
         for cond in conditions:
@@ -3758,11 +4102,13 @@ class SaleDAO:
         incoming_storage: Optional[str] = None,
         incoming_owner: Optional[str] = None,
         responsible: Optional[str] = None,
+        catalog_ids: Optional[List[int]] = None,
     ) -> tuple[int, List[Sale]]:
         conditions = movement_filter_conditions(
             date_from, date_to, statuses,
             incoming_storage=incoming_storage,
             incoming_owner=incoming_owner,
+            catalog_ids=catalog_ids,
         )
         movement_ids = select(Movement.id)
         for cond in conditions:
@@ -3992,10 +4338,12 @@ class SaleReturnDAO:
         date_to: str = "",
         statuses: Optional[List[int]] = None,
         destination_storage: Optional[str] = None,
+        catalog_ids: Optional[List[int]] = None,
     ) -> tuple[int, List[SaleReturn]]:
         conditions = movement_filter_conditions(
             date_from, date_to, statuses,
             destination_storage=destination_storage,
+            catalog_ids=catalog_ids,
         )
         movement_ids = select(Movement.id).where(Movement.type == MovementsType.SALE_RETURN)
         for cond in conditions:
