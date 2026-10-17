@@ -165,10 +165,64 @@ def _dialog_pagination() -> rx.Component:
     )
 
 
+def _stat_item(label: str, value: rx.Var[str]) -> rx.Component:
+    return rx.box(
+        rx.text(label, size="1", color=rx.color("gray", 11)),
+        rx.text(value, size="2", weight="bold", color=rx.color("gray", 12)),
+        padding="0.4em 0.6em",
+        border_radius="0.4em",
+        background_color=rx.color("gray", 3),
+        flex="1",
+        min_width="9em",
+    )
+
+
+def _dialog_stats_card() -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.flex(
+                _stat_item("Одиниця виміру", State.dialog_unit),
+                _stat_item("Поставлено", State.dialog_delivered),
+                _stat_item("Видано", State.dialog_issued),
+                _stat_item("Продано", State.dialog_sold),
+                _stat_item("Повернуто", State.dialog_returned),
+                _stat_item("Списано", State.dialog_written_off),
+                wrap="wrap",
+                spacing="2",
+                width="100%",
+            ),
+            rx.hstack(
+                rx.text("Динаміка цін постачання:", size="1", color=rx.color("gray", 11)),
+                rx.text(State.dialog_price_history, size="2", weight="medium", color=rx.color("gray", 12)),
+                spacing="2",
+                align="center",
+            ),
+            spacing="2",
+            width="100%",
+        ),
+        variant="surface",
+        width="100%",
+        margin_bottom="1em",
+    )
+
+
 def _movements_dialog() -> rx.Component:
     return rx.dialog.root(
         rx.dialog.content(
-            controls.dialog_heading(f"Рухи: {State.selected_title}"),
+            rx.hstack(
+                rx.box(controls.dialog_heading(f"Рухи: {State.selected_title}"), flex="1"),
+                rx.button(
+                    rx.icon("download", size=16),
+                    "Експорт у .csv",
+                    variant="outline",
+                    size="2",
+                    on_click=State.export_csv,
+                    margin_bottom="0.6em",
+                ),
+                align="center",
+                width="100%",
+            ),
+            _dialog_stats_card(),
             rx.cond(
                 State.movement_rows.length() > 0,
                 rx.vstack(
@@ -181,6 +235,7 @@ def _movements_dialog() -> rx.Component:
                                 rx.table.column_header_cell("Відправник", color=rx.color("accent", 2)),
                                 rx.table.column_header_cell("Отримувач", color=rx.color("accent", 2)),
                                 rx.table.column_header_cell("Кількість", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                                rx.table.column_header_cell("Вартість од. (грн)", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                                 rx.table.column_header_cell("Статус", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                             ),
                             background_color=rx.color("accent", 9),
@@ -196,7 +251,8 @@ def _movements_dialog() -> rx.Component:
                                     rx.table.cell(m[4]),
                                     rx.table.cell(m[5], width="1%", white_space="nowrap"),
                                     rx.table.cell(m[6], width="1%", white_space="nowrap"),
-                                    on_click=rx.redirect(m[7]),
+                                    rx.table.cell(m[7], width="1%", white_space="nowrap"),
+                                    on_click=rx.redirect(m[8]),
                                     cursor="pointer",
                                     _hover={"background_color": rx.color("accent", 3)},
                                 ),
@@ -204,7 +260,7 @@ def _movements_dialog() -> rx.Component:
                         ),
                         variant="surface",
                         width="100%",
-                        margin_top="1em",
+                        margin_top="0.5em",
                     ),
                     _dialog_pagination(),
                     spacing="3",
@@ -217,7 +273,7 @@ def _movements_dialog() -> rx.Component:
                 justify="end",
                 margin_top="1em",
             ),
-            max_width="60em",
+            max_width="72em",
         ),
         open=State.is_movements_open,
         on_open_change=State.set_movements_open,
@@ -230,7 +286,13 @@ def _table() -> rx.Component:
             rx.table.row(
                 rx.table.column_header_cell("Назва позиції", color=rx.color("accent", 2)),
                 rx.table.column_header_cell("Категорія", color=rx.color("accent", 2)),
-                rx.table.column_header_cell("Одиниця виміру", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Од. виміру", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Поставлено", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Видано", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Продано", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Повернуто", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Списано", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
+                rx.table.column_header_cell("Остання ціна (грн)", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
                 rx.table.column_header_cell("Кількість рухів", color=rx.color("accent", 2), width="1%", white_space="nowrap"),
             ),
             background_color=rx.color("accent", 9),
@@ -240,9 +302,15 @@ def _table() -> rx.Component:
                 State.rows,
                 lambda row: rx.table.row(
                     rx.table.cell(row[1]),
-                    rx.table.cell(row[3]),
-                    rx.table.cell(row[2], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[2]),
+                    rx.table.cell(row[3], width="1%", white_space="nowrap"),
                     rx.table.cell(row[4], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[5], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[6], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[7], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[8], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[9], width="1%", white_space="nowrap"),
+                    rx.table.cell(row[10], width="1%", white_space="nowrap"),
                     on_click=State.open_movements(row[0], row[1]),
                     cursor="pointer",
                     _hover={"background_color": rx.color("accent", 3)},

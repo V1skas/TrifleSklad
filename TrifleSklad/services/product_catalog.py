@@ -14,10 +14,10 @@ from TrifleSklad.services.errors import ServiceError
 
 
 class ProductCatalogService:
-    def get_by_id(self, id: int) -> Optional[ProductCatalog]:
+    def get_by_id(self, id: int, with_del: bool = False) -> Optional[ProductCatalog]:
         try:
             with rx.session() as session:
-                item = ProductCatalogDao.get_by_id(id, session)
+                item = ProductCatalogDao.get_by_id(id, session, with_del=with_del)
                 if item is not None:
                     session.expunge(item)
                 return item

@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import reflex as rx
 import math
@@ -2106,6 +2106,26 @@ class ProductDAO:
             return False, f"Ошибка: {str(e)}"
 
 
+class CatalogMovementLine(NamedTuple):
+    """Рядок діалогу/експорту звіту «Рух по каталогу ТМЦ» — одна позиція руху."""
+
+    movement: Movement
+    # Фізичних одиниць ТМЦ у позиції.
+    units: int
+    # Обсяг в одиницях виміру на момент руху (для неподільного = units).
+    amount: float
+    # Базова ціна позиції (MovementProductsCatalog.price) за одиницю ТМЦ.
+    price: float
+    # Загальна вартість позиції — лише для постачання, інакше None.
+    line_cost: Optional[float]
+    # Постачальник (лише для постачання).
+    supplier_title: Optional[str]
+    # Отримувач-особа: працівник (видача/видача клієнту) або клієнт (продаж).
+    recipient: Optional[str]
+    # Відправник-особа: клієнт вихідного продажу (повернення продажу).
+    sender: Optional[str]
+
+
 def movement_filter_conditions(
     date_from: str = "",
     date_to: str = "",
@@ -2601,8 +2621,8 @@ class MovementDAO:
         search: Optional[str] = None,
     ) -> tuple[int, List[tuple]]:
         """Сторінка позицій каталогу з кількістю рухів під фільтром. Повертає
-        (total_pages, [(catalog_id, title, unit, category_title, movement_count), ...]),
-        сортування за назвою позиції."""
+        (total_pages, [(catalog_id, title, unit, category_title, movement_count,
+        divisible, uniq), ...]), сортування за назвою позиції."""
         total_pages = max(1, math.ceil(count_items / limit))
         skip = (max(1, page) - 1) * limit
 
@@ -2617,6 +2637,8 @@ class MovementDAO:
                 ProductCatalog.unit,
                 ProductCategory.title,
                 func.count(func.distinct(Movement.id)),
+                ProductCatalog.divisible,
+                ProductCatalog.uniq,
             )
             .join(
                 MovementProductsCatalog,
@@ -2633,6 +2655,8 @@ class MovementDAO:
                 ProductCatalog.title,
                 ProductCatalog.unit,
                 ProductCategory.title,
+                ProductCatalog.divisible,
+                ProductCatalog.uniq,
             )
             .order_by(ProductCatalog.title)
             .offset(skip)
@@ -2642,9 +2666,182 @@ class MovementDAO:
         with rx.session() as session:
             rows = session.exec(statement).all()
             return total_pages, [
-                (row[0], row[1], row[2], row[3] or "—", int(row[4] or 0))
+                (
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3] or "—",
+                    int(row[4] or 0),
+                    bool(row[5]),
+                    bool(row[6]),
+                )
                 for row in rows
             ]
+
+    @classmethod
+    def _unit_amounts_at_movements(
+        cls,
+        session,
+        catalog_ids: List[int],
+        pairs: List[Tuple[int, int]],
+    ) -> Dict[Tuple[int, int], float]:
+        """Обсяг (в одиницях виміру) кожної одиниці ТМЦ НА МОМЕНТ руху —
+        {(movement_id, product_id): обсяг}.
+
+        `Product.count` — поточний залишок: після руху подільну одиницю могли
+        поділити, і її count зменшився. Поділ зберігає обсяг (батько −= x,
+        осколок = x; злиття — навпаки, осколок фізично видаляється), тому обсяг
+        на момент руху M = власний count + повні обсяги піддерев осколків,
+        відділених ПІСЛЯ M. Ознака «відділено після M» — перший рух осколка
+        має id > M (осколок породжується саме під рух). Осколки, відділені до
+        M, або без жодного руху — не враховуються. Для неподільного count = 1."""
+        if not pairs or not catalog_ids:
+            return {}
+
+        units = session.exec(
+            select(Product.id, Product.id_parent, Product.count).where(
+                Product.id_product_catalog.in_(catalog_ids)
+            )
+        ).all()
+        count_by_id: Dict[int, float] = {}
+        children: Dict[int, List[int]] = {}
+        for unit_id, parent_id, count in units:
+            count_by_id[unit_id] = float(count or 0)
+            if parent_id is not None:
+                children.setdefault(parent_id, []).append(unit_id)
+
+        first_rows = session.exec(
+            select(MovementProducts.id_product, func.min(MovementProductsCatalog.id_movement))
+            .join(
+                MovementProductsCatalog,
+                MovementProductsCatalog.id == MovementProducts.id_movement_product,
+            )
+            .where(MovementProductsCatalog.id_product_catalog.in_(catalog_ids))
+            .group_by(MovementProducts.id_product)
+        ).all()
+        first_movement = {product_id: movement_id for product_id, movement_id in first_rows}
+
+        subtree_cache: Dict[int, float] = {}
+
+        def subtree(root: int) -> float:
+            if root in subtree_cache:
+                return subtree_cache[root]
+            total = 0.0
+            stack = [root]
+            seen: set[int] = set()
+            while stack:
+                current = stack.pop()
+                if current in seen:
+                    continue
+                seen.add(current)
+                total += count_by_id.get(current, 0.0)
+                stack.extend(children.get(current, ()))
+            subtree_cache[root] = total
+            return total
+
+        result: Dict[Tuple[int, int], float] = {}
+        for movement_id, product_id in pairs:
+            amount = count_by_id.get(product_id, 0.0)
+            for child_id in children.get(product_id, ()):
+                child_first = first_movement.get(child_id)
+                if child_first is not None and child_first > movement_id:
+                    amount += subtree(child_id)
+            result[(movement_id, product_id)] = amount
+        return result
+
+    @classmethod
+    def get_catalog_movement_stats(
+        cls,
+        catalog_ids: List[int],
+        date_from: str = "",
+        date_to: str = "",
+        incoming_storage: Optional[str] = None,
+        destination_storage: Optional[str] = None,
+        incoming_owner: Optional[str] = None,
+        destination_owner: Optional[str] = None,
+    ) -> Dict[int, Dict[int, Tuple[int, float]]]:
+        """Статистика руху позицій каталогу під фільтром звіту «Рух по каталогу
+        ТМЦ»: {catalog_id: {тип_руху: (к-сть одиниць ТМЦ, обсяг в од. виміру)}}.
+        Скасовані рухи не враховуються ніколи (фактично не відбулися).
+        Обсяг — на момент руху (`_unit_amounts_at_movements`)."""
+        if not catalog_ids:
+            return {}
+        conditions = movement_filter_conditions(
+            date_from,
+            date_to,
+            None,
+            incoming_storage,
+            destination_storage,
+            incoming_owner,
+            destination_owner,
+        )
+        conditions.append(Movement.status != MovementsStatus.CANCELED)
+        statement = (
+            select(
+                MovementProductsCatalog.id_product_catalog,
+                Movement.id,
+                Movement.type,
+                MovementProducts.id_product,
+            )
+            .join(Movement, Movement.id == MovementProductsCatalog.id_movement)
+            .join(
+                MovementProducts,
+                MovementProducts.id_movement_product == MovementProductsCatalog.id,
+            )
+            .where(MovementProductsCatalog.id_product_catalog.in_(catalog_ids))
+        )
+        for cond in conditions:
+            statement = statement.where(cond)
+
+        with rx.session() as session:
+            links = session.exec(statement).all()
+            amounts = cls._unit_amounts_at_movements(
+                session,
+                catalog_ids,
+                [(movement_id, product_id) for _, movement_id, _, product_id in links],
+            )
+
+        stats: Dict[int, Dict[int, Tuple[int, float]]] = {}
+        for catalog_id, movement_id, movement_type, product_id in links:
+            per_type = stats.setdefault(catalog_id, {})
+            units, amount = per_type.get(movement_type, (0, 0.0))
+            per_type[movement_type] = (
+                units + 1,
+                amount + amounts.get((movement_id, product_id), 0.0),
+            )
+        return stats
+
+    @classmethod
+    def get_catalog_admission_prices(
+        cls, catalog_ids: List[int]
+    ) -> Dict[int, List[Tuple[float, str]]]:
+        """Ціни постачання позицій каталогу (базова ціна позиції за одиницю ТМЦ)
+        — {catalog_id: [(ціна, дата), ...]}, найсвіжіші першими. Скасовані
+        постачання не враховуються. Фільтри звіту НЕ застосовуються: остання
+        ціна/динаміка — властивість позиції каталогу, а не вибірки рухів."""
+        if not catalog_ids:
+            return {}
+        statement = (
+            select(
+                MovementProductsCatalog.id_product_catalog,
+                MovementProductsCatalog.price,
+                Movement.date,
+            )
+            .join(Movement, Movement.id == MovementProductsCatalog.id_movement)
+            .where(MovementProductsCatalog.id_product_catalog.in_(catalog_ids))
+            .where(Movement.type == MovementsType.ADMISSION)
+            .where(Movement.status != MovementsStatus.CANCELED)
+            .order_by(
+                Movement.date.desc(),
+                Movement.id.desc(),
+                MovementProductsCatalog.id.desc(),
+            )
+        )
+        result: Dict[int, List[Tuple[float, str]]] = {}
+        with rx.session() as session:
+            for catalog_id, price, date in session.exec(statement).all():
+                result.setdefault(catalog_id, []).append((float(price or 0), date))
+        return result
 
     @classmethod
     def _movements_by_catalog_conditions(
@@ -2709,7 +2906,7 @@ class MovementDAO:
         cls,
         catalog_id: int,
         page: int = 1,
-        limit: int = 20,
+        limit: Optional[int] = 20,
         count_items: int = 0,
         date_from: str = "",
         date_to: str = "",
@@ -2718,22 +2915,30 @@ class MovementDAO:
         incoming_owner: Optional[str] = None,
         destination_owner: Optional[str] = None,
         exclude_canceled: bool = False,
-    ) -> tuple[int, List[tuple]]:
+    ) -> tuple[int, List["CatalogMovementLine"]]:
         """Сторінка рухів однієї позиції каталогу під фільтром, найсвіжіші зверху.
-        Один рядок = один рух (одна позиція каталогу дає один
-        MovementProductsCatalog на рух). Повертає (total_pages,
-        [(Movement, count_позиції, supplier_title|None), ...]) із підвантаженими
-        складами/власниками; supplier_title заповнено лише для постачання
-        (джерело = постачальник)."""
-        total_pages = max(1, math.ceil(count_items / limit))
-        skip = (max(1, page) - 1) * limit
+        Один рядок = одна позиція руху (зазвичай одна на рух; ТМЦ без фіксованої
+        ємності може бути доданий у постачання кількома позиціями). Повертає
+        (total_pages, [CatalogMovementLine, ...]) із підвантаженими
+        складами/власниками. `limit=None` — усі рядки без пагінації (експорт)."""
+        if limit:
+            total_pages = max(1, math.ceil(count_items / limit))
+            skip = (max(1, page) - 1) * limit
+        else:
+            total_pages, skip = 1, 0
 
         conditions = cls._movements_by_catalog_conditions(
             date_from, date_to, incoming_storage, destination_storage,
             incoming_owner, destination_owner, exclude_canceled,
         )
         statement = (
-            select(Movement, MovementProductsCatalog.count, Supplier.title)
+            select(
+                Movement,
+                MovementProductsCatalog.id,
+                MovementProductsCatalog.count,
+                MovementProductsCatalog.price,
+                Supplier.title,
+            )
             .join(
                 MovementProductsCatalog,
                 MovementProductsCatalog.id_movement == Movement.id,
@@ -2750,13 +2955,104 @@ class MovementDAO:
         )
         for cond in conditions:
             statement = statement.where(cond)
-        statement = statement.order_by(Movement.id.desc()).offset(skip).limit(limit)
+        statement = statement.order_by(Movement.id.desc(), MovementProductsCatalog.id.desc())
+        if limit:
+            statement = statement.offset(skip).limit(limit)
 
         with rx.session() as session:
             rows = session.exec(statement).all()
-            result = [(row[0], int(row[1] or 0), row[2]) for row in rows]
-            if rows:
-                session.expunge_all()
+            if not rows:
+                return total_pages, []
+
+            catalog = session.get(ProductCatalog, catalog_id)
+            fixed_divisible = bool(
+                catalog is not None
+                and catalog.divisible
+                and not catalog.no_fixed_capacity
+                and catalog.capacity
+            )
+            capacity = float(catalog.capacity) if fixed_divisible else 0.0
+
+            position_ids = [row[1] for row in rows]
+            movement_by_position = {row[1]: row[0].id for row in rows}
+            unit_rows = session.exec(
+                select(
+                    MovementProducts.id_movement_product,
+                    Product.id,
+                    Product.price,
+                )
+                .join(Product, Product.id == MovementProducts.id_product)
+                .where(MovementProducts.id_movement_product.in_(position_ids))
+            ).all()
+            amounts = cls._unit_amounts_at_movements(
+                session,
+                [catalog_id],
+                [(movement_by_position[pos_id], unit_id) for pos_id, unit_id, _ in unit_rows],
+            )
+            units_by_position: Dict[int, List[Tuple[float, Optional[float]]]] = {}
+            for pos_id, unit_id, unit_price in unit_rows:
+                units_by_position.setdefault(pos_id, []).append(
+                    (amounts.get((movement_by_position[pos_id], unit_id), 0.0), unit_price)
+                )
+
+            # Отримувач/відправник-особа: працівник видачі, клієнт продажу.
+            movement_ids = list({row[0].id for row in rows})
+            recipients: Dict[int, str] = {}
+            for model in (Issue, ClientIssue):
+                for movement_id, fio in session.exec(
+                    select(model.id, Worker.fio)
+                    .join(Worker, Worker.id == model.id_recipient)
+                    .where(model.id.in_(movement_ids))
+                ).all():
+                    recipients[movement_id] = fio
+            for movement_id, client_info in session.exec(
+                select(Sale.id, Sale.client_info).where(Sale.id.in_(movement_ids))
+            ).all():
+                if client_info:
+                    recipients[movement_id] = client_info
+            senders: Dict[int, str] = {}
+            for movement_id, client_info in session.exec(
+                select(SaleReturn.id, Sale.client_info)
+                .join(Sale, Sale.id == SaleReturn.id_sale)
+                .where(SaleReturn.id.in_(movement_ids))
+            ).all():
+                if client_info:
+                    senders[movement_id] = client_info
+
+            result: List[CatalogMovementLine] = []
+            for movement, pos_id, count, price, supplier_title in rows:
+                units = units_by_position.get(pos_id, [])
+                base_price = float(price or 0)
+                line_cost: Optional[float] = None
+                if movement.type == MovementsType.ADMISSION:
+                    # Та сама логіка, що `_admission_unit_lines` у states/admission.py
+                    # (ручна ціна одиниці — абсолютна; подільний з фікс. ємністю —
+                    # пропорційно), але по обсягу НА МОМЕНТ постачання.
+                    if not units:
+                        line_cost = int(count or 0) * base_price
+                    else:
+                        line_cost = 0.0
+                        for amount, unit_price in units:
+                            if unit_price is not None:
+                                line_cost += unit_price
+                            elif fixed_divisible:
+                                line_cost += base_price * amount / capacity
+                            else:
+                                line_cost += base_price
+                    line_cost = round(line_cost, 2)
+                result.append(
+                    CatalogMovementLine(
+                        movement=movement,
+                        units=int(count or 0),
+                        amount=sum(amount for amount, _ in units),
+                        price=base_price,
+                        line_cost=line_cost,
+                        supplier_title=supplier_title,
+                        recipient=recipients.get(movement.id),
+                        sender=senders.get(movement.id),
+                    )
+                )
+            session.expunge_all()
             return total_pages, result
 
     @classmethod

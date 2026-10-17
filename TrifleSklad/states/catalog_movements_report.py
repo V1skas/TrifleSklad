@@ -1,3 +1,5 @@
+import csv
+import io
 from typing import List, Optional, Tuple
 
 import reflex as rx
@@ -5,9 +7,17 @@ import reflex as rx
 from TrifleSklad import routes
 from TrifleSklad.actions import Action
 from TrifleSklad.dao_legacy import MovementDAO, OwnerDAO, ProductCategoryDAO, StorageDAO
-from TrifleSklad.declared import MovementsType, movements_status_list, movements_type_list
+from TrifleSklad.declared import (
+    MovementsType,
+    format_amount,
+    format_transferred_qty,
+    movements_status_list,
+    movements_type_list,
+)
 from TrifleSklad.movement.list_mixin import SCROLL_TOP_SCRIPT
+from TrifleSklad.services.product_catalog import ProductCatalogService
 from TrifleSklad.states.app import AppState
+from TrifleSklad.utils.clock import now_local
 
 ALL = "all"
 
@@ -47,8 +57,8 @@ def _receiver_label(movement) -> str:
 class CatalogMovementsReportState(AppState):
     in_progress: bool = True
 
-    # (catalog_id, title, unit, category_title, movement_count)
-    rows: List[Tuple[int, str, str, str, int]] = []
+    # (catalog_id, title, category_title, unit_display, delivered, issued, sold, returned, written_off, last_price, movement_count)
+    rows: List[Tuple[int, str, str, str, str, str, str, str, str, str, str]] = []
 
     # Кеші опцій фільтрів.
     list_categories: List[Tuple[str, str]] = []
@@ -78,8 +88,16 @@ class CatalogMovementsReportState(AppState):
     is_movements_open: bool = False
     selected_title: str = ""
     selected_catalog_id: int = -1
-    # (id, тип, дата, відправник, отримувач, кількість, статус, view_url)
-    movement_rows: List[Tuple[str, str, str, str, str, str, str, str]] = []
+    # Статистика обраної позиції для діалогу:
+    dialog_unit: str = ""
+    dialog_delivered: str = ""
+    dialog_issued: str = ""
+    dialog_sold: str = ""
+    dialog_returned: str = ""
+    dialog_written_off: str = ""
+    dialog_price_history: str = ""
+    # (id, тип, дата, відправник, отримувач, кількість, вартість_од, статус, view_url)
+    movement_rows: List[Tuple[str, str, str, str, str, str, str, str, str]] = []
 
     # Пагінація діалогу (окрема від пагінації головної таблиці).
     _dialog_current_page: int = 1
@@ -107,7 +125,7 @@ class CatalogMovementsReportState(AppState):
             category_id=int(self.filter_category) if self.filter_category else None,
             search=self.search_text or None,
         )
-        self._all_pages, self.rows = MovementDAO.get_catalog_movement_summary_paginated(
+        self._all_pages, catalog_rows = MovementDAO.get_catalog_movement_summary_paginated(
             page=self._current_page,
             limit=self._limit,
             count_items=count_items,
@@ -121,6 +139,71 @@ class CatalogMovementsReportState(AppState):
             category_id=int(self.filter_category) if self.filter_category else None,
             search=self.search_text or None,
         )
+
+        catalog_ids = [r[0] for r in catalog_rows]
+        stats = MovementDAO.get_catalog_movement_stats(
+            catalog_ids,
+            date_from=self.date_from,
+            date_to=self.date_to,
+            incoming_storage=self.filter_incoming_storage or None,
+            destination_storage=self.filter_destination_storage or None,
+            incoming_owner=self.filter_incoming_owner or None,
+            destination_owner=self.filter_destination_owner or None,
+        )
+        prices = MovementDAO.get_catalog_admission_prices(catalog_ids)
+
+        def _fmt_stat(units: int, amount: float, divisible: bool) -> str:
+            if divisible:
+                return format_amount(amount)
+            return str(units)
+
+        rows: List[Tuple[int, str, str, str, str, str, str, str, str, str, str]] = []
+        for cat_id, title, unit, category_title, movement_count, divisible, uniq in catalog_rows:
+            unit_display = unit if divisible else "од."
+            cat_stat = stats.get(cat_id, {})
+
+            # Поставлено
+            adm_u, adm_a = cat_stat.get(MovementsType.ADMISSION, (0, 0.0))
+            adm_str = _fmt_stat(adm_u, adm_a, divisible)
+
+            # Видано (ISSUE + CLIENT_ISSUE)
+            iss_u1, iss_a1 = cat_stat.get(MovementsType.ISSUE, (0, 0.0))
+            iss_u2, iss_a2 = cat_stat.get(MovementsType.CLIENT_ISSUE, (0, 0.0))
+            iss_str = _fmt_stat(iss_u1 + iss_u2, iss_a1 + iss_a2, divisible)
+
+            # Продано (SALE)
+            sale_u, sale_a = cat_stat.get(MovementsType.SALE, (0, 0.0))
+            sale_str = _fmt_stat(sale_u, sale_a, divisible)
+
+            # Повернуто (RETURN + SALE_RETURN)
+            ret_u1, ret_a1 = cat_stat.get(MovementsType.RETURN, (0, 0.0))
+            ret_u2, ret_a2 = cat_stat.get(MovementsType.SALE_RETURN, (0, 0.0))
+            ret_str = _fmt_stat(ret_u1 + ret_u2, ret_a1 + ret_a2, divisible)
+
+            # Списано (WRITE_OFF)
+            wo_u, wo_a = cat_stat.get(MovementsType.WRITE_OFF, (0, 0.0))
+            wo_str = _fmt_stat(wo_u, wo_a, divisible)
+
+            # Остання вартість
+            price_list = prices.get(cat_id, [])
+            last_price_str = f"{price_list[0][0]:.2f}" if price_list else "—"
+
+            rows.append(
+                (
+                    cat_id,
+                    title,
+                    category_title,
+                    unit_display,
+                    adm_str,
+                    iss_str,
+                    sale_str,
+                    ret_str,
+                    wo_str,
+                    last_price_str,
+                    str(movement_count),
+                )
+            )
+        self.rows = rows
 
     # --- computed vars ---
 
@@ -208,6 +291,13 @@ class CatalogMovementsReportState(AppState):
             self.movement_rows = []
             self.selected_title = ""
             self.selected_catalog_id = -1
+            self.dialog_unit = ""
+            self.dialog_delivered = ""
+            self.dialog_issued = ""
+            self.dialog_sold = ""
+            self.dialog_returned = ""
+            self.dialog_written_off = ""
+            self.dialog_price_history = ""
 
         self._reload()
 
@@ -321,6 +411,74 @@ class CatalogMovementsReportState(AppState):
     def _load_movements(self, catalog_id: int, title: str) -> None:
         self.selected_catalog_id = catalog_id
         self.selected_title = title
+
+        catalog = ProductCatalogService().get_by_id(catalog_id, with_del=True)
+        unit = catalog.unit if catalog else ""
+        divisible = catalog.divisible if catalog else False
+        uniq = catalog.uniq if catalog else False
+        capacity = catalog.capacity if catalog else 0.0
+        no_fixed = catalog.no_fixed_capacity if catalog else False
+
+        self.dialog_unit = unit or "од."
+
+        # Завантажуємо статистику для діалогу
+        stats_dict = MovementDAO.get_catalog_movement_stats(
+            [catalog_id],
+            date_from=self.date_from,
+            date_to=self.date_to,
+            incoming_storage=self.filter_incoming_storage or None,
+            destination_storage=self.filter_destination_storage or None,
+            incoming_owner=self.filter_incoming_owner or None,
+            destination_owner=self.filter_destination_owner or None,
+        )
+        cat_stats = stats_dict.get(catalog_id, {})
+
+        def _fmt_dlg_stat(units: int, amount: float) -> str:
+            if uniq:
+                return f"{units} од."
+            if divisible:
+                return f"{units} од. ({format_amount(amount)} {unit})"
+            if unit and unit != "од.":
+                return f"{units} од. ({units} {unit})"
+            return f"{units} од."
+
+        # Поставлено
+        adm_u, adm_a = cat_stats.get(MovementsType.ADMISSION, (0, 0.0))
+        self.dialog_delivered = _fmt_dlg_stat(adm_u, adm_a)
+
+        # Видано (ISSUE + CLIENT_ISSUE)
+        iss_u1, iss_a1 = cat_stats.get(MovementsType.ISSUE, (0, 0.0))
+        iss_u2, iss_a2 = cat_stats.get(MovementsType.CLIENT_ISSUE, (0, 0.0))
+        self.dialog_issued = _fmt_dlg_stat(iss_u1 + iss_u2, iss_a1 + iss_a2)
+
+        # Продано (SALE)
+        sale_u, sale_a = cat_stats.get(MovementsType.SALE, (0, 0.0))
+        self.dialog_sold = _fmt_dlg_stat(sale_u, sale_a)
+
+        # Повернуто (RETURN + SALE_RETURN)
+        ret_u1, ret_a1 = cat_stats.get(MovementsType.RETURN, (0, 0.0))
+        ret_u2, ret_a2 = cat_stats.get(MovementsType.SALE_RETURN, (0, 0.0))
+        self.dialog_returned = _fmt_dlg_stat(ret_u1 + ret_u2, ret_a1 + ret_a2)
+
+        # Списано (WRITE_OFF)
+        wo_u, wo_a = cat_stats.get(MovementsType.WRITE_OFF, (0, 0.0))
+        self.dialog_written_off = _fmt_dlg_stat(wo_u, wo_a)
+
+        # Динаміка цін постачання (останні три різні ціни)
+        prices_dict = MovementDAO.get_catalog_admission_prices([catalog_id])
+        prices_list = prices_dict.get(catalog_id, [])
+        distinct_prices: List[float] = []
+        for p, _ in prices_list:
+            p_round = round(p, 2)
+            if p_round not in distinct_prices:
+                distinct_prices.append(p_round)
+                if len(distinct_prices) == 3:
+                    break
+        if distinct_prices:
+            self.dialog_price_history = " → ".join(f"{p:.2f} грн" for p in reversed(distinct_prices))
+        else:
+            self.dialog_price_history = "—"
+
         count_items = MovementDAO.get_movements_by_catalog_count(
             catalog_id,
             date_from=self.date_from,
@@ -331,7 +489,7 @@ class CatalogMovementsReportState(AppState):
             destination_owner=self.filter_destination_owner or None,
             exclude_canceled=self.exclude_canceled,
         )
-        self._dialog_all_pages, movements = MovementDAO.get_movements_by_catalog(
+        self._dialog_all_pages, lines = MovementDAO.get_movements_by_catalog(
             catalog_id,
             page=self._dialog_current_page,
             limit=self._dialog_limit,
@@ -344,24 +502,37 @@ class CatalogMovementsReportState(AppState):
             destination_owner=self.filter_destination_owner or None,
             exclude_canceled=self.exclude_canceled,
         )
-        rows: List[Tuple[str, str, str, str, str, str, str, str]] = []
-        for movement, count, supplier_title in movements:
-            type_title = movements_type_list.get(movement.type, "—")
+
+        rows: List[Tuple[str, str, str, str, str, str, str, str, str]] = []
+        for line in lines:
+            m = line.movement
+            type_title = movements_type_list.get(m.type, "—")
             status_title = (
-                movements_status_list[movement.status]
-                if 0 <= movement.status < len(movements_status_list)
+                movements_status_list[m.status]
+                if 0 <= m.status < len(movements_status_list)
+                else "—"
+            )
+            qty_label = (
+                format_transferred_qty(line.amount, line.units, divisible, capacity, no_fixed)
+                if (divisible and not no_fixed and capacity > 0)
+                else (format_amount(line.amount) if divisible else str(line.units))
+            )
+            unit_price_label = (
+                f"{line.price:.2f}"
+                if m.type == MovementsType.ADMISSION
                 else "—"
             )
             rows.append(
                 (
-                    str(movement.id),
+                    str(m.id),
                     type_title,
-                    movement.date,
-                    _sender_label(movement, supplier_title),
-                    _receiver_label(movement),
-                    str(count),
+                    m.date,
+                    _sender_label(m, line.supplier_title),
+                    _receiver_label(m),
+                    qty_label,
+                    unit_price_label,
                     status_title,
-                    routes.movement_view_url(movement.type, movement.id),
+                    routes.movement_view_url(m.type, m.id),
                 )
             )
         self.movement_rows = rows
@@ -379,6 +550,13 @@ class CatalogMovementsReportState(AppState):
             self.movement_rows = []
             self.selected_title = ""
             self.selected_catalog_id = -1
+            self.dialog_unit = ""
+            self.dialog_delivered = ""
+            self.dialog_issued = ""
+            self.dialog_sold = ""
+            self.dialog_returned = ""
+            self.dialog_written_off = ""
+            self.dialog_price_history = ""
             self._dialog_current_page = 1
             self._dialog_all_pages = 1
 
@@ -399,3 +577,103 @@ class CatalogMovementsReportState(AppState):
         if value != "" and 0 < int(value) <= self._dialog_all_pages:
             self._dialog_current_page = int(value)
             self._load_movements(self.selected_catalog_id, self.selected_title)
+
+    @rx.event
+    def export_csv(self):
+        if self.selected_catalog_id == -1:
+            return
+        catalog = ProductCatalogService().get_by_id(self.selected_catalog_id, with_del=True)
+        divisible = catalog.divisible if catalog else False
+
+        _, lines = MovementDAO.get_movements_by_catalog(
+            self.selected_catalog_id,
+            page=1,
+            limit=None,
+            date_from=self.date_from,
+            date_to=self.date_to,
+            incoming_storage=self.filter_incoming_storage or None,
+            destination_storage=self.filter_destination_storage or None,
+            incoming_owner=self.filter_incoming_owner or None,
+            destination_owner=self.filter_destination_owner or None,
+            exclude_canceled=self.exclude_canceled,
+        )
+
+        output = io.StringIO()
+        # UTF-8 BOM для коректного відкриття кирилиці в MS Excel
+        output.write("\ufeff")
+        writer = csv.writer(output, delimiter=";")
+        writer.writerow([
+            "Дата",
+            "Тип руху",
+            "Місце відправлення",
+            "Відправник",
+            "Місце отримання",
+            "Отримувач",
+            "Кількість",
+            "Вартість одиниці",
+            "Загальна вартість у постачанні",
+        ])
+
+        for line in lines:
+            m = line.movement
+            m_type = movements_type_list.get(m.type, "—")
+
+            src_storage = m.incoming_storage.title if m.incoming_storage else "—"
+            if m.type == MovementsType.ADMISSION:
+                sender = line.supplier_title or "—"
+            elif m.type == MovementsType.SALE_RETURN:
+                sender = line.sender or "Клієнт"
+            else:
+                sender = m.incoming_owner.title if m.incoming_owner else "—"
+
+            if m.destination_storage:
+                dst_storage = m.destination_storage.title
+            elif m.type == MovementsType.WRITE_OFF:
+                dst_storage = "Списано"
+            else:
+                dst_storage = "—"
+
+            if line.recipient:
+                receiver = line.recipient
+            elif m.type == MovementsType.SALE:
+                receiver = "Клієнт"
+            elif m.type == MovementsType.WRITE_OFF:
+                receiver = "Списано"
+            else:
+                receiver = m.destination_owner.title if m.destination_owner else "—"
+
+            qty_str = (
+                format_amount(line.amount)
+                if divisible
+                else str(line.units)
+            )
+
+            is_admission = (m.type == MovementsType.ADMISSION)
+            unit_price_str = f"{line.price:.2f}" if is_admission else "—"
+            line_cost_str = (
+                f"{line.line_cost:.2f}"
+                if (is_admission and line.line_cost is not None)
+                else "—"
+            )
+
+            writer.writerow([
+                m.date,
+                m_type,
+                src_storage,
+                sender,
+                dst_storage,
+                receiver,
+                qty_str,
+                unit_price_str,
+                line_cost_str,
+            ])
+
+        csv_text = output.getvalue()
+        file_title = self.selected_title.replace(" ", "_").replace("/", "_")
+        filename = f"movements_{file_title}_{now_local().strftime('%Y%m%d_%H%M%S')}.csv"
+        return rx.download(
+            data=csv_text,
+            filename=filename,
+            mime_type="text/csv",
+        )
+
